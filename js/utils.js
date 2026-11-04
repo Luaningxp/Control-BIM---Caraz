@@ -35,6 +35,26 @@ export const isCerrado = (t) => t.estado === 'Cerrado';
 
 export const daysToDeadline = (t) => !t.fecha_fin ? null : Math.round((new Date(t.fecha_fin + 'T00:00:00') - today()) / DAY);
 
+// --- LÓGICA DE EISENHOWER ---
+export const isUrgente = (t) => {
+    if (isCerrado(t) || !t.fecha_fin) return false;
+    return daysToDeadline(t) <= 7; // Vence en 7 días o ya venció
+};
+
+export const isImportante = (t) => {
+    return t.importancia === 'Muy alto' || t.importancia === 'Alto';
+};
+
+// Cálculo automático de criticidad para la tabla
+export const getCriticidad = (t) => {
+    const urg = isUrgente(t);
+    const imp = isImportante(t);
+    if (urg && imp) return 'Muy alto'; // Hacer ya
+    if (!urg && imp) return 'Alto';    // Programar
+    if (urg && !imp) return 'Medio';   // Delegar
+    return 'Bajo';                     // Eliminar / Posponer
+};
+
 export const semaforo = (t) => {
     if (isCerrado(t)) return 'Cerrado';
     if (!t.fecha_fin) return 'Sin fecha';
@@ -52,7 +72,6 @@ export const nombreResponsable = (t, perfiles) => {
     return t.responsable || 'Sin asignar';
 };
 
-// ESTA ES LA FUNCIÓN QUE FALTABA:
 export const critColor = (c) => {
     return c === 'Muy alto' ? 'text-red-600' :
            c === 'Alto' ? 'text-orange-600' :
