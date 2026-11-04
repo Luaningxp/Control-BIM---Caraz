@@ -1,8 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; color: #1e293b; }
-.inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.45rem 0.65rem; font-size: 0.875rem; background: #fff; transition: all 0.2s; }
-.inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
+.inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.375rem; padding: 0.35rem 0.5rem; font-size: 0.75rem; background: #fff; transition: all 0.2s; }
+.inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15); }
 .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; text-align: left; padding: 0.6rem 0.8rem; background: #f1f5f9; }
 td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; vertical-align: top; }
@@ -20,53 +20,68 @@ td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem;
 .kpi-card:hover { transform: translateY(-2px); }
 .chart-box { position: relative; height: 280px; }
 
-/* ==== LOGIN ULTRA COMPACTO ==== */
-.login-page {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    background-image: url('../assets/fondo.jpeg');
-    background-size: cover; background-position: center;
-    z-index: 50; padding: 1rem;
-}
-.login-page::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(2,132,199,0.6));
-    backdrop-filter: blur(5px); z-index: -1;
+/* ==== LOGIN RECTANGULAR Y COMPACTO ==== */
+.login-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: #0f172a;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .login-box {
-    background: #fff; width: 100%; max-width: 360px;
-    border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-    overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+    background: #ffffff;
+    width: 100%;
+    max-width: 340px; /* Rectángulo central */
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
 }
 
 .login-header {
-    background: #f8fafc; padding: 1.5rem 1.5rem 1rem;
-    text-align: center; border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 1.25rem 1.25rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .login-logos {
-    display: flex; align-items: center; justify-content: center;
-    gap: 1rem; margin-bottom: 1rem; height: 32px; /* Forzar altura del contenedor */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    height: 28px; /* Altura estricta */
 }
 
 .login-logos img {
-    height: 32px !important; /* Forzar tamaño pequeño */
+    height: 28px !important;
     width: auto !important;
-    max-width: 90px !important;
+    max-width: 80px !important;
     object-fit: contain;
 }
 
 .login-logos .separator {
-    width: 1px; height: 24px; background: #cbd5e1;
+    width: 1px;
+    height: 20px;
+    background: #cbd5e1;
 }
 
 .login-body {
-    padding: 1.5rem;
+    padding: 1.25rem;
 }
 
 .login-error {
-    background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
-    padding: 0.5rem; border-radius: 0.5rem; font-size: 0.75rem;
-    text-align: center; margin-bottom: 1rem; display: none;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    padding: 0.35rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    display: none;
 }
