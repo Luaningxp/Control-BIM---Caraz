@@ -1,10 +1,9 @@
 import { state } from './db.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad } from './utils.js';
 
 export function renderDashboard(container) {
     const k = calcularKPIs();
     
-    // Render KPIs
     const KPI = [
         { label: 'PPC (28 días)', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} en plazo`, color: 'teal', icon: 'fa-chart-line' },
         { label: 'Total', value: k.total, sub: 'contenedores', color: 'sky', icon: 'fa-cubes' },
@@ -50,7 +49,7 @@ export function renderDashboard(container) {
                 <div class="chart-box"><canvas id="chart-resp"></canvas></div>
             </div>
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Criticidad vs Estado operativo</h4>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Matriz Eisenhower (Criticidad vs Estado)</h4>
                 <div class="chart-box"><canvas id="chart-crit"></canvas></div>
             </div>
         </div>
@@ -81,7 +80,6 @@ function calcularKPIs() {
     const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
     const sinFecha = abiertas.filter(t => !t.fecha_fin);
     
-    // PPC
     const ref = today();
     const inicio = new Date(ref.getTime() - 28 * DAY);
     const cerradas = state.tasksCache.filter(t => t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') >= inicio);
@@ -96,7 +94,6 @@ function calcularKPIs() {
 }
 
 function renderCharts() {
-    // PPC Chart
     const labels = [], data = [];
     for (let i = 7; i >= 0; i--) {
         const ref = today();
@@ -113,7 +110,6 @@ function renderCharts() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
     });
 
-    // CDE Chart
     const counts = ['WIP', 'Shared', 'Published', 'Archived'].map(e => state.tasksCache.filter(t => (t.estado_cde || 'WIP') === e).length);
     if (state.charts.cde) state.charts.cde.destroy();
     state.charts.cde = new Chart(document.getElementById('chart-cde'), {
@@ -121,7 +117,6 @@ function renderCharts() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
     });
 
-    // Resp Chart
     const map = {};
     state.tasksCache.forEach(t => {
         const r = t.responsable || 'Sin asignar';
@@ -135,13 +130,15 @@ function renderCharts() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
     });
 
-    // Crit Chart
     const CRIT = ['Muy alto', 'Alto', 'Medio', 'Bajo'];
     const EST = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
     const colors = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
+    
+    // Usar getCriticidad(t) para los gráficos
     const datasets = EST.map((e, i) => ({
-        label: e, data: CRIT.map(c => state.tasksCache.filter(t => t.criticidad === c && t.estado === e).length), backgroundColor: colors[i]
+        label: e, data: CRIT.map(c => state.tasksCache.filter(t => getCriticidad(t) === c && t.estado === e).length), backgroundColor: colors[i]
     }));
+    
     if (state.charts.crit) state.charts.crit.destroy();
     state.charts.crit = new Chart(document.getElementById('chart-crit'), {
         type: 'bar', data: { labels: CRIT, datasets },
@@ -160,7 +157,7 @@ function renderPerfTable() {
         } else {
             map[r].a++;
             if (semaforo(t) === 'Vencida') map[r].v++;
-            map[r].carga += WEIGHT[t.criticidad] || 1;
+            map[r].carga += WEIGHT[getCriticidad(t)] || 1; // Usar criticidad calculada
         }
     });
     document.getElementById('perf-table').innerHTML = Object.keys(map).sort().map(r => {
