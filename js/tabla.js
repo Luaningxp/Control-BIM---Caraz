@@ -102,4 +102,127 @@ function renderCustomProps(pendienteId) {
         let valor = '';
         if (pendienteId) {
             const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
-            if (pv) valor = pd.tipo === 'numero' ? pv.valor_numero : pd.tipo === 'fecha' ? p
+            if (pv) valor = pd.tipo === 'numero' ? pv.valor_numero : pd.tipo === 'fecha' ? pv.valor_fecha : pd.tipo === 'booleano' ? pv.valor_booleano : pv.valor_texto;
+        }
+
+        let inputHtml = '';
+        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${valor || ''}">`;
+        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor || ''}">`;
+        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor || ''}">`;
+        else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
+        else if (pd.tipo === 'seleccion') {
+            const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
+            inputHtml = `<select class="inp custom-prop-input" data-pid="${pd.id}" data-type="seleccion"><option value="">— Seleccionar —</option>${opts}</select>`;
+        }
+
+        return `
+            <div>
+                <label class="block font-semibold text-slate-600 mb-1">${escapeHtml(pd.nombre)} ${pd.requerido ? '<span class="text-red-500">*</span>' : ''}</label>
+                ${inputHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+export function closeModal() {
+    document.getElementById('modal-task').classList.add('hidden');
+    document.getElementById('modal-task').classList.remove('flex');
+}
+
+export async function saveTask(e) {
+    e.preventDefault();
+    const id = document.getElementById('task-id').value;
+    const respId = document.getElementById('task-responsable').value || null;
+    const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
+    const payload = {
+        actividad: document.getElementById('task-actividad').value,
+        grupo: document.getElementById('task-grupo').value || null,
+        responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
+        responsable_id: respId,
+        criticidad: document.getElementById('task-criticidad').value,
+        estado: document.getElementById('task-estado').value,
+        fecha_fin: document.getElementById('task-fecha-fin').value || null,
+        fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
+        nota: document.getElementById('task-nota').value
+    };
+
+    let taskId = id;
+    if (id) {
+        const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
+        if (error) { toast('Error: ' + error.message); return; }
+    } else {
+        payload.estado_cde = 'WIP'; payload.codigo_aptitud = 'S0'; payload.user_id = state.currentUser.id;
+        const { data, error } = await supabaseClient.from('pendientes_bim').insert([payload]).select();
+        if (error) { toast('Error: ' + error.message); return; }
+        taskId = data[0].id;
+    }
+
+    // Guardar propiedades personalizadas
+    const propInputs = document.querySelectorAll('.custom-prop-input');
+    for (const input of propInputs) {
+        const pid = parseInt(input.dataset.pid);
+        const type = input.dataset.type;
+        let val = input.type === 'checkbox' ? input.checked : input.value;
+        if (val === '' || val === false) val = null;
+
+        // Buscar si ya existe
+        const existente = state.propValsCache.find(v => v.pendiente_id === parseInt(taskId) && v.propiedad_id === pid);
+        
+        const propPayload = { pendiente_id: parseInt(taskId), propiedad_id: pid, valor_texto: null, valor_numero: null, valor_fecha: null, valor_booleano: null };
+        if (val !== null) {
+            if (type === 'texto' || type === 'seleccion') propPayload.valor_texto = val;
+            else if (type === 'numero') propPayload.valor_numero = parseFloat(val);
+            else if (type === 'fecha') propPayload.valor_fecha = val;
+            else if (type === 'booleano') propPayload.valor_booleano = val;
+        }
+
+        if (existente) {
+            await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
+        } else if (val !== null) {
+            await supabaseClient.from('propiedades_valores').insert([propPayload]);
+        }
+    }
+
+    closeModal();
+    await fetchAll();
+    window.renderView();
+    toast('Guardado');
+}
+
+export async function deleteTask(id) {
+    if (!canDelete()) return;
+    if (!confirm("¿Eliminar este contenedor?")) return;
+    const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
+    if (error) { toast('Error: ' + error.message); return; }
+    await fetchAll(); window.renderView();
+}
+
+export function openModalCDE(id) {
+    if (!canTransition()) return;
+    state.cdeTargetId = id;
+    document.getElementById('cde-current').innerText = `Contenedor #${id}`;
+    document.getElementById('cde-estado').value = 'Shared';
+    document.getElementById('cde-aptitud').value = 'S1';
+    document.getElementById('cde-comentario').value = '';
+    document.getElementById('modal-cde').classList.remove('hidden');
+    document.getElementById('modal-cde').classList.add('flex');
+}
+
+export function closeModalCDE() {
+    document.getElementById('modal-cde').classList.add('hidden');
+    document.getElementById('modal-cde').classList.remove('flex');
+    state.cdeTargetId = null;
+}
+
+export async function confirmarTransicion() {
+    if (!state.cdeTargetId) return;
+    const estado = document.getElementById('cde-estado').value;
+    const aptitud = document.getElementById('cde-aptitud').value || null;
+    const comentario = document.getElementById('cde-comentario').value || null;
+    const { data, error } = await supabaseClient.rpc('transicionar_cde', {
+        p_pendiente_id: state.cdeTargetId, p_estado_nuevo: estado, p_aptitud_nueva: aptitud, p_comentario: comentario
+    });
+    if (error) { toast('Error RPC: ' + error.message); return; }
+    if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
+    closeModalCDE(); await fetchAll(); window.renderView(); toast('Transición aplicada');
+}
