@@ -8,6 +8,11 @@ export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador; }
 
 export function renderTabla(container) {
+    // 1. Generar los encabezados dinámicos para las propiedades personalizadas
+    const propHeaders = state.propDefsCache.map(pd => 
+        `<th class="p-3">${escapeHtml(pd.nombre)}</th>`
+    ).join('');
+
     container.innerHTML = `
         <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <h3 class="font-bold text-sm text-slate-800">Base de Contenedores</h3>
@@ -17,27 +22,52 @@ export function renderTabla(container) {
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                     <tr>
-                        <th class="p-3">Código</th><th class="p-3">Actividad</th><th class="p-3">Grupo</th><th class="p-3">Responsable</th>
-                        <th class="p-3">Crit.</th><th class="p-3">Estado</th><th class="p-3">CDE ISO</th><th class="p-3 text-center">Acciones</th>
+                        <th class="p-3">Código</th>
+                        <th class="p-3">Actividad</th>
+                        <th class="p-3">Grupo</th>
+                        <th class="p-3">Responsable</th>
+                        <th class="p-3">Crit.</th>
+                        <th class="p-3">Estado</th>
+                        <th class="p-3">CDE ISO</th>
+                        ${propHeaders} <!-- Aquí se inyectan las columnas personalizadas -->
+                        <th class="p-3 text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="task-list" class="divide-y divide-slate-100">
-                    ${state.tasksCache.map(t => `
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>
-                            <td class="p-3 font-medium text-slate-900 max-w-xs">${escapeHtml(t.actividad)}</td>
-                            <td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>
-                            <td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>
-                            <td class="p-3 font-semibold text-slate-700">${escapeHtml(t.criticidad)}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>
-                            <td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>
-                            <td class="p-3 text-center whitespace-nowrap">
-                                ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2"><i class="fa-solid fa-pen"></i></button>` : ''}
-                                ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
-                                ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>` : ''}
-                            </td>
-                        </tr>
-                    `).join('')}
+                    ${state.tasksCache.map(t => {
+                        // 2. Buscar los valores personalizados de esta tarea específica
+                        const propCells = state.propDefsCache.map(pd => {
+                            const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
+                            let displayVal = '-';
+                            
+                            if (pv) {
+                                if (pd.tipo === 'numero') displayVal = pv.valor_numero ?? '-';
+                                else if (pd.tipo === 'fecha') displayVal = pv.valor_fecha ? fmtDate(pv.valor_fecha) : '-';
+                                else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? 'Sí' : 'No';
+                                else displayVal = pv.valor_texto || '-';
+                            }
+                            
+                            return `<td class="p-3 text-slate-600">${escapeHtml(displayVal)}</td>`;
+                        }).join('');
+
+                        return `
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>
+                                <td class="p-3 font-medium text-slate-900 max-w-xs">${escapeHtml(t.actividad)}</td>
+                                <td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>
+                                <td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>
+                                <td class="p-3 font-semibold text-slate-700">${escapeHtml(t.criticidad)}</td>
+                                <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>
+                                <td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>
+                                ${propCells} <!-- Aquí se inyectan los valores -->
+                                <td class="p-3 text-center whitespace-nowrap">
+                                    ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2"><i class="fa-solid fa-pen"></i></button>` : ''}
+                                    ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
+                                    ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>` : ''}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -62,7 +92,6 @@ export function openModal() {
     document.getElementById('modal-task').classList.add('flex');
 }
 
-// AHORA RECIBE EL ID EN LUGAR DEL OBJETO COMPLETO
 export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
@@ -90,12 +119,10 @@ export function editTask(id) {
     document.getElementById('modal-task').classList.add('flex');
 }
 
-// ESTA FUNCIÓN ES LA QUE DIBUJA LOS INPUTS DINÁMICOS
 function renderCustomProps(pendienteId) {
     const container = document.getElementById('custom-props-container');
     const inputs = document.getElementById('custom-props-inputs');
     
-    // Si no hay parámetros creados en Configuración, ocultar la sección
     if (state.propDefsCache.length === 0) {
         container.classList.add('hidden');
         return;
@@ -104,7 +131,6 @@ function renderCustomProps(pendienteId) {
 
     inputs.innerHTML = state.propDefsCache.map(pd => {
         let valor = '';
-        // Buscar si esta tarea ya tiene un valor guardado para este parámetro
         if (pendienteId) {
             const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
             if (pv) {
@@ -167,7 +193,6 @@ export async function saveTask(e) {
         taskId = data[0].id;
     }
 
-    // Guardar parámetros personalizados
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid);
