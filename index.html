@@ -6,6 +6,7 @@
     <title>Control BIM · Hospital Caraz II-1 · ISO 19650</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -17,16 +18,17 @@
         td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; vertical-align: top; }
         .badge-cde { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; }
         .tab-active { border-color: #0284c7 !important; color: #0284c7 !important; }
-        /* Kanban */
         .kb-col { background: #f1f5f9; border-radius: 0.75rem; min-height: 200px; display: flex; flex-direction: column; }
         .kb-col.drag-over { background: #e0f2fe; outline: 2px dashed #0284c7; outline-offset: -4px; }
         .kb-card { cursor: grab; user-select: none; transition: transform .12s ease, box-shadow .12s ease; }
         .kb-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-1px); }
         .kb-card.dragging { opacity: .45; cursor: grabbing; transform: rotate(1.5deg) scale(.98); }
         .kb-body { overflow-y: auto; padding: 0 .5rem .5rem .5rem; flex: 1; }
-        /* Eisenhower */
         .eis-q { border-radius: 0.75rem; padding: .75rem; border-width: 1px; }
         .eis-body { max-height: 52vh; overflow-y: auto; }
+        .kpi-card { transition: transform .15s ease; }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .chart-box { position: relative; height: 280px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -79,9 +81,9 @@
             </div>
         </header>
 
-        <!-- TABS -->
         <nav class="bg-white border-b border-slate-200 sticky top-16 z-20">
             <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+                <button data-tab="dashboard" onclick="switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
                 <button data-tab="tabla" onclick="switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
                 <button data-tab="kanban" onclick="switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
                 <button data-tab="eisenhower" onclick="switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
@@ -90,8 +92,70 @@
 
         <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
 
+            <!-- DASHBOARD -->
+            <section id="view-dashboard" class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-800">Dashboard de métricas · ISO 19650</h3>
+                        <p class="text-[11px] text-slate-500">PPC, cumplimiento, avance CDE y desempeño por responsable.</p>
+                    </div>
+                    <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
+                    </button>
+                </div>
+
+                <!-- KPIs -->
+                <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+
+                <!-- Charts fila 1 -->
+                <div class="grid lg:grid-cols-3 gap-3">
+                    <div class="card p-4 lg:col-span-2">
+                        <h4 class="font-semibold text-sm text-slate-800 mb-2">PPC semanal (últimas 8 semanas)</h4>
+                        <div class="chart-box"><canvas id="chart-ppc"></canvas></div>
+                    </div>
+                    <div class="card p-4">
+                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Distribución por estado CDE</h4>
+                        <div class="chart-box"><canvas id="chart-cde"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Charts fila 2 -->
+                <div class="grid lg:grid-cols-2 gap-3">
+                    <div class="card p-4">
+                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Abiertas vs Vencidas por responsable</h4>
+                        <div class="chart-box"><canvas id="chart-resp"></canvas></div>
+                    </div>
+                    <div class="card p-4">
+                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Criticidad vs Estado operativo</h4>
+                        <div class="chart-box"><canvas id="chart-crit"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Tabla desempeño -->
+                <div class="card overflow-x-auto">
+                    <div class="p-4 pb-2">
+                        <h4 class="font-semibold text-sm text-slate-800">Desempeño por responsable</h4>
+                        <p class="text-[11px] text-slate-500">PPC = cerradas en fecha / cerradas totales. Carga ponderada = suma de peso por criticidad en abiertas.</p>
+                    </div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <tr>
+                                <th class="p-3">Responsable</th>
+                                <th class="p-3">Abiertas</th>
+                                <th class="p-3">Vencidas</th>
+                                <th class="p-3">% Venc.</th>
+                                <th class="p-3">Cerradas</th>
+                                <th class="p-3">PPC</th>
+                                <th class="p-3">Carga pond.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="perf-table" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- TABLA -->
-            <section id="view-tabla">
+            <section id="view-tabla" class="hidden">
                 <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
                     <div>
                         <h3 class="font-bold text-sm text-slate-800">Contenedores de Información (Supabase)</h3>
@@ -256,7 +320,6 @@
         </div>
     </div>
 
-    <!-- TOAST -->
     <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
 
     <script>
@@ -271,7 +334,8 @@
         let isCoordinador = false;
         let cdeTargetId = null;
         let tasksCache = [];
-        let currentTab = 'tabla';
+        let currentTab = 'dashboard';
+        let charts = {};
 
         const CDE_COLORS = {
             WIP: 'background:#f1f5f9;color:#334155;',
@@ -280,13 +344,14 @@
             Archived: 'background:#e2e8f0;color:#64748b;'
         };
         const CDE_META = {
-            WIP:       { titulo: 'WIP',       sub: 'En trabajo',       icon: 'fa-pen-ruler',     color: 'slate' },
-            Shared:    { titulo: 'Shared',    sub: 'En coordinación',  icon: 'fa-share-nodes',   color: 'amber' },
-            Published: { titulo: 'Published', sub: 'Publicado',        icon: 'fa-stamp',         color: 'teal'  },
-            Archived:  { titulo: 'Archived',  sub: 'Archivado',        icon: 'fa-box-archive',   color: 'slate' }
+            WIP:       { titulo: 'WIP',       sub: 'En trabajo',       icon: 'fa-pen-ruler',   color: 'slate' },
+            Shared:    { titulo: 'Shared',    sub: 'En coordinación',  icon: 'fa-share-nodes', color: 'amber' },
+            Published: { titulo: 'Published', sub: 'Publicado',        icon: 'fa-stamp',       color: 'teal'  },
+            Archived:  { titulo: 'Archived',  sub: 'Archivado',        icon: 'fa-box-archive', color: 'slate' }
         };
         const ESTADOS_CDE = ['WIP', 'Shared', 'Published', 'Archived'];
-        const APTITUD_DEFAULT = { WIP: 'S0', Shared: 'S3', Published: 'S4', Archived: 'A1' };
+        // ISO 19650 UK NA: S0 WIP; S1 coordinación; S2 info; S3 revisión; S4 aprobación etapa; A1/B1 autorizado; CR as-built
+        const APTITUD_DEFAULT = { WIP: 'S0', Shared: 'S1', Published: 'A1', Archived: 'A1' };
 
         const cdeBadge = (estado, aptitud) =>
             `<span class="badge-cde" style="${CDE_COLORS[estado] || ''}">${estado || 'WIP'} · ${aptitud || 'S0'}</span>`;
@@ -333,11 +398,10 @@
 
             if (isAdmin || isCoordinador) document.getElementById('btn-new-task').classList.remove('hidden');
 
-            switchTab('tabla');
+            switchTab('dashboard');
             fetchTasks();
         }
 
-        // ==== PERMISOS ====
         const canEdit = (t) => (isAdmin || isCoordinador) || (t.estado_cde === 'WIP' && t.user_id === currentUser?.id);
         const canDelete = () => isAdmin;
         const canTransition = () => isAdmin || isCoordinador;
@@ -345,7 +409,7 @@
         // ==== TABS ====
         function switchTab(tab) {
             currentTab = tab;
-            ['tabla', 'kanban', 'eisenhower'].forEach(t => {
+            ['dashboard', 'tabla', 'kanban', 'eisenhower'].forEach(t => {
                 document.getElementById('view-' + t).classList.toggle('hidden', t !== tab);
                 const btn = document.querySelector(`[data-tab="${t}"]`);
                 btn.classList.toggle('tab-active', t === tab);
@@ -354,18 +418,279 @@
         }
 
         function render() {
-            if (currentTab === 'tabla') renderTabla();
+            if (currentTab === 'dashboard') renderDashboard();
+            else if (currentTab === 'tabla') renderTabla();
             else if (currentTab === 'kanban') renderKanban();
             else if (currentTab === 'eisenhower') renderEisenhower();
         }
 
-        // ==== FETCH ====
         async function fetchTasks() {
             const { data, error } = await supabaseClient
                 .from('pendientes_bim').select('*').order('id', { ascending: false });
             if (error) { toast('Error cargando: ' + error.message); return; }
             tasksCache = data || [];
             render();
+        }
+
+        // ==== DASHBOARD ====
+        const WEIGHT = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
+        const DAY = 86400000;
+        const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+
+        function daysToDeadline(t) {
+            if (!t.fecha_fin) return null;
+            const f = new Date(t.fecha_fin + 'T00:00:00');
+            return Math.round((f - today()) / DAY);
+        }
+
+        function isCerrado(t) { return t.estado === 'Cerrado'; }
+
+        function semaforo(t) {
+            if (isCerrado(t)) {
+                if (!t.fecha_fin || !t.fecha_cierre) return 'Cerrado';
+                const f = new Date(t.fecha_fin + 'T00:00:00');
+                const k = new Date(t.fecha_cierre + 'T00:00:00');
+                return k <= f ? 'Cerrado en plazo' : 'Cerrado tardío';
+            }
+            if (!t.fecha_fin) return 'Sin fecha';
+            const d = daysToDeadline(t);
+            if (d < 0) return 'Vencida';
+            if (d <= 7) return 'Por vencer';
+            return 'En plazo';
+        }
+
+        // PPC = Planned Percent Complete = cerradas en plazo / cerradas totales en ventana
+        function calcularPPC(ventanaDias, offsetSemanas = 0) {
+            const ref = today();
+            const inicio = new Date(ref.getTime() - (ventanaDias + offsetSemanas * 7) * DAY);
+            const fin = new Date(ref.getTime() - offsetSemanas * 7 * DAY);
+
+            const cerradas = tasksCache.filter(t => {
+                if (!t.fecha_cierre) return false;
+                const k = new Date(t.fecha_cierre + 'T00:00:00');
+                return k >= inicio && k < fin;
+            });
+
+            if (!cerradas.length) return { ppc: null, total: 0, enPlazo: 0 };
+            const enPlazo = cerradas.filter(t => {
+                if (!t.fecha_fin) return false;
+                const k = new Date(t.fecha_cierre + 'T00:00:00');
+                const f = new Date(t.fecha_fin + 'T00:00:00');
+                return k <= f;
+            }).length;
+            return { ppc: Math.round((enPlazo / cerradas.length) * 100), total: cerradas.length, enPlazo };
+        }
+
+        function calcularKPIs() {
+            const total = tasksCache.length;
+            const abiertas = tasksCache.filter(t => !isCerrado(t));
+            const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida');
+            const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
+            const sinFecha = abiertas.filter(t => !t.fecha_fin);
+            const sinResp = abiertas.filter(t => !t.responsable);
+
+            const ppc = calcularPPC(28, 0); // últimos 28 días
+
+            return {
+                total,
+                abiertas: abiertas.length,
+                vencidas: vencidas.length,
+                porVencer: porVencer.length,
+                sinFecha: sinFecha.length,
+                sinResp: sinResp.length,
+                ppc: ppc.ppc,
+                ppcTotal: ppc.total,
+                ppcEnPlazo: ppc.enPlazo
+            };
+        }
+
+        function renderDashboard() {
+            const k = calcularKPIs();
+
+            const KPI = [
+                { label: 'PPC (28 días)', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} en plazo`, color: 'teal', icon: 'fa-chart-line' },
+                { label: 'Total contenedores', value: k.total, sub: 'registrados', color: 'sky', icon: 'fa-cubes' },
+                { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
+                { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
+                { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
+                { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
+            ];
+
+            document.getElementById('kpi-grid').innerHTML = KPI.map(x => `
+                <div class="card kpi-card p-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
+                        <i class="fa-solid ${x.icon} text-${x.color}-500 text-xs"></i>
+                    </div>
+                    <p class="text-2xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
+                    <p class="text-[10px] text-slate-400">${x.sub}</p>
+                </div>
+            `).join('');
+
+            renderChartPPC();
+            renderChartCDE();
+            renderChartResp();
+            renderChartCrit();
+            renderPerfTable();
+        }
+
+        function renderChartPPC() {
+            const labels = [];
+            const data = [];
+            for (let i = 7; i >= 0; i--) {
+                const ref = today();
+                const inicio = new Date(ref.getTime() - (7 + i * 7) * DAY);
+                const fin = new Date(ref.getTime() - i * 7 * DAY);
+                const cerradas = tasksCache.filter(t => {
+                    if (!t.fecha_cierre) return false;
+                    const k = new Date(t.fecha_cierre + 'T00:00:00');
+                    return k >= inicio && k < fin;
+                });
+                const enPlazo = cerradas.filter(t => t.fecha_fin && new Date(t.fecha_cierre + 'T00:00:00') <= new Date(t.fecha_fin + 'T00:00:00')).length;
+                labels.push(`S-${i}`);
+                data.push(cerradas.length ? Math.round((enPlazo / cerradas.length) * 100) : null);
+            }
+
+            const ctx = document.getElementById('chart-ppc');
+            charts.ppc?.destroy();
+            charts.ppc = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'PPC %',
+                        data,
+                        borderColor: '#0d9488',
+                        backgroundColor: 'rgba(13,148,136,.12)',
+                        fill: true,
+                        tension: .35,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#0d9488',
+                        spanGaps: true
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y !== null ? c.parsed.y + '%' : 'sin datos' } } },
+                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function renderChartCDE() {
+            const counts = ESTADOS_CDE.map(e => tasksCache.filter(t => (t.estado_cde || 'WIP') === e).length);
+            const ctx = document.getElementById('chart-cde');
+            charts.cde?.destroy();
+            charts.cde = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ESTADOS_CDE,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: ['#94a3b8', '#f59e0b', '#14b8a6', '#64748b'],
+                        borderColor: '#fff', borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+                }
+            });
+        }
+
+        function renderChartResp() {
+            const respMap = {};
+            tasksCache.forEach(t => {
+                const r = t.responsable || 'Sin asignar';
+                if (!respMap[r]) respMap[r] = { abiertas: 0, vencidas: 0 };
+                if (!isCerrado(t)) {
+                    respMap[r].abiertas++;
+                    if (semaforo(t) === 'Vencida') respMap[r].vencidas++;
+                }
+            });
+            const resp = Object.keys(respMap).sort();
+
+            const ctx = document.getElementById('chart-resp');
+            charts.resp?.destroy();
+            charts.resp = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: resp,
+                    datasets: [
+                        { label: 'Abiertas', data: resp.map(r => respMap[r].abiertas), backgroundColor: '#0284c7', borderRadius: 4 },
+                        { label: 'Vencidas', data: resp.map(r => respMap[r].vencidas), backgroundColor: '#dc2626', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function renderChartCrit() {
+            const CRIT = ['Muy alto', 'Alto', 'Medio', 'Bajo'];
+            const EST = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+            const colors = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
+            const datasets = EST.map((e, i) => ({
+                label: e,
+                data: CRIT.map(c => tasksCache.filter(t => t.criticidad === c && t.estado === e).length),
+                backgroundColor: colors[i],
+                borderRadius: 4
+            }));
+
+            const ctx = document.getElementById('chart-crit');
+            charts.crit?.destroy();
+            charts.crit = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: CRIT, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+
+        function renderPerfTable() {
+            const map = {};
+            tasksCache.forEach(t => {
+                const r = t.responsable || 'Sin asignar';
+                if (!map[r]) map[r] = { abiertas: 0, vencidas: 0, cerradas: 0, cerradasPlazo: 0, carga: 0 };
+                if (isCerrado(t)) {
+                    map[r].cerradas++;
+                    if (t.fecha_fin && t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= new Date(t.fecha_fin + 'T00:00:00')) {
+                        map[r].cerradasPlazo++;
+                    }
+                } else {
+                    map[r].abiertas++;
+                    if (semaforo(t) === 'Vencida') map[r].vencidas++;
+                    map[r].carga += WEIGHT[t.criticidad] || 1;
+                }
+            });
+
+            const rows = Object.keys(map).sort().map(r => {
+                const m = map[r];
+                const pctVenc = m.abiertas ? Math.round((m.vencidas / m.abiertas) * 100) : 0;
+                const ppc = m.cerradas ? Math.round((m.cerradasPlazo / m.cerradas) * 100) : null;
+                return { r, ...m, pctVenc, ppc };
+            });
+
+            document.getElementById('perf-table').innerHTML = rows.map(x => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3 font-semibold text-slate-800">${escapeHtml(x.r)}</td>
+                    <td class="p-3">${x.abiertas}</td>
+                    <td class="p-3 ${x.vencidas ? 'text-red-600 font-semibold' : ''}">${x.vencidas}</td>
+                    <td class="p-3 ${x.pctVenc >= 50 ? 'text-red-600 font-bold' : x.pctVenc >= 25 ? 'text-amber-600 font-semibold' : ''}">${x.pctVenc}%</td>
+                    <td class="p-3">${x.cerradas}</td>
+                    <td class="p-3">${x.ppc !== null ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${x.ppc >= 80 ? 'bg-teal-100 text-teal-800' : x.ppc >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}">${x.ppc}%</span>` : '—'}</td>
+                    <td class="p-3 font-semibold">${x.carga.toFixed(1)}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin datos</td></tr>';
         }
 
         // ==== TABLA ====
@@ -401,11 +726,10 @@
 
         // ==== KANBAN ====
         function kanbanCard(t) {
-            const dragAllowed = canTransition();
             const d = daysToDeadline(t);
             return `
                 <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm"
-                     draggable="${dragAllowed}"
+                     draggable="${canTransition()}"
                      data-id="${t.id}"
                      ondragstart="onDragStart(event, ${t.id})"
                      ondragend="onDragEnd(event)">
@@ -418,8 +742,8 @@
                         <span class="truncate"><i class="fa-solid fa-user mr-1"></i>${escapeHtml(t.responsable || 'sin asignar')}</span>
                         <span class="font-semibold ${critColor(t.criticidad)}">${escapeHtml(t.criticidad || '–')}</span>
                     </div>
-                    ${t.fecha_fin ? `<div class="mt-1 text-[10px] ${d < 0 ? 'text-red-600 font-semibold' : d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
-                        <i class="fa-regular fa-calendar mr-1"></i>${fmtDate(t.fecha_fin)} ${d < 0 ? `· ${Math.abs(d)}d atraso` : ''}
+                    ${t.fecha_fin ? `<div class="mt-1 text-[10px] ${d !== null && d < 0 ? 'text-red-600 font-semibold' : d !== null && d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
+                        <i class="fa-regular fa-calendar mr-1"></i>${fmtDate(t.fecha_fin)} ${d !== null && d < 0 ? `· ${Math.abs(d)}d atraso` : ''}
                     </div>` : ''}
                     <div class="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
                         ${canEdit(t) ? `<button onclick="event.stopPropagation();editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})" class="text-sky-600 hover:text-sky-800" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
@@ -457,7 +781,6 @@
             }).join('');
         }
 
-        // Drag & Drop
         let dragId = null;
         function onDragStart(e, id) {
             if (!canTransition()) { e.preventDefault(); return; }
@@ -480,7 +803,6 @@
             if (estadoActual === nuevoEstado) return;
             if (!canTransition()) { toast('Tu rol no permite mover entre estados CDE'); return; }
 
-            // Sugerir aptitud coherente con el estado
             const aptitud = APTITUD_DEFAULT[nuevoEstado];
 
             const { data, error } = await supabaseClient.rpc('transicionar_cde', {
@@ -499,14 +821,11 @@
         // ==== EISENHOWER ====
         function renderEisenhower() {
             const board = document.getElementById('eisenhower-board');
-            const activos = tasksCache.filter(t => t.estado_cde !== 'Archived' && t.estado !== 'Cerrado');
+            const activos = tasksCache.filter(t => t.estado_cde !== 'Archived' && !isCerrado(t));
 
-            const today = new Date(); today.setHours(0,0,0,0);
             const isUrgente = (t) => {
                 if (!t.fecha_fin) return false;
-                const f = new Date(t.fecha_fin + 'T00:00:00');
-                const d = Math.round((f - today) / 86400000);
-                return d <= 7;
+                return daysToDeadline(t) <= 7;
             };
             const isImportante = (t) => t.criticidad === 'Muy alto' || t.criticidad === 'Alto';
 
@@ -547,12 +866,6 @@
             if (!iso) return '–';
             const [y, m, d] = iso.split('-');
             return `${d}/${m}/${y.slice(2)}`;
-        }
-        function daysToDeadline(t) {
-            if (!t.fecha_fin) return 9999;
-            const today = new Date(); today.setHours(0,0,0,0);
-            const f = new Date(t.fecha_fin + 'T00:00:00');
-            return Math.round((f - today) / 86400000);
         }
         function critColor(c) {
             return c === 'Muy alto' ? 'text-red-600' :
