@@ -7,26 +7,21 @@ import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
 
-// --- LOGIN ---
 document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Evita que la página se recargue
-    
+    e.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
     const errorDiv = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
-    // Estado de carga
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando...';
     btn.disabled = true;
     errorDiv.style.display = 'none';
 
     try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
         if (error) throw error;
 
-        // Login exitoso: ocultar login, mostrar app
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-screen').classList.remove('hidden');
@@ -35,7 +30,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         await initApp(data.user);
 
     } catch (err) {
-        // Mostrar error
         btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar';
         btn.disabled = false;
         errorDiv.innerText = err.message === 'Invalid login credentials' 
@@ -45,47 +39,46 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// --- LOGOUT ---
 document.getElementById('btn-logout').addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
     location.reload();
 });
 
-// --- INICIALIZACIÓN DE LA APP ---
 async function initApp(user) {
     state.currentUser = user;
     
-    // Obtener rol
-    const { data: perfil, error } = await supabaseClient.from('perfiles').select('rol,cargo').eq('id', user.id).maybeSingle();
-    
-    if (error) console.error("Error cargando perfil:", error);
+    const { data: perfil } = await supabaseClient.from('perfiles').select('rol,cargo').eq('id', user.id).maybeSingle();
     
     state.currentRol = (perfil?.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
-    state.isAdmin = state.currentRol === 'admin';
-    state.isCoordinador = state.currentRol === 'coordinador_bim';
+    state.currentCargo = (perfil?.cargo ? String(perfil.cargo).trim() : '');
+    
+    state.isAdmin = state.currentRol === 'admin' || state.currentCargo === 'BIM Manager';
+    state.isCoordinador = state.currentRol === 'coordinador_bim' || state.currentCargo === 'Coordinador BIM';
+    state.isSupervisor = state.currentCargo === 'Supervisor BIM';
+    state.isModelador = !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
-    // Actualizar UI
     document.getElementById('user-display').innerText = user.email;
-    document.getElementById('role-display').innerText = state.isAdmin ? 'Administrador' : state.isCoordinador ? 'Coordinador BIM' : 'Modelador';
+    // Muestra el cargo real en la barra
+    document.getElementById('role-display').innerText = state.currentCargo || 'Sin Cargo';
 
     if (state.isAdmin || state.isCoordinador) {
         document.getElementById('btn-new-task').classList.remove('hidden');
-    }
-    if (state.isAdmin) {
         document.getElementById('tab-config-btn').classList.remove('hidden');
     }
+    
+    // Supervisores y Modeladores van a "Mi Trabajo" por defecto
     if (!state.isAdmin && !state.isCoordinador) {
         document.querySelector('[data-tab="mitrabajo"]').classList.remove('hidden');
     }
+    // Ocultar config a quien no es admin
+    if (!state.isAdmin) {
+        document.getElementById('tab-config-btn').classList.add('hidden');
+    }
 
-    // Cargar datos de Supabase
     await fetchAll();
-    
-    // Ir a la pestaña por defecto
     window.switchTab(state.isAdmin || state.isCoordinador ? 'dashboard' : 'mitrabajo');
 }
 
-// --- NAVEGACIÓN ---
 window.switchTab = function(tab) {
     state.currentTab = tab;
     ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'manpower', 'config'].forEach(t => {
@@ -108,7 +101,7 @@ window.renderView = function() {
     else if (state.currentTab === 'config') renderConfig(container);
 }
 
-// --- EXPORTAR FUNCIONES AL HTML ---
+// Asignar a window para que el HTML los use
 window.openModal = openModal; window.closeModal = closeModal; window.saveTask = saveTask; window.editTask = editTask; window.deleteTask = deleteTask;
 window.openModalCDE = openModalCDE; window.closeModalCDE = closeModalCDE; window.confirmarTransicion = confirmarTransicion;
 window.onDragStart = onDragStart; window.onDragEnd = onDragEnd; window.onDragOver = onDragOver; window.onDragLeave = onDragLeave; window.onDrop = onDrop;
@@ -118,7 +111,6 @@ window.openPropModal = openPropModal; window.closePropModal = closePropModal; wi
 window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
 window.fetchAll = fetchAll;
 
-// --- COMPROBAR SESIÓN AL RECARGAR ---
 window.addEventListener('DOMContentLoaded', async () => {
     const user = await checkUser();
     if (user) {
