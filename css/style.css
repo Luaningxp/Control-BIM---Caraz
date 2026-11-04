@@ -20,77 +20,53 @@ td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem;
 .kpi-card:hover { transform: translateY(-2px); }
 .chart-box { position: relative; height: 280px; }
 
-/* ==== LOGIN REDISEÑADO ==== */
+/* ==== LOGIN ULTRA COMPACTO ==== */
 .login-page {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
     background-image: url('../assets/fondo.jpeg');
-    background-size: cover;
-    background-position: center;
-    z-index: 50;
-    padding: 1rem;
+    background-size: cover; background-position: center;
+    z-index: 50; padding: 1rem;
 }
 .login-page::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, rgba(15,23,42,0.85), rgba(2,132,199,0.4));
-    backdrop-filter: blur(4px);
-    z-index: -1;
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(2,132,199,0.6));
+    backdrop-filter: blur(5px); z-index: -1;
 }
 
 .login-box {
-    background: #fff;
-    width: 100%;
-    max-width: 400px;
-    border-radius: 1rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
+    background: #fff; width: 100%; max-width: 360px;
+    border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
 }
 
 .login-header {
-    background: #f8fafc;
-    padding: 2rem 2rem 1.5rem;
-    text-align: center;
-    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc; padding: 1.5rem 1.5rem 1rem;
+    text-align: center; border-bottom: 1px solid #e2e8f0;
 }
 
 .login-logos {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: center;
+    gap: 1rem; margin-bottom: 1rem; height: 32px; /* Forzar altura del contenedor */
 }
 
 .login-logos img {
-    height: 40px; /* Tamaño fijo, no crece */
-    width: auto;
-    max-width: 120px;
+    height: 32px !important; /* Forzar tamaño pequeño */
+    width: auto !important;
+    max-width: 90px !important;
     object-fit: contain;
 }
 
 .login-logos .separator {
-    width: 1px;
-    height: 30px;
-    background: #cbd5e1;
+    width: 1px; height: 24px; background: #cbd5e1;
 }
 
 .login-body {
-    padding: 2rem;
+    padding: 1.5rem;
 }
 
 .login-error {
-    background: #fef2f2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    text-align: center;
-    margin-bottom: 1rem;
-    display: none;
+    background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+    padding: 0.5rem; border-radius: 0.5rem; font-size: 0.75rem;
+    text-align: center; margin-bottom: 1rem; display: none;
 }
