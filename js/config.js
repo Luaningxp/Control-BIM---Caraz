@@ -21,7 +21,7 @@ export function renderConfig(container) {
                 </div>
             </div>
             <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Criticidad, Estado, Fecha Fin, Fecha Cierre, Nota</i>. (El sistema los detectará automáticamente).
+                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Importancia, Estado, Fecha Fin, Fecha Cierre, Nota</i>. (El sistema los detectará automáticamente).
             </div>
         </div>
 
@@ -92,7 +92,7 @@ export function renderConfig(container) {
             </div>
         </div>
 
-        <!-- MODALES (Grupos, Props, Cargos) -->
+        <!-- MODALES -->
         ${renderModales()}
     `;
 }
@@ -106,11 +106,13 @@ window.exportToExcel = () => {
         'Actividad': t.actividad,
         'Grupo': t.grupo || '',
         'Responsable': t.responsable || '',
-        'Criticidad': t.criticidad,
+        'Importancia': t.importancia || 'Medio', // Nuevo campo
         'Estado': t.estado,
         'Fecha Fin': t.fecha_fin || '',
         'Fecha Cierre': t.fecha_cierre || '',
-        'Nota': t.nota || ''
+        'Nota': t.nota || '',
+        'CDE': t.estado_cde || 'WIP',
+        'Aptitud': t.codigo_aptitud || 'S0'
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -131,14 +133,12 @@ window.handleFileUpload = (e) => {
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            // Leemos como JSON, asumiendo que la primera fila tiene los encabezados
             const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
             
             if (json.length === 0) { toast('El archivo está vacío o no tiene datos.'); return; }
             
             if (!confirm(`Se encontraron ${json.length} filas. ¿Deseas importarlas a la base de datos?`)) return;
 
-            // Función para convertir fechas de Excel (números) o strings a formato YYYY-MM-DD
             const parseDate = (val) => {
                 if (!val) return null;
                 if (typeof val === 'number') {
@@ -149,9 +149,7 @@ window.handleFileUpload = (e) => {
                 return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
             };
 
-            // Preparar los inserts
             const inserts = json.map(row => {
-                // Buscar ID del responsable si coincide con el email
                 let respId = null;
                 const respEmail = row['Responsable'] || row['responsable'] || '';
                 if (respEmail) {
@@ -159,12 +157,17 @@ window.handleFileUpload = (e) => {
                     if (perfil) respId = perfil.id;
                 }
 
+                // Buscar valor de importancia o usar 'Medio' por defecto
+                let imp = row['Importancia'] || row['importancia'] || row['Criticidad'] || row['criticidad'] || 'Medio';
+                // Validar que sea un valor permitido
+                if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(imp)) imp = 'Medio';
+
                 return {
                     actividad: row['Actividad'] || row['actividad'] || 'Sin nombre',
                     grupo: row['Grupo'] || row['grupo'] || null,
                     responsable: respEmail || null,
                     responsable_id: respId,
-                    criticidad: row['Criticidad'] || row['criticidad'] || 'Medio',
+                    importancia: imp, // <-- Guardamos Importancia
                     estado: row['Estado'] || row['estado'] || 'No iniciado',
                     fecha_fin: parseDate(row['Fecha Fin'] || row['fecha_fin']),
                     fecha_cierre: parseDate(row['Fecha Cierre'] || row['fecha_cierre']),
@@ -175,7 +178,6 @@ window.handleFileUpload = (e) => {
                 };
             });
 
-            // Insertar en lotes de 50 para no saturar
             for (let i = 0; i < inserts.length; i += 50) {
                 const batch = inserts.slice(i, i + 50);
                 const { error } = await supabaseClient.from('pendientes_bim').insert(batch);
@@ -192,10 +194,10 @@ window.handleFileUpload = (e) => {
         }
     };
     reader.readAsArrayBuffer(file);
-    e.target.value = ''; // Limpiar input
+    e.target.value = ''; 
 };
 
-// --- RENDERIZADO DE MODALES (Igual que antes) ---
+// --- RENDERIZADO DE MODALES ---
 function renderModales() {
     return `
         <div id="modal-grupo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
