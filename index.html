@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión BIM - Hospital Caraz II-1</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0284c7', 650: '#0369a1', 700: '#03588c', 900: '#0c4a6e' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-brand-900 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight"><i class="fa-solid fa-building-shield mr-2"></i> Control BIM & Gestión de Pendientes</h1>
+                <p class="text-xs text-sky-200">Hospital de Apoyo de Caraz II-1 | Entorno Colaborativo CDE</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="exportDataExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i> Exportar a CSV/Excel
+                </button>
+                <button onclick="openModal()" class="bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold px-3 py-2 rounded shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> Nueva Actividad
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 flex space-x-6 overflow-x-auto">
+            <button onclick="switchTab('dash')" id="btn-dash" class="tab-btn py-3 px-1 text-sm font-semibold border-b-2 border-brand-500 text-brand-650 flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie"></i> Dashboard Ejecutivo
+            </button>
+            <button onclick="switchTab('tabla')" id="btn-tabla" class="tab-btn py-3 px-1 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-brand-500 flex items-center gap-2">
+                <i class="fa-solid fa-table-list"></i> Base Operativa (Tabla)
+            </button>
+            <button onclick="switchTab('kanban')" id="btn-kanban" class="tab-btn py-3 px-1 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-brand-500 flex items-center gap-2">
+                <i class="fa-solid fa-columns"></i> Tablero Kanban
+            </button>
+            <button onclick="switchTab('eisenhower')" id="btn-eisenhower" class="tab-btn py-3 px-1 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-brand-500 flex items-center gap-2">
+                <i class="fa-solid fa-bullseye"></i> Matriz Eisenhower
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+        <!-- DASHBOARD TAB -->
+        <section id="tab-dash" class="space-y-6">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase">Total HH Planificadas</p>
+                        <h3 id="kpi-hh-est" class="text-2xl font-bold text-brand-900 mt-1">0.0</h3>
+                    </div>
+                    <div class="p-3 bg-sky-50 text-sky-600 rounded-lg text-lg"><i class="fa-solid fa-clock"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase">Avance Ponderado Real</p>
+                        <h3 id="kpi-avance" class="text-2xl font-bold text-emerald-600 mt-1">0.0%</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg text-lg"><i class="fa-solid fa-chart-line"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase">HH Ganadas (Earned V.)</p>
+                        <h3 id="kpi-hh-ganadas" class="text-2xl font-bold text-brand-700 mt-1">0.0</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-lg text-lg"><i class="fa-solid fa-square-poll-vertical"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase">Completadas / Total</p>
+                        <h3 id="kpi-completadas" class="text-2xl font-bold text-slate-700 mt-1">0 / 0</h3>
+                    </div>
+                    <div class="p-3 bg-slate-100 text-slate-600 rounded-lg text-lg"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4"><i class="fa-solid fa-chart-pie mr-2 text-brand-500"></i> Distribución de Tareas por Estado</h3>
+                    <div class="relative h-64 flex justify-center">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4"><i class="fa-solid fa-chart-column mr-2 text-brand-500"></i> Carga de Trabajo y Avance por Responsable (HH)</h3>
+                    <div class="relative h-64">
+                        <canvas id="workloadChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TABLE TAB -->
+        <section id="tab-tabla" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <input type="text" id="searchInput" oninput="renderTable()" placeholder="Buscar entregable o responsable..." class="border border-slate-300 rounded px-3 py-1.5 text-xs w-full sm:w-64 focus:outline-none focus:border-brand-500">
+                    <select id="filterResponsable" onchange="renderTable()" class="border border-slate-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-brand-500">
+                        <option value="">Todos los Responsables</option>
+                        <option value="Manuel">Manuel</option>
+                        <option value="Luis">Luis</option>
+                        <option value="Falco">Falco</option>
+                        <option value="Juanjho">Juanjho</option>
+                        <option value="Tony">Tony</option>
+                    </select>
+                </div>
+                <div class="text-xs text-slate-500 font-medium" id="tableCount">Mostrando 0 registros</div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-brand-900 text-white uppercase font-semibold">
+                            <tr>
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Entregable / Actividad</th>
+                                <th class="p-3">Responsable</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3 text-center">HH Est.</th>
+                                <th class="p-3 text-center">% Avance</th>
+                                <th class="p-3 text-center">HH Ganadas</th>
+                                <th class="p-3 text-center">Estado</th>
+                                <th class="p-3 text-center">Urg / Imp</th>
+                                <th class="p-3 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="taskTableBody" class="divide-y divide-slate-200">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- KANBAN TAB -->
+        <section id="tab-kanban" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="kanbanGrid">
+                <!-- Columns generated via JS -->
+            </div>
+        </section>
+
+        <!-- EISENHOWER TAB -->
+        <section id="tab-eisenhower" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 border-t-4 border-t-red-500">
+                    <h3 class="font-bold text-sm text-slate-800 mb-1">Cuadrante I: Hacer Ya (Urgente e Importante)</h3>
+                    <p class="text-xs text-slate-500 mb-4">Crisis, problemas inmediatos, entregas límite.</p>
+                    <div id="eisen-q1" class="space-y-2 min-h-[150px]"></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 border-t-4 border-t-blue-500">
+                    <h3 class="font-bold text-sm text-slate-800 mb-1">Cuadrante II: Programar (No Urgente e Importante)</h3>
+                    <p class="text-xs text-slate-500 mb-4">Planificación BIM, estandarización, desarrollo CDE.</p>
+                    <div id="eisen-q2" class="space-y-2 min-h-[150px]"></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 border-t-4 border-t-amber-500">
+                    <h3 class="font-bold text-sm text-slate-800 mb-1">Cuadrante III: Delegar (Urgente y No Importante)</h3>
+                    <p class="text-xs text-slate-500 mb-4">Interrupciones menores, reportes operativos rápidos.</p>
+                    <div id="eisen-q3" class="space-y-2 min-h-[150px]"></div>
+                </div>
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-slate-200 border-t-4 border-t-slate-400">
+                    <h3 class="font-bold text-sm text-slate-800 mb-1">Cuadrante IV: Eliminar (No Urgente y No Importante)</h3>
+                    <p class="text-xs text-slate-500 mb-4">Distracciones o actividades sin valor agregado.</p>
+                    <div id="eisen-q4" class="space-y-2 min-h-[150px]"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Add/Edit Task -->
+    <div id="taskModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                <h3 id="modalTitle" class="font-bold text-base text-slate-800">Nueva Actividad BIM</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="taskForm" onsubmit="saveTask(event)" class="space-y-3">
+                <input type="hidden" id="taskId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Entregable / Actividad</label>
+                    <input type="text" id="taskName" required class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Responsable</label>
+                        <select id="taskResp" class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                            <option value="Manuel">Manuel</option>
+                            <option value="Luis">Luis</option>
+                            <option value="Falco">Falco</option>
+                            <option value="Juanjho">Juanjho</option>
+                            <option value="Tony">Tony</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Categoría</label>
+                        <select id="taskCat" class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                            <option value="Modelado y Coordinación">Modelado y Coordinación</option>
+                            <option value="Gestión de Calidad y Estandarización">Gestión de Calidad y Estandarización</option>
+                            <option value="Gestión de Datos">Gestión de Datos</option>
+                            <option value="Oficina Técnica">Oficina Técnica</option>
+                            <option value="Entorno Colaborativo">Entorno Colaborativo</option>
+                            <option value="Bajada e Ingreso">Bajada e Ingreso</option>
+                            <option value="Reuniones">Reuniones</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">HH Estimadas</label>
+                        <input type="number" step="0.5" id="taskHH" required class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">% Avance (0 a 1)</label>
+                        <input type="number" step="0.05" min="0" max="1" id="taskAvance" required class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Estado</label>
+                        <select id="taskEstado" class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                            <option value="No iniciado">No iniciado</option>
+                            <option value="En proceso">En proceso</option>
+                            <option value="En pausa">En pausa</option>
+                            <option value="Terminado">Terminado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Urgencia (1-5)</label>
+                        <input type="number" min="1" max="5" id="taskUrg" required class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Importancia (1-5)</label>
+                        <input type="number" min="1" max="5" id="taskImp" required class="w-full border border-slate-300 rounded px-3 py-2 text-xs focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-4 py-2 rounded text-xs">Cancelar</button>
+                    <button type="submit" class="bg-brand-500 hover:bg-brand-650 text-white font-medium px-4 py-2 rounded text-xs">Guardar Actividad</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        let tasks = JSON.parse(localStorage.getItem('bim_tasks_caraz')) || [
+            { id: 1, name: "REFUERZO DE DRYWALL / REF. PUERTAS / REF. MADERA MOBILIARIOS", resp: "Luis", cat: "Modelado y Coordinación", hh: 40, avance: 0.85, estado: "En proceso", urg: 5, imp: 5 },
+            { id: 2, name: "TABIQUERIA SECA Y HUMEDA - MODELADO Y CORRECCIÓN", resp: "Luis", cat: "Modelado y Coordinación", hh: 60, avance: 0.40, estado: "En proceso", urg: 5, imp: 4 },
+            { id: 3, name: "PUERTAS Y CERRAJERÍAS - LEVANTAMIENTO OBSERVACIONES", resp: "Falco", cat: "Modelado y Coordinación", hh: 30, avance: 0.10, estado: "En pausa", urg: 4, imp: 3 },
+            { id: 4, name: "INTERFERENCIAS PISO CUB - MEP VS ESTRUCTURAS", resp: "Manuel", cat: "Modelado y Coordinación", hh: 45, avance: 1.00, estado: "Terminado", urg: 5, imp: 5 },
+            { id: 5, name: "ACI-IISS DISEÑO Y VALORIZACIONES", resp: "Tony", cat: "Modelado y Coordinación", hh: 50, avance: 0.20, estado: "En proceso", urg: 3, imp: 4 },
+            { id: 6, name: "VENTANAS Y MAMPARAS - REVISIÓN EN REVIZTO", resp: "Luis", cat: "Gestión de Calidad y Estandarización", hh: 25, avance: 0.00, estado: "No iniciado", urg: 2, imp: 3 },
+            { id: 7, name: "PAISAJISMO Y EXTERIORES RED PLUVIAL", resp: "Juanjho", cat: "Modelado y Coordinación", hh: 55, avance: 0.50, estado: "En proceso", urg: 4, imp: 4 },
+            { id: 8, name: "ESTANDARIZACIÓN Y PARÁMETROS COBie", resp: "Tony", cat: "Gestión de Calidad y Estandarización", hh: 35, avance: 1.00, estado: "Terminado", urg: 3, imp: 5 },
+            { id: 9, name: "REPORTES DE METRADOS - SUBESTRUCTURAS", resp: "Manuel", cat: "Oficina Técnica", hh: 20, avance: 1.00, estado: "Terminado", urg: 4, imp: 4 },
+            { id: 10, name: "ACTUALIZACIÓN MODELO CUARTO DE BOMBAS / POZOS", resp: "Luis", cat: "Modelado y Coordinación", hh: 48, avance: 0.60, estado: "En proceso", urg: 5, imp: 5 }
+        ];
+
+        let statusChartInst = null;
+        let workloadChartInst = null;
+
+        function saveToStorage() {
+            localStorage.setItem('bim_tasks_caraz', JSON.stringify(tasks));
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('border-brand-500', 'text-brand-650', 'font-semibold');
+                b.classList.add('border-transparent', 'text-slate-600', 'font-medium');
+            });
+            document.getElementById(`btn-${tabId}`).classList.remove('border-transparent', 'text-slate-600', 'font-medium');
+            document.getElementById(`btn-${tabId}`).classList.add('border-brand-500', 'text-brand-650', 'font-semibold');
+
+            ['dash', 'tabla', 'kanban', 'eisenhower'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            if(tabId === 'dash') updateDashboard();
+            if(tabId === 'tabla') renderTable();
+            if(tabId === 'kanban') renderKanban();
+            if(tabId === 'eisenhower') renderEisenhower();
+        }
+
+        function getEisenhowerCategory(urg, imp) {
+            if(urg >= 3 && imp >= 3) return "Importante / Urgente";
+            if(urg < 3 && imp >= 3) return "Importante / No Urgente";
+            if(urg >= 3 && imp < 3) return "No Importante / Urgente";
+            return "No Importante / No Urgente";
+        }
+
+        // Dashboard & KPIs
+        function updateDashboard() {
+            let totalHH = tasks.reduce((acc, t) => acc + parseFloat(t.hh), 0);
+            let earnedHH = tasks.reduce((acc, t) => acc + (parseFloat(t.hh) * parseFloat(t.avance)), 0);
+            let avanceReal = totalHH > 0 ? (earnedHH / totalHH) * 100 : 0;
+            let completadas = tasks.filter(t => t.estado === 'Terminado').length;
+
+            document.getElementById('kpi-hh-est').innerText = totalHH.toFixed(1) + " HH";
+            document.getElementById('kpi-avance').innerText = avanceReal.toFixed(1) + "%";
+            document.getElementById('kpi-hh-ganadas').innerText = earnedHH.toFixed(1) + " HH";
+            document.getElementById('kpi-completadas').innerText = `${completadas} / ${tasks.length}`;
+
+            // Charts update
+            updateCharts();
+        }
+
+        function updateCharts() {
+            // Status counts
+            const statuses = ["No iniciado", "En proceso", "En pausa", "Terminado"];
+            const statusCounts = statuses.map(s => tasks.filter(t => t.estado === s).length);
+
+            if(statusChartInst) statusChartInst.destroy();
+            const ctx1 = document.getElementById('statusChart').getContext('2d');
+            statusChartInst = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: statuses,
+                    datasets: [{
+                        data: statusCounts,
+                        backgroundColor: ['#94a3b8', '#0284c7', '#f59e0b', '#10b981']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+
+            // Workload per responsible
+            const respList = ["Manuel", "Luis", "Falco", "Juanjho", "Tony"];
+            const assignedHH = respList.map(r => tasks.filter(t => t.resp === r).reduce((acc, t) => acc + parseFloat(t.hh), 0));
+            const earnedHHList = respList.map(r => tasks.filter(t => t.resp === r).reduce((acc, t) => acc + (parseFloat(t.hh) * parseFloat(t.avance)), 0));
+
+            if(workloadChartInst) workloadChartInst.destroy();
+            const ctx2 = document.getElementById('workloadChart').getContext('2d');
+            workloadChartInst = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: respList,
+                    datasets: [
+                        { label: 'HH Asignadas', data: assignedHH, backgroundColor: '#cbd5e1' },
+                        { label: 'HH Ganadas', data: earnedHHList, backgroundColor: '#0284c7' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+        }
+
+        // Table Render
+        function renderTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const respFilter = document.getElementById('filterResponsable').value;
+            const tbody = document.getElementById('taskTableBody');
+            tbody.innerHTML = '';
+
+            const filtered = tasks.filter(t => {
+                const matchSearch = t.name.toLowerCase().includes(search) || t.resp.toLowerCase().includes(search);
+                const matchResp = respFilter === "" || t.resp === respFilter;
+                return matchSearch && matchResp;
+            });
+
+            document.getElementById('tableCount').innerText = `Mostrando ${filtered.length} de ${tasks.length} registros`;
+
+            filtered.forEach(t => {
+                const hhGanadas = (t.hh * t.avance).toFixed(1);
+                const eisen = getEisenhowerCategory(t.urg, t.imp);
+                let badgeColor = "bg-slate-100 text-slate-700";
+                if(t.estado === "Terminado") badgeColor = "bg-emerald-100 text-emerald-800";
+                if(t.estado === "En proceso") badgeColor = "bg-sky-100 text-sky-800";
+                if(t.estado === "En pausa") badgeColor = "bg-amber-100 text-amber-800";
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 font-semibold text-center">#${t.id}</td>
+                        <td class="p-3 font-medium text-slate-900">${t.name}</td>
+                        <td class="p-3 text-center"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-700">${t.resp}</span></td>
+                        <td class="p-3 text-slate-600">${t.cat}</td>
+                        <td class="p-3 text-center font-medium">${parseFloat(t.hh).toFixed(1)}</td>
+                        <td class="p-3 text-center font-medium">${(t.avance * 100).toFixed(0)}%</td>
+                        <td class="p-3 text-center font-bold text-brand-700">${hhGanadas}</td>
+                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold ${badgeColor}">${t.estado}</span></td>
+                        <td class="p-3 text-center text-[10px] text-slate-500">${t.urg}/${t.imp} (${eisen.split('/')[0]})</td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="editTask(${t.id})" class="text-sky-600 hover:text-sky-800"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Kanban Render
+        function renderKanban() {
+            const columns = [
+                { id: "No iniciado", title: "No Iniciado", color: "border-slate-300" },
+                { id: "En proceso", title: "En Proceso", color: "border-sky-500" },
+                { id: "En pausa", title: "En Pausa", color: "border-amber-500" },
+                { id: "Terminado", title: "Terminado", color: "border-emerald-500" }
+            ];
+
+            const grid = document.getElementById('kanbanGrid');
+            grid.innerHTML = '';
+
+            columns.forEach(col => {
+                const colTasks = tasks.filter(t => t.estado === col.id);
+                let cardsHtml = colTasks.map(t => `
+                    <div class="bg-white p-3 rounded shadow-sm border border-slate-200 space-y-2">
+                        <div class="flex justify-between items-start">
+                            <span class="text-[10px] font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-600">${t.resp}</span>
+                            <span class="text-[10px] font-bold text-brand-700">${t.hh} HH</span>
+                        </div>
+                        <p class="text-xs font-semibold text-slate-800">${t.name}</p>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-[10px] text-slate-500">
+                            <span>Avance: ${(t.avance*100).toFixed(0)}%</span>
+                            <div class="space-x-1">
+                                <button onclick="editTask(${t.id})" class="text-sky-600"><i class="fa-solid fa-pen"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col gap-3">
+                        <div class="flex justify-between items-center border-b border-slate-200 pb-2 border-t-4 ${col.color}">
+                            <h4 class="font-bold text-xs uppercase text-slate-700">${col.title}</h4>
+                            <span class="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">${colTasks.length}</span>
+                        </div>
+                        <div class="space-y-2 flex-1">${cardsHtml}</div>
+                    </div>
+                `;
+            });
+        }
+
+        // Eisenhower Render
+        function renderEisenhower() {
+            const q1 = tasks.filter(t => getEisenhowerCategory(t.urg, t.imp) === "Importante / Urgente");
+            const q2 = tasks.filter(t => getEisenhowerCategory(t.urg, t.imp) === "Importante / No Urgente");
+            const q3 = tasks.filter(t => getEisenhowerCategory(t.urg, t.imp) === "No Importante / Urgente");
+            const q4 = tasks.filter(t => getEisenhowerCategory(t.urg, t.imp) === "No Importante / No Urgente");
+
+            const mapCards = (list) => list.map(t => `
+                <div class="bg-slate-50 border border-slate-200 p-2.5 rounded text-xs flex justify-between items-center">
+                    <div>
+                        <span class="font-bold text-slate-800">${t.name}</span>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Resp: ${t.resp} | HH: ${t.hh}</div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-brand-100 text-brand-800 font-bold">${t.estado}</span>
+                </div>
+            `).join('') || '<p class="text-xs text-slate-400 italic">No hay actividades en este cuadrante.</p>';
+
+            document.getElementById('eisen-q1').innerHTML = mapCards(q1);
+            document.getElementById('eisen-q2').innerHTML = mapCards(q2);
+            document.getElementById('eisen-q3').innerHTML = mapCards(q3);
+            document.getElementById('eisen-q4').innerHTML = mapCards(q4);
+        }
+
+        // Modal Functions
+        function openModal(id = null) {
+            document.getElementById('taskModal').classList.remove('hidden');
+            document.getElementById('taskModal').classList.add('flex');
+            if(id) {
+                document.getElementById('modalTitle').innerText = "Editar Actividad BIM";
+                const t = tasks.find(x => x.id === id);
+                document.getElementById('taskId').value = t.id;
+                document.getElementById('taskName').value = t.name;
+                document.getElementById('taskResp').value = t.resp;
+                document.getElementById('taskCat').value = t.cat;
+                document.getElementById('taskHH').value = t.hh;
+                document.getElementById('taskAvance').value = t.avance;
+                document.getElementById('taskEstado').value = t.estado;
+                document.getElementById('taskUrg').value = t.urg;
+                document.getElementById('taskImp').value = t.imp;
+            } else {
+                document.getElementById('modalTitle').innerText = "Nueva Actividad BIM";
+                document.getElementById('taskForm').reset();
+                document.getElementById('taskId').value = '';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('taskModal').classList.add('hidden');
+            document.getElementById('taskModal').classList.remove('flex');
+        }
+
+        function saveTask(e) {
+            e.preventDefault();
+            const id = document.getElementById('taskId').value;
+            const newTask = {
+                id: id ? parseInt(id) : (tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1),
+                name: document.getElementById('taskName').value,
+                resp: document.getElementById('taskResp').value,
+                cat: document.getElementById('taskCat').value,
+                hh: parseFloat(document.getElementById('taskHH').value),
+                avance: parseFloat(document.getElementById('taskAvance').value),
+                estado: document.getElementById('taskEstado').value,
+                urg: parseInt(document.getElementById('taskUrg').value),
+                imp: parseInt(document.getElementById('taskImp').value)
+            };
+
+            if(id) {
+                const idx = tasks.findIndex(t => t.id === parseInt(id));
+                tasks[idx] = newTask;
+            } else {
+                tasks.push(newTask);
+            }
+
+            saveToStorage();
+            closeModal();
+            updateDashboard();
+            renderTable();
+        }
+
+        function deleteTask(id) {
+            if(confirm("¿Estás seguro de eliminar esta actividad?")) {
+                tasks = tasks.filter(t => t.id !== id);
+                saveToStorage();
+                updateDashboard();
+                renderTable();
+            }
+        }
+
+        // Export Data to CSV (Compatible with Excel)
+        function exportDataExcel() {
+            let csvContent = "﻿ID,Entregable / Actividad,Responsable,Categoría,HH Estimadas,% Avance Real,HH Ganadas,Estado,Urgencia,Importancia,Matriz Eisenhower\n";
+            tasks.forEach(t => {
+                let hhGanadas = (t.hh * t.avance).toFixed(1);
+                let eisen = getEisenhowerCategory(t.urg, t.imp);
+                let row = [
+                    t.id,
+                    `"${t.name.replace(/"/g, '""')}"`,
+                    t.resp,
+                    `"${t.cat}"`,
+                    t.hh,
+                    t.avance,
+                    hhGanadas,
+                    t.estado,
+                    t.urg,
+                    t.imp,
+                    `"${eisen}"`
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `control_bim_caraz_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Initial Load
+        window.onload = function() {
+            updateDashboard();
+        }
+    </script>
+</body>
+</html>
