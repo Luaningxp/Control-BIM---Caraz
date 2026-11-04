@@ -21,7 +21,7 @@ export function renderConfig(container) {
                 </div>
             </div>
             <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Importancia, Estado, Fecha Fin, Fecha Cierre, Nota</i>. (El sistema los detectará automáticamente).
+                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Importancia, Urgencia, Estado, Fecha Fin, Fecha Cierre, Nota</i>. (El sistema los detectará automáticamente).
             </div>
         </div>
 
@@ -106,7 +106,8 @@ window.exportToExcel = () => {
         'Actividad': t.actividad,
         'Grupo': t.grupo || '',
         'Responsable': t.responsable || '',
-        'Importancia': t.importancia || 'Medio', // Nuevo campo
+        'Importancia': t.importancia || 'Medio',
+        'Urgencia': t.urgencia || 'Medio', // <-- Añadido
         'Estado': t.estado,
         'Fecha Fin': t.fecha_fin || '',
         'Fecha Cierre': t.fecha_cierre || '',
@@ -157,17 +158,21 @@ window.handleFileUpload = (e) => {
                     if (perfil) respId = perfil.id;
                 }
 
-                // Buscar valor de importancia o usar 'Medio' por defecto
+                // Leer Importancia
                 let imp = row['Importancia'] || row['importancia'] || row['Criticidad'] || row['criticidad'] || 'Medio';
-                // Validar que sea un valor permitido
                 if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(imp)) imp = 'Medio';
+
+                // Leer Urgencia
+                let urg = row['Urgencia'] || row['urgencia'] || 'Medio';
+                if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(urg)) urg = 'Medio';
 
                 return {
                     actividad: row['Actividad'] || row['actividad'] || 'Sin nombre',
                     grupo: row['Grupo'] || row['grupo'] || null,
                     responsable: respEmail || null,
                     responsable_id: respId,
-                    importancia: imp, // <-- Guardamos Importancia
+                    importancia: imp,
+                    urgencia: urg, // <-- Añadido
                     estado: row['Estado'] || row['estado'] || 'No iniciado',
                     fecha_fin: parseDate(row['Fecha Fin'] || row['fecha_fin']),
                     fecha_cierre: parseDate(row['Fecha Cierre'] || row['fecha_cierre']),
