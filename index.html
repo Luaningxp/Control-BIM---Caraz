@@ -3,23 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Control BIM · Hospital Caraz II-1</title>
-    <!-- Tailwind CSS -->
+    <title>Control BIM · Hospital Caraz II-1 · ISO 19650</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS Client (Única declaración) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; color: #1e293b; }
         .inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.45rem 0.65rem; font-size: 0.875rem; background: #fff; }
         .inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15); }
         .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; text-align: left; padding: 0.6rem 0.8rem; background: #f1f5f9; }
-        td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; }
+        td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; vertical-align: top; }
+        .badge-cde { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -30,7 +27,7 @@
             <div class="text-center">
                 <div class="w-12 h-12 bg-sky-600 text-white rounded-lg grid place-items-center mx-auto text-xl mb-2">🏥</div>
                 <h2 class="font-bold text-lg text-slate-900">Control BIM · Caraz II-1</h2>
-                <p class="text-xs text-slate-500">Inicia sesión con tu cuenta autorizada</p>
+                <p class="text-xs text-slate-500">CDE alineado a ISO 19650</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-3">
                 <div>
@@ -54,13 +51,16 @@
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-slate-900 text-white grid place-items-center text-base">🏥</div>
                     <div>
-                        <h1 class="font-bold text-slate-900 leading-tight">Control del Equipo BIM</h1>
-                        <p class="text-xs text-slate-500">Usuario: <b id="user-display" class="text-sky-600"></b> (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700"></span>)</p>
+                        <h1 class="font-bold text-slate-900 leading-tight">Control del Equipo BIM · CDE ISO 19650</h1>
+                        <p class="text-xs text-slate-500">
+                            Usuario: <b id="user-display" class="text-sky-600"></b>
+                            (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700"></span>)
+                        </p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="btn-new-task" onclick="openModal()" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
-                        + Nuevo Pendiente
+                    <button id="btn-new-task" onclick="openModal()" class="hidden px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                        + Nuevo Contenedor
                     </button>
                     <button onclick="handleLogout()" class="px-3 py-2 text-xs border border-slate-300 rounded-lg hover:bg-slate-100 transition text-slate-600">
                         Cerrar Sesión
@@ -71,19 +71,25 @@
 
         <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
             <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                <h3 class="font-bold text-sm text-slate-800">Base de Entregables en Tiempo Real (Supabase)</h3>
-                <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
+                <div>
+                    <h3 class="font-bold text-sm text-slate-800">Contenedores de Información (Supabase)</h3>
+                    <p class="text-[11px] text-slate-500">WIP → Shared → Published → Archived · Códigos S0–S4</p>
+                </div>
+                <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
+                </button>
             </div>
 
             <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                         <tr>
+                            <th class="p-3">Código</th>
                             <th class="p-3">Actividad</th>
-                            <th class="p-3">Grupo</th>
-                            <th class="p-3">Responsable</th>
-                            <th class="p-3">Criticidad</th>
-                            <th class="p-3">Estado</th>
+                            <th class="p-3">Grupo / Resp.</th>
+                            <th class="p-3">Crit.</th>
+                            <th class="p-3">Estado op.</th>
+                            <th class="p-3">CDE ISO</th>
                             <th class="p-3 text-center">Acciones</th>
                         </tr>
                     </thead>
@@ -93,14 +99,14 @@
         </main>
     </div>
 
-    <!-- Modal Form -->
+    <!-- MODAL: Crear / Editar -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Pendiente</h3>
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
+            <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
             <form onsubmit="saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Actividad</label>
+                    <label class="block font-semibold text-slate-600 mb-1">Actividad *</label>
                     <input type="text" id="task-actividad" required class="inp">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -124,7 +130,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
+                        <label class="block font-semibold text-slate-600 mb-1">Estado operativo</label>
                         <select id="task-estado" class="inp">
                             <option>No iniciado</option>
                             <option>En proceso</option>
@@ -134,6 +140,24 @@
                         </select>
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Fecha fin prog.</label>
+                        <input type="date" id="task-fecha-fin" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Fecha cierre</label>
+                        <input type="date" id="task-fecha-cierre" class="inp">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Nota / restricción</label>
+                    <textarea id="task-nota" rows="2" class="inp"></textarea>
+                </div>
+                <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
+                    <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
+                    El contenedor se crea en <b>WIP · S0</b>. Para moverlo a Shared o Published usa el botón <b>CDE</b> en la tabla (RPC ISO).
+                </div>
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                     <button type="button" onclick="closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
                     <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
@@ -142,15 +166,81 @@
         </div>
     </div>
 
+    <!-- MODAL: Transición CDE -->
+    <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
+            <h3 class="font-bold text-sm text-slate-800">Transición CDE · ISO 19650</h3>
+            <p id="cde-current" class="text-[11px] text-slate-500"></p>
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Estado destino</label>
+                    <select id="cde-estado" class="inp">
+                        <option value="WIP">WIP (Work in Progress)</option>
+                        <option value="Shared">Shared</option>
+                        <option value="Published">Published</option>
+                        <option value="Archived">Archived</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Código de aptitud</label>
+                    <select id="cde-aptitud" class="inp">
+                        <option value="S0">S0 · WIP</option>
+                        <option value="S1">S1 · Coordinación</option>
+                        <option value="S2">S2 · Información</option>
+                        <option value="S3">S3 · Revisión / comentarios</option>
+                        <option value="S4">S4 · Aprobación de etapa</option>
+                        <option value="A1">A1 · Autorizado (fase)</option>
+                        <option value="B1">B1 · Autorizado (parcial)</option>
+                        <option value="CR">CR · Registro de cambios</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Comentario (auditoría)</label>
+                    <textarea id="cde-comentario" rows="2" class="inp" placeholder="Motivo de la transición..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeModalCDE()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600 text-xs">Cancelar</button>
+                <button type="button" onclick="confirmarTransicion()" class="px-4 py-1.5 bg-teal-600 text-white font-semibold rounded hover:bg-teal-700 text-xs">Confirmar transición</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Historial de transiciones -->
+    <div id="modal-hist" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-sm text-slate-800">Historial CDE</h3>
+                <button onclick="closeHistorial()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="hist-content" class="space-y-2 text-xs"></div>
+        </div>
+    </div>
+
     <script>
-        // CONFIGURACIÓN SUPABASE (Reemplaza con tus datos reales)
+        // ==== CONFIGURACIÓN SUPABASE ====
         const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';
-
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let currentUser = null;
-        let isAdmin = false;
 
+        let currentUser = null;
+        let currentRol = 'operador';
+        let isAdmin = false;
+        let isCoordinador = false;
+        let cdeTargetId = null;
+
+        // ==== UTILIDADES DE PRESENTACIÓN ====
+        const CDE_COLORS = {
+            WIP: 'background:#f1f5f9;color:#334155;',
+            Shared: 'background:#fef3c7;color:#92400e;',
+            Published: 'background:#ccfbf1;color:#115e59;',
+            Archived: 'background:#e2e8f0;color:#64748b;'
+        };
+        const cdeBadge = (estado, aptitud) => `
+            <span class="badge-cde" style="${CDE_COLORS[estado] || ''}">${estado || 'WIP'} · ${aptitud || 'S0'}</span>
+        `;
+
+        // ==== LOGIN / LOGOUT ====
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -173,84 +263,119 @@
             location.reload();
         }
 
-async function initApp() {
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) return;
+        // ==== INICIALIZACIÓN ====
+        async function initApp() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) return;
 
-    currentUser = user;
+            currentUser = user;
 
-    // Consultar el rol del usuario logueado en la tabla 'perfiles'
-    const { data: perfil, error } = await supabaseClient
-        .from('perfiles')
-        .select('rol')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+            const { data: perfil, error } = await supabaseClient
+                .from('perfiles')
+                .select('rol')
+                .eq('id', currentUser.id)
+                .maybeSingle();
 
-    if (error) {
-        console.error("Error al consultar perfil:", error);
-    }
+            if (error) console.error("Error al consultar perfil:", error);
 
-    // Comprobar si el rol es 'admin' (convertimos a minúsculas por seguridad)
-    isAdmin = perfil && String(perfil.rol).trim().toLowerCase() === 'admin';
+            currentRol = (perfil && perfil.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
+            isAdmin = currentRol === 'admin';
+            isCoordinador = currentRol === 'coordinador_bim';
 
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('app-screen').classList.remove('hidden');
-    document.getElementById('app-screen').classList.add('flex');
-    
-    document.getElementById('user-display').innerText = currentUser.email;
-    document.getElementById('role-display').innerText = isAdmin ? 'Administrador' : 'Operador / Modelador';
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('app-screen').classList.add('flex');
 
-    // Mostrar u ocultar el botón de nuevo pendiente según el rol
-    const btnNew = document.getElementById('btn-new-task');
-    if (btnNew) {
-        if (isAdmin) {
-            btnNew.classList.remove('hidden');
-        } else {
-            btnNew.classList.add('hidden');
+            document.getElementById('user-display').innerText = currentUser.email;
+            document.getElementById('role-display').innerText =
+                isAdmin ? 'Administrador' :
+                isCoordinador ? 'Coordinador BIM' : 'Modelador / Operador';
+
+            // Solo admin y coordinador pueden crear
+            const btnNew = document.getElementById('btn-new-task');
+            if (isAdmin || isCoordinador) btnNew.classList.remove('hidden');
+            else btnNew.classList.add('hidden');
+
+            fetchTasks();
         }
-    }
 
-    fetchTasks();
-}
+        // ==== PERMISOS DERIVADOS ====
+        const canEdit = (t) => {
+            if (isAdmin || isCoordinador) return true;
+            return t.estado_cde === 'WIP' && t.user_id === currentUser?.id;
+        };
+        const canDelete = () => isAdmin;
+        const canTransition = () => isAdmin || isCoordinador;
+
+        // ==== LECTURA ====
         async function fetchTasks() {
-            const { data: tasks, error } = await supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false });
+            const { data: tasks, error } = await supabaseClient
+                .from('pendientes_bim')
+                .select('*')
+                .order('id', { ascending: false });
+
             if (error) { console.error(error); return; }
 
             const tbody = document.getElementById('task-list');
+
+            if (!tasks.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin contenedores aún</td></tr>`;
+                return;
+            }
+
             tbody.innerHTML = tasks.map(t => `
                 <tr class="hover:bg-slate-50 transition">
-                    <td class="p-3 font-medium text-slate-900">${t.actividad}</td>
-                    <td class="p-3 text-slate-500">${t.grupo || '-'}</td>
-                    <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-600">${t.responsable || 'Sin asignar'}</span></td>
-                    <td class="p-3 font-semibold text-slate-700">${t.criticidad}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${t.estado}</span></td>
-                    <td class="p-3 text-center">
-                        <button onclick="editTask(${t.id}, '${t.actividad}', '${t.grupo}', '${t.responsable}', '${t.criticidad}', '${t.estado}')" class="text-sky-600 hover:text-sky-800 mr-3"><i class="fa-solid fa-pen"></i></button>
-                        ${isAdmin ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    <td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>
+                    <td class="p-3 font-medium text-slate-900 max-w-xs">
+                        ${escapeHtml(t.actividad)}
+                        ${t.nota ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5">${escapeHtml(t.nota)}</div>` : ''}
+                    </td>
+                    <td class="p-3 text-slate-500 text-[11px]">
+                        ${escapeHtml(t.grupo || '-')}<br>
+                        <span class="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-600">${escapeHtml(t.responsable || 'Sin asignar')}</span>
+                    </td>
+                    <td class="p-3 font-semibold text-slate-700">${escapeHtml(t.criticidad)}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>
+                    <td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>
+                    <td class="p-3 text-center whitespace-nowrap">
+                        ${canEdit(t) ? `<button onclick='editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})' class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
+                        ${canTransition() ? `<button onclick="openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
+                        <button onclick="openHistorial(${t.id})" class="text-slate-500 hover:text-slate-700 mr-2" title="Historial"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                        ${canDelete() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `).join('');
         }
 
+        // ==== MODAL CREAR / EDITAR ====
         function openModal() {
-            document.getElementById('modal-title').innerText = "Nuevo Pendiente";
+            if (!isAdmin && !isCoordinador) return;
+            document.getElementById('modal-title').innerText = "Nuevo Contenedor";
             document.getElementById('task-id').value = '';
             document.getElementById('task-actividad').value = '';
             document.getElementById('task-grupo').value = '';
             document.getElementById('task-responsable').value = '';
+            document.getElementById('task-criticidad').value = 'Alto';
+            document.getElementById('task-estado').value = 'No iniciado';
+            document.getElementById('task-fecha-fin').value = '';
+            document.getElementById('task-fecha-cierre').value = '';
+            document.getElementById('task-nota').value = '';
             document.getElementById('modal-task').classList.remove('hidden');
             document.getElementById('modal-task').classList.add('flex');
         }
 
-        function editTask(id, actividad, grupo, responsable, criticidad, estado) {
-            document.getElementById('modal-title').innerText = "Editar Pendiente";
-            document.getElementById('task-id').value = id;
-            document.getElementById('task-actividad').value = actividad;
-            document.getElementById('task-grupo').value = grupo !== 'null' ? grupo : '';
-            document.getElementById('task-responsable').value = responsable !== 'null' ? responsable : '';
-            document.getElementById('task-criticidad').value = criticidad;
-            document.getElementById('task-estado').value = estado;
-
+        function editTask(t) {
+            if (!canEdit(t)) return;
+            document.getElementById('modal-title').innerText = "Editar Contenedor";
+            document.getElementById('task-id').value = t.id;
+            document.getElementById('task-actividad').value = t.actividad || '';
+            document.getElementById('task-grupo').value = t.grupo || '';
+            document.getElementById('task-responsable').value = t.responsable || '';
+            document.getElementById('task-criticidad').value = t.criticidad || 'Alto';
+            document.getElementById('task-estado').value = t.estado || 'No iniciado';
+            document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
+            document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
+            document.getElementById('task-nota').value = t.nota || '';
             document.getElementById('modal-task').classList.remove('hidden');
             document.getElementById('modal-task').classList.add('flex');
         }
@@ -268,13 +393,22 @@ async function initApp() {
                 grupo: document.getElementById('task-grupo').value,
                 responsable: document.getElementById('task-responsable').value,
                 criticidad: document.getElementById('task-criticidad').value,
-                estado: document.getElementById('task-estado').value
+                estado: document.getElementById('task-estado').value,
+                fecha_fin: document.getElementById('task-fecha-fin').value || null,
+                fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
+                nota: document.getElementById('task-nota').value
             };
 
             if (id) {
-                await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
+                const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
+                if (error) { alert('Error: ' + error.message); return; }
             } else {
-                await supabaseClient.from('pendientes_bim').insert([payload]);
+                if (!isAdmin && !isCoordinador) { alert('Solo admin/coordinador puede crear.'); return; }
+                payload.estado_cde = 'WIP';
+                payload.codigo_aptitud = 'S0';
+                payload.user_id = currentUser.id;
+                const { error } = await supabaseClient.from('pendientes_bim').insert([payload]);
+                if (error) { alert('Error: ' + error.message); return; }
             }
 
             closeModal();
@@ -282,12 +416,98 @@ async function initApp() {
         }
 
         async function deleteTask(id) {
-            if (confirm("¿Estás seguro de eliminar este registro?")) {
-                await supabaseClient.from('pendientes_bim').delete().eq('id', id);
-                fetchTasks();
-            }
+            if (!canDelete()) return;
+            if (!confirm("¿Eliminar este contenedor? Se borrará también su historial CDE.")) return;
+            const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
+            if (error) { alert('Error: ' + error.message); return; }
+            fetchTasks();
         }
 
+        // ==== TRANSICIÓN CDE (RPC ISO) ====
+        function openModalCDE(id) {
+            if (!canTransition()) return;
+            cdeTargetId = id;
+            document.getElementById('cde-current').innerText = `Contenedor #${id}`;
+            document.getElementById('cde-estado').value = 'Shared';
+            document.getElementById('cde-aptitud').value = 'S1';
+            document.getElementById('cde-comentario').value = '';
+            document.getElementById('modal-cde').classList.remove('hidden');
+            document.getElementById('modal-cde').classList.add('flex');
+        }
+
+        function closeModalCDE() {
+            document.getElementById('modal-cde').classList.add('hidden');
+            document.getElementById('modal-cde').classList.remove('flex');
+            cdeTargetId = null;
+        }
+
+        async function confirmarTransicion() {
+            if (!cdeTargetId) return;
+            const estado = document.getElementById('cde-estado').value;
+            const aptitud = document.getElementById('cde-aptitud').value;
+            const comentario = document.getElementById('cde-comentario').value || null;
+
+            const { data, error } = await supabaseClient.rpc('transicionar_cde', {
+                p_pendiente_id: cdeTargetId,
+                p_estado_nuevo: estado,
+                p_aptitud_nueva: aptitud,
+                p_comentario: comentario
+            });
+
+            if (error) { alert('Error RPC: ' + error.message); return; }
+            if (!data || !data.ok) {
+                alert('Transición rechazada: ' + (data?.error || 'desconocida'));
+                return;
+            }
+
+            closeModalCDE();
+            fetchTasks();
+        }
+
+        // ==== HISTORIAL ====
+        async function openHistorial(id) {
+            document.getElementById('modal-hist').classList.remove('hidden');
+            document.getElementById('modal-hist').classList.add('flex');
+            const box = document.getElementById('hist-content');
+            box.innerHTML = '<p class="text-slate-400">Cargando...</p>';
+
+            const { data, error } = await supabaseClient
+                .from('transiciones_cde')
+                .select('*')
+                .eq('pendiente_id', id)
+                .order('created_at', { ascending: false });
+
+            if (error) { box.innerHTML = `<p class="text-red-500">${escapeHtml(error.message)}</p>`; return; }
+            if (!data.length) { box.innerHTML = '<p class="text-slate-400">Sin transiciones registradas aún.</p>'; return; }
+
+            box.innerHTML = data.map(x => `
+                <div class="border border-slate-200 rounded p-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-semibold">${x.estado_anterior || '—'} → ${x.estado_nuevo}</span>
+                        <span class="text-[10px] text-slate-400">${new Date(x.created_at).toLocaleString()}</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">
+                        Aptitud: ${x.aptitud_anterior || '—'} → ${x.aptitud_nueva || '—'}
+                        · Usuario: ${escapeHtml(x.usuario_email || 'desconocido')}
+                    </div>
+                    ${x.comentario ? `<div class="text-[11px] text-slate-600 mt-1 italic">“${escapeHtml(x.comentario)}”</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function closeHistorial() {
+            document.getElementById('modal-hist').classList.add('hidden');
+            document.getElementById('modal-hist').classList.remove('flex');
+        }
+
+        // ==== UTIL ====
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // ==== ARRANQUE ====
         window.onload = async () => {
             const { data: { user } } = await supabaseClient.auth.getUser();
             if (user) initApp();
