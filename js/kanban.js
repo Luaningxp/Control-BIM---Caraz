@@ -1,5 +1,5 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, cdeBadge, nombreResponsable, daysToDeadline, fmtDate, critColor, toast, APTITUD_DEFAULT } from './utils.js';
+import { escapeHtml, cdeBadge, nombreResponsable, critColor, toast, APTITUD_DEFAULT, getCriticidad } from './utils.js';
 
 export function renderKanban(container) {
     const ESTADOS = ['WIP', 'Shared', 'Published', 'Archived'];
@@ -24,7 +24,9 @@ export function renderKanban(container) {
                             <span class="text-[11px] font-bold bg-white text-slate-600 rounded-full px-2 py-0.5 border border-slate-200">${items.length}</span>
                         </div>
                         <div class="kb-body">
-                            ${items.map(t => `
+                            ${items.map(t => {
+                                const crit = getCriticidad(t);
+                                return `
                                 <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm" draggable="${state.isAdmin || state.isCoordinador}" ondragstart="window.onDragStart(event, ${t.id})" ondragend="window.onDragEnd(event)">
                                     <div class="flex justify-between gap-2 mb-1">
                                         <span class="font-mono text-[10px] text-slate-400">${t.codigo_contenedor || '–'}</span>
@@ -33,10 +35,10 @@ export function renderKanban(container) {
                                     <p class="text-[12px] font-medium text-slate-800 leading-snug line-clamp-3">${escapeHtml(t.actividad)}</p>
                                     <div class="flex justify-between items-center mt-2 text-[10px] text-slate-500">
                                         <span>${escapeHtml(nombreResponsable(t, state.perfilesCache))}</span>
-                                        <span class="${critColor(t.criticidad)}">${t.criticidad}</span>
+                                        <span class="${critColor(crit)}">${crit}</span>
                                     </div>
                                 </div>
-                            `).join('') || '<p class="text-[11px] text-slate-400 text-center py-4">Vacío</p>'}
+                            `}).join('') || '<p class="text-[11px] text-slate-400 text-center py-4">Vacío</p>'}
                         </div>
                     </div>
                 `;
