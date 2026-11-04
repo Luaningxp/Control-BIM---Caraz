@@ -21,7 +21,7 @@ export function renderConfig(container) {
                 </div>
             </div>
             <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Importancia, Urgencia, Estado, Fecha Fin, Fecha Cierre, Nota</i>. (El sistema los detectará automáticamente).
+                <b>Formato esperado para importar:</b> La primera fila del Excel debe tener los encabezados: <i>Actividad, Grupo, Responsable, Importancia, Urgencia, Estado, Inicio Prog., Fin Prog., Cierre Real, Nota</i>. (El sistema los detectará automáticamente).
             </div>
         </div>
 
@@ -107,10 +107,11 @@ window.exportToExcel = () => {
         'Grupo': t.grupo || '',
         'Responsable': t.responsable || '',
         'Importancia': t.importancia || 'Medio',
-        'Urgencia': t.urgencia || 'Medio', // <-- Añadido
+        'Urgencia': t.urgencia || 'Medio',
         'Estado': t.estado,
-        'Fecha Fin': t.fecha_fin || '',
-        'Fecha Cierre': t.fecha_cierre || '',
+        'Inicio Prog.': t.fecha_inicio_programado || '',
+        'Fin Prog.': t.fecha_fin || '',
+        'Cierre Real': t.fecha_cierre || '',
         'Nota': t.nota || '',
         'CDE': t.estado_cde || 'WIP',
         'Aptitud': t.codigo_aptitud || 'S0'
@@ -158,11 +159,9 @@ window.handleFileUpload = (e) => {
                     if (perfil) respId = perfil.id;
                 }
 
-                // Leer Importancia
                 let imp = row['Importancia'] || row['importancia'] || row['Criticidad'] || row['criticidad'] || 'Medio';
                 if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(imp)) imp = 'Medio';
 
-                // Leer Urgencia
                 let urg = row['Urgencia'] || row['urgencia'] || 'Medio';
                 if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(urg)) urg = 'Medio';
 
@@ -172,10 +171,11 @@ window.handleFileUpload = (e) => {
                     responsable: respEmail || null,
                     responsable_id: respId,
                     importancia: imp,
-                    urgencia: urg, // <-- Añadido
+                    urgencia: urg,
                     estado: row['Estado'] || row['estado'] || 'No iniciado',
-                    fecha_fin: parseDate(row['Fecha Fin'] || row['fecha_fin']),
-                    fecha_cierre: parseDate(row['Fecha Cierre'] || row['fecha_cierre']),
+                    fecha_inicio_programado: parseDate(row['Inicio Prog.'] || row['fecha_inicio_programado']),
+                    fecha_fin: parseDate(row['Fin Prog.'] || row['fecha_fin']),
+                    fecha_cierre: parseDate(row['Cierre Real'] || row['fecha_cierre']),
                     nota: row['Nota'] || row['nota'] || null,
                     estado_cde: 'WIP',
                     codigo_aptitud: 'S0',
