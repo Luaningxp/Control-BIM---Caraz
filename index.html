@@ -83,7 +83,7 @@
             <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto" id="tabs-nav">
                 <button data-tab="mitrabajo" onclick="window.switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hidden">👤 Mi Trabajo</button>
                 <button data-tab="dashboard" onclick="window.switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
-                <button data-tab="tabla" onclick="window.switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
+                <button data-tab="tabla" onclick="window.switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Gestión de Actividades</button>
                 <button data-tab="kanban" onclick="window.switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
                 <button data-tab="eisenhower" onclick="window.switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
                 <button data-tab="manpower" onclick="window.switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⏱ MANPOWER</button>
@@ -103,8 +103,10 @@
             <form onsubmit="window.saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Actividad *</label>
-                    <input type="text" id="task-actividad" required class="inp">
+                    <label class="block font-semibold text-slate-600 mb-1">Importancia (Impacto)</label>
+                    <select id="task-importancia" class="inp">
+                        <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
+                    </select>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
