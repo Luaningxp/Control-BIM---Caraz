@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; color: #1e293b; }
         .inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.45rem 0.65rem; font-size: 0.875rem; background: #fff; }
@@ -17,11 +16,22 @@
         th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; text-align: left; padding: 0.6rem 0.8rem; background: #f1f5f9; }
         td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; vertical-align: top; }
         .badge-cde { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; }
+        .tab-active { border-color: #0284c7 !important; color: #0284c7 !important; }
+        /* Kanban */
+        .kb-col { background: #f1f5f9; border-radius: 0.75rem; min-height: 200px; display: flex; flex-direction: column; }
+        .kb-col.drag-over { background: #e0f2fe; outline: 2px dashed #0284c7; outline-offset: -4px; }
+        .kb-card { cursor: grab; user-select: none; transition: transform .12s ease, box-shadow .12s ease; }
+        .kb-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-1px); }
+        .kb-card.dragging { opacity: .45; cursor: grabbing; transform: rotate(1.5deg) scale(.98); }
+        .kb-body { overflow-y: auto; padding: 0 .5rem .5rem .5rem; flex: 1; }
+        /* Eisenhower */
+        .eis-q { border-radius: 0.75rem; padding: .75rem; border-width: 1px; }
+        .eis-body { max-height: 52vh; overflow-y: auto; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full space-y-4">
             <div class="text-center">
@@ -44,7 +54,7 @@
         </div>
     </div>
 
-    <!-- MAIN APP SCREEN -->
+    <!-- APP -->
     <div id="app-screen" class="hidden flex-col min-h-screen">
         <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -69,37 +79,73 @@
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
-            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                <div>
-                    <h3 class="font-bold text-sm text-slate-800">Contenedores de Información (Supabase)</h3>
-                    <p class="text-[11px] text-slate-500">WIP → Shared → Published → Archived · Códigos S0–S4</p>
-                </div>
-                <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium">
-                    <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-                </button>
+        <!-- TABS -->
+        <nav class="bg-white border-b border-slate-200 sticky top-16 z-20">
+            <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+                <button data-tab="tabla" onclick="switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
+                <button data-tab="kanban" onclick="switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
+                <button data-tab="eisenhower" onclick="switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
             </div>
+        </nav>
 
-            <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                        <tr>
-                            <th class="p-3">Código</th>
-                            <th class="p-3">Actividad</th>
-                            <th class="p-3">Grupo / Resp.</th>
-                            <th class="p-3">Crit.</th>
-                            <th class="p-3">Estado op.</th>
-                            <th class="p-3">CDE ISO</th>
-                            <th class="p-3 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="task-list" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
+        <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
+
+            <!-- TABLA -->
+            <section id="view-tabla">
+                <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-800">Contenedores de Información (Supabase)</h3>
+                        <p class="text-[11px] text-slate-500">WIP → Shared → Published → Archived · Códigos S0–S4</p>
+                    </div>
+                    <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
+                    </button>
+                </div>
+                <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <tr>
+                                <th class="p-3">Código</th>
+                                <th class="p-3">Actividad</th>
+                                <th class="p-3">Grupo / Resp.</th>
+                                <th class="p-3">Crit.</th>
+                                <th class="p-3">Estado op.</th>
+                                <th class="p-3">CDE ISO</th>
+                                <th class="p-3 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="task-list" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- KANBAN -->
+            <section id="view-kanban" class="hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-800">Tablero Kanban · Flujo CDE</h3>
+                        <p class="text-[11px] text-slate-500">Arrastra un contenedor entre columnas. Las transiciones se validan contra la RPC ISO 19650.</p>
+                    </div>
+                    <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
+                    </button>
+                </div>
+                <div id="kanban-board" class="grid grid-cols-1 md:grid-cols-4 gap-3"></div>
+            </section>
+
+            <!-- EISENHOWER -->
+            <section id="view-eisenhower" class="hidden">
+                <div class="mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Matriz Eisenhower · Priorización</h3>
+                    <p class="text-[11px] text-slate-500">Urgente = vence en ≤7 días o ya venció. Importante = criticidad Muy alto / Alto. Solo contenedores abiertos (no Archived).</p>
+                </div>
+                <div id="eisenhower-board" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </section>
+
         </main>
     </div>
 
-    <!-- MODAL: Crear / Editar -->
+    <!-- MODAL TASK -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
             <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
@@ -123,20 +169,13 @@
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Criticidad</label>
                         <select id="task-criticidad" class="inp">
-                            <option>Muy alto</option>
-                            <option>Alto</option>
-                            <option>Medio</option>
-                            <option>Bajo</option>
+                            <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
                         </select>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Estado operativo</label>
                         <select id="task-estado" class="inp">
-                            <option>No iniciado</option>
-                            <option>En proceso</option>
-                            <option>En espera</option>
-                            <option>Reprogramado</option>
-                            <option>Cerrado</option>
+                            <option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option><option>Cerrado</option>
                         </select>
                     </div>
                 </div>
@@ -156,7 +195,7 @@
                 </div>
                 <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
                     <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
-                    El contenedor se crea en <b>WIP · S0</b>. Para moverlo a Shared o Published usa el botón <b>CDE</b> en la tabla (RPC ISO).
+                    Se crea en <b>WIP · S0</b>. Para moverlo de estado CDE usa el tablero Kanban o el botón <b>CDE</b> (RPC ISO).
                 </div>
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                     <button type="button" onclick="closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
@@ -166,7 +205,7 @@
         </div>
     </div>
 
-    <!-- MODAL: Transición CDE -->
+    <!-- MODAL CDE -->
     <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
             <h3 class="font-bold text-sm text-slate-800">Transición CDE · ISO 19650</h3>
@@ -206,7 +245,7 @@
         </div>
     </div>
 
-    <!-- MODAL: Historial de transiciones -->
+    <!-- MODAL HISTORIAL -->
     <div id="modal-hist" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto">
             <div class="flex justify-between items-center">
@@ -217,8 +256,11 @@
         </div>
     </div>
 
+    <!-- TOAST -->
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
+
     <script>
-        // ==== CONFIGURACIÓN SUPABASE ====
+        // ==== SUPABASE ====
         const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -228,19 +270,28 @@
         let isAdmin = false;
         let isCoordinador = false;
         let cdeTargetId = null;
+        let tasksCache = [];
+        let currentTab = 'tabla';
 
-        // ==== UTILIDADES DE PRESENTACIÓN ====
         const CDE_COLORS = {
             WIP: 'background:#f1f5f9;color:#334155;',
             Shared: 'background:#fef3c7;color:#92400e;',
             Published: 'background:#ccfbf1;color:#115e59;',
             Archived: 'background:#e2e8f0;color:#64748b;'
         };
-        const cdeBadge = (estado, aptitud) => `
-            <span class="badge-cde" style="${CDE_COLORS[estado] || ''}">${estado || 'WIP'} · ${aptitud || 'S0'}</span>
-        `;
+        const CDE_META = {
+            WIP:       { titulo: 'WIP',       sub: 'En trabajo',       icon: 'fa-pen-ruler',     color: 'slate' },
+            Shared:    { titulo: 'Shared',    sub: 'En coordinación',  icon: 'fa-share-nodes',   color: 'amber' },
+            Published: { titulo: 'Published', sub: 'Publicado',        icon: 'fa-stamp',         color: 'teal'  },
+            Archived:  { titulo: 'Archived',  sub: 'Archivado',        icon: 'fa-box-archive',   color: 'slate' }
+        };
+        const ESTADOS_CDE = ['WIP', 'Shared', 'Published', 'Archived'];
+        const APTITUD_DEFAULT = { WIP: 'S0', Shared: 'S3', Published: 'S4', Archived: 'A1' };
 
-        // ==== LOGIN / LOGOUT ====
+        const cdeBadge = (estado, aptitud) =>
+            `<span class="badge-cde" style="${CDE_COLORS[estado] || ''}">${estado || 'WIP'} · ${aptitud || 'S0'}</span>`;
+
+        // ==== AUTH ====
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -248,7 +299,6 @@
             const errorDiv = document.getElementById('login-error');
 
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
             if (error) {
                 errorDiv.innerText = "Error: Credenciales inválidas";
                 errorDiv.classList.remove('hidden');
@@ -257,73 +307,75 @@
                 initApp();
             }
         }
-
         async function handleLogout() {
             await supabaseClient.auth.signOut();
             location.reload();
         }
 
-        // ==== INICIALIZACIÓN ====
         async function initApp() {
             const { data: { user } } = await supabaseClient.auth.getUser();
             if (!user) return;
-
             currentUser = user;
 
-            const { data: perfil, error } = await supabaseClient
-                .from('perfiles')
-                .select('rol')
-                .eq('id', currentUser.id)
-                .maybeSingle();
+            const { data: perfil } = await supabaseClient
+                .from('perfiles').select('rol').eq('id', currentUser.id).maybeSingle();
 
-            if (error) console.error("Error al consultar perfil:", error);
-
-            currentRol = (perfil && perfil.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
+            currentRol = (perfil?.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
             isAdmin = currentRol === 'admin';
             isCoordinador = currentRol === 'coordinador_bim';
 
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
             document.getElementById('app-screen').classList.add('flex');
-
             document.getElementById('user-display').innerText = currentUser.email;
             document.getElementById('role-display').innerText =
-                isAdmin ? 'Administrador' :
-                isCoordinador ? 'Coordinador BIM' : 'Modelador / Operador';
+                isAdmin ? 'Administrador' : isCoordinador ? 'Coordinador BIM' : 'Modelador / Operador';
 
-            // Solo admin y coordinador pueden crear
-            const btnNew = document.getElementById('btn-new-task');
-            if (isAdmin || isCoordinador) btnNew.classList.remove('hidden');
-            else btnNew.classList.add('hidden');
+            if (isAdmin || isCoordinador) document.getElementById('btn-new-task').classList.remove('hidden');
 
+            switchTab('tabla');
             fetchTasks();
         }
 
-        // ==== PERMISOS DERIVADOS ====
-        const canEdit = (t) => {
-            if (isAdmin || isCoordinador) return true;
-            return t.estado_cde === 'WIP' && t.user_id === currentUser?.id;
-        };
+        // ==== PERMISOS ====
+        const canEdit = (t) => (isAdmin || isCoordinador) || (t.estado_cde === 'WIP' && t.user_id === currentUser?.id);
         const canDelete = () => isAdmin;
         const canTransition = () => isAdmin || isCoordinador;
 
-        // ==== LECTURA ====
+        // ==== TABS ====
+        function switchTab(tab) {
+            currentTab = tab;
+            ['tabla', 'kanban', 'eisenhower'].forEach(t => {
+                document.getElementById('view-' + t).classList.toggle('hidden', t !== tab);
+                const btn = document.querySelector(`[data-tab="${t}"]`);
+                btn.classList.toggle('tab-active', t === tab);
+            });
+            render();
+        }
+
+        function render() {
+            if (currentTab === 'tabla') renderTabla();
+            else if (currentTab === 'kanban') renderKanban();
+            else if (currentTab === 'eisenhower') renderEisenhower();
+        }
+
+        // ==== FETCH ====
         async function fetchTasks() {
-            const { data: tasks, error } = await supabaseClient
-                .from('pendientes_bim')
-                .select('*')
-                .order('id', { ascending: false });
+            const { data, error } = await supabaseClient
+                .from('pendientes_bim').select('*').order('id', { ascending: false });
+            if (error) { toast('Error cargando: ' + error.message); return; }
+            tasksCache = data || [];
+            render();
+        }
 
-            if (error) { console.error(error); return; }
-
+        // ==== TABLA ====
+        function renderTabla() {
             const tbody = document.getElementById('task-list');
-
-            if (!tasks.length) {
+            if (!tasksCache.length) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin contenedores aún</td></tr>`;
                 return;
             }
-
-            tbody.innerHTML = tasks.map(t => `
+            tbody.innerHTML = tasksCache.map(t => `
                 <tr class="hover:bg-slate-50 transition">
                     <td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>
                     <td class="p-3 font-medium text-slate-900 max-w-xs">
@@ -347,19 +399,187 @@
             `).join('');
         }
 
-        // ==== MODAL CREAR / EDITAR ====
+        // ==== KANBAN ====
+        function kanbanCard(t) {
+            const dragAllowed = canTransition();
+            const d = daysToDeadline(t);
+            return `
+                <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm"
+                     draggable="${dragAllowed}"
+                     data-id="${t.id}"
+                     ondragstart="onDragStart(event, ${t.id})"
+                     ondragend="onDragEnd(event)">
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="font-mono text-[10px] text-slate-400">${t.codigo_contenedor || '–'}</span>
+                        ${cdeBadge(t.estado_cde, t.codigo_aptitud)}
+                    </div>
+                    <p class="text-[12px] font-medium text-slate-800 mt-1.5 leading-snug line-clamp-3">${escapeHtml(t.actividad)}</p>
+                    <div class="flex items-center justify-between mt-2 text-[10px] text-slate-500">
+                        <span class="truncate"><i class="fa-solid fa-user mr-1"></i>${escapeHtml(t.responsable || 'sin asignar')}</span>
+                        <span class="font-semibold ${critColor(t.criticidad)}">${escapeHtml(t.criticidad || '–')}</span>
+                    </div>
+                    ${t.fecha_fin ? `<div class="mt-1 text-[10px] ${d < 0 ? 'text-red-600 font-semibold' : d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
+                        <i class="fa-regular fa-calendar mr-1"></i>${fmtDate(t.fecha_fin)} ${d < 0 ? `· ${Math.abs(d)}d atraso` : ''}
+                    </div>` : ''}
+                    <div class="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
+                        ${canEdit(t) ? `<button onclick="event.stopPropagation();editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})" class="text-sky-600 hover:text-sky-800" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
+                        <button onclick="event.stopPropagation();openHistorial(${t.id})" class="text-slate-500 hover:text-slate-700" title="Historial"><i class="fa-solid fa-clock-rotate-left text-[11px]"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderKanban() {
+            const board = document.getElementById('kanban-board');
+            board.innerHTML = ESTADOS_CDE.map(estado => {
+                const meta = CDE_META[estado];
+                const items = tasksCache.filter(t => (t.estado_cde || 'WIP') === estado);
+                return `
+                    <div class="kb-col p-2" data-estado="${estado}"
+                         ondragover="onDragOver(event)"
+                         ondragleave="onDragLeave(event)"
+                         ondrop="onDrop(event, '${estado}')">
+                        <div class="flex items-center justify-between px-2 py-2 mb-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded bg-${meta.color}-100 text-${meta.color}-700 grid place-items-center">
+                                    <i class="fa-solid ${meta.icon} text-[11px]"></i>
+                                </span>
+                                <div>
+                                    <p class="text-[12px] font-bold text-slate-800 leading-tight">${meta.titulo}</p>
+                                    <p class="text-[10px] text-slate-500">${meta.sub}</p>
+                                </div>
+                            </div>
+                            <span class="text-[11px] font-bold bg-white text-slate-600 rounded-full px-2 py-0.5 border border-slate-200">${items.length}</span>
+                        </div>
+                        <div class="kb-body">${items.map(kanbanCard).join('') || '<p class="text-[11px] text-slate-400 text-center py-4">Vacío</p>'}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Drag & Drop
+        let dragId = null;
+        function onDragStart(e, id) {
+            if (!canTransition()) { e.preventDefault(); return; }
+            dragId = id;
+            e.dataTransfer.effectAllowed = 'move';
+            e.currentTarget.classList.add('dragging');
+        }
+        function onDragEnd(e) { e.currentTarget.classList.remove('dragging'); dragId = null; }
+        function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('drag-over'); }
+        function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+        async function onDrop(e, nuevoEstado) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const id = dragId;
+            dragId = null;
+            if (!id) return;
+            const t = tasksCache.find(x => x.id === id);
+            if (!t) return;
+            const estadoActual = t.estado_cde || 'WIP';
+            if (estadoActual === nuevoEstado) return;
+            if (!canTransition()) { toast('Tu rol no permite mover entre estados CDE'); return; }
+
+            // Sugerir aptitud coherente con el estado
+            const aptitud = APTITUD_DEFAULT[nuevoEstado];
+
+            const { data, error } = await supabaseClient.rpc('transicionar_cde', {
+                p_pendiente_id: id,
+                p_estado_nuevo: nuevoEstado,
+                p_aptitud_nueva: aptitud,
+                p_comentario: `Movido vía Kanban a ${nuevoEstado}`
+            });
+            if (error) { toast('Error: ' + error.message); return; }
+            if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'transición inválida')); return; }
+
+            toast(`Movido a ${nuevoEstado} · ${aptitud}`);
+            fetchTasks();
+        }
+
+        // ==== EISENHOWER ====
+        function renderEisenhower() {
+            const board = document.getElementById('eisenhower-board');
+            const activos = tasksCache.filter(t => t.estado_cde !== 'Archived' && t.estado !== 'Cerrado');
+
+            const today = new Date(); today.setHours(0,0,0,0);
+            const isUrgente = (t) => {
+                if (!t.fecha_fin) return false;
+                const f = new Date(t.fecha_fin + 'T00:00:00');
+                const d = Math.round((f - today) / 86400000);
+                return d <= 7;
+            };
+            const isImportante = (t) => t.criticidad === 'Muy alto' || t.criticidad === 'Alto';
+
+            const Q = [
+                { key: 'q1', titulo: 'Hacer ya',     sub: 'Urgente + Importante',     color: 'red',   items: activos.filter(t =>  isUrgente(t) &&  isImportante(t)) },
+                { key: 'q2', titulo: 'Programar',    sub: 'Importante, no urgente',   color: 'sky',   items: activos.filter(t => !isUrgente(t) &&  isImportante(t)) },
+                { key: 'q3', titulo: 'Delegar',      sub: 'Urgente, no importante',   color: 'amber', items: activos.filter(t =>  isUrgente(t) && !isImportante(t)) },
+                { key: 'q4', titulo: 'Eliminar / posponer', sub: 'Ni urgente ni importante', color: 'slate', items: activos.filter(t => !isUrgente(t) && !isImportante(t)) }
+            ];
+
+            board.innerHTML = Q.map(q => `
+                <div class="eis-q bg-${q.color}-50 border-${q.color}-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <h4 class="text-[13px] font-bold text-${q.color}-800">${q.titulo}</h4>
+                            <p class="text-[10px] text-${q.color}-600">${q.sub}</p>
+                        </div>
+                        <span class="text-[11px] font-bold bg-white border border-${q.color}-200 text-${q.color}-700 rounded-full px-2 py-0.5">${q.items.length}</span>
+                    </div>
+                    <div class="eis-body space-y-1.5">
+                        ${q.items.slice(0, 50).map(t => `
+                            <div class="bg-white rounded border border-slate-200 p-2 text-[11px]">
+                                <p class="font-medium text-slate-800 leading-snug line-clamp-2">${escapeHtml(t.actividad)}</p>
+                                <div class="flex justify-between items-center mt-1 text-[10px] text-slate-500">
+                                    <span>${escapeHtml(t.responsable || 'sin asignar')}</span>
+                                    <span>${t.fecha_fin ? fmtDate(t.fecha_fin) : 'sin fecha'}</span>
+                                </div>
+                            </div>
+                        `).join('') || '<p class="text-[11px] text-slate-400 text-center py-3">Sin actividades</p>'}
+                        ${q.items.length > 50 ? `<p class="text-[10px] text-slate-400 text-center">+${q.items.length - 50} más</p>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ==== HELPERS ====
+        function fmtDate(iso) {
+            if (!iso) return '–';
+            const [y, m, d] = iso.split('-');
+            return `${d}/${m}/${y.slice(2)}`;
+        }
+        function daysToDeadline(t) {
+            if (!t.fecha_fin) return 9999;
+            const today = new Date(); today.setHours(0,0,0,0);
+            const f = new Date(t.fecha_fin + 'T00:00:00');
+            return Math.round((f - today) / 86400000);
+        }
+        function critColor(c) {
+            return c === 'Muy alto' ? 'text-red-600' :
+                   c === 'Alto' ? 'text-orange-600' :
+                   c === 'Medio' ? 'text-amber-600' : 'text-slate-500';
+        }
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+        function toast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => el.classList.add('hidden'), 2600);
+        }
+
+        // ==== CRUD ====
         function openModal() {
             if (!isAdmin && !isCoordinador) return;
             document.getElementById('modal-title').innerText = "Nuevo Contenedor";
-            document.getElementById('task-id').value = '';
-            document.getElementById('task-actividad').value = '';
-            document.getElementById('task-grupo').value = '';
-            document.getElementById('task-responsable').value = '';
+            ['task-id','task-actividad','task-grupo','task-responsable','task-fecha-fin','task-fecha-cierre','task-nota']
+                .forEach(id => document.getElementById(id).value = '');
             document.getElementById('task-criticidad').value = 'Alto';
             document.getElementById('task-estado').value = 'No iniciado';
-            document.getElementById('task-fecha-fin').value = '';
-            document.getElementById('task-fecha-cierre').value = '';
-            document.getElementById('task-nota').value = '';
             document.getElementById('modal-task').classList.remove('hidden');
             document.getElementById('modal-task').classList.add('flex');
         }
@@ -398,32 +618,31 @@
                 fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
                 nota: document.getElementById('task-nota').value
             };
-
             if (id) {
                 const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
-                if (error) { alert('Error: ' + error.message); return; }
+                if (error) { toast('Error: ' + error.message); return; }
             } else {
-                if (!isAdmin && !isCoordinador) { alert('Solo admin/coordinador puede crear.'); return; }
+                if (!isAdmin && !isCoordinador) { toast('Solo admin/coordinador puede crear.'); return; }
                 payload.estado_cde = 'WIP';
                 payload.codigo_aptitud = 'S0';
                 payload.user_id = currentUser.id;
                 const { error } = await supabaseClient.from('pendientes_bim').insert([payload]);
-                if (error) { alert('Error: ' + error.message); return; }
+                if (error) { toast('Error: ' + error.message); return; }
             }
-
             closeModal();
             fetchTasks();
+            toast('Guardado');
         }
 
         async function deleteTask(id) {
             if (!canDelete()) return;
             if (!confirm("¿Eliminar este contenedor? Se borrará también su historial CDE.")) return;
             const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
-            if (error) { alert('Error: ' + error.message); return; }
+            if (error) { toast('Error: ' + error.message); return; }
             fetchTasks();
         }
 
-        // ==== TRANSICIÓN CDE (RPC ISO) ====
+        // ==== CDE ====
         function openModalCDE(id) {
             if (!canTransition()) return;
             cdeTargetId = id;
@@ -434,13 +653,11 @@
             document.getElementById('modal-cde').classList.remove('hidden');
             document.getElementById('modal-cde').classList.add('flex');
         }
-
         function closeModalCDE() {
             document.getElementById('modal-cde').classList.add('hidden');
             document.getElementById('modal-cde').classList.remove('flex');
             cdeTargetId = null;
         }
-
         async function confirmarTransicion() {
             if (!cdeTargetId) return;
             const estado = document.getElementById('cde-estado').value;
@@ -453,15 +670,11 @@
                 p_aptitud_nueva: aptitud,
                 p_comentario: comentario
             });
-
-            if (error) { alert('Error RPC: ' + error.message); return; }
-            if (!data || !data.ok) {
-                alert('Transición rechazada: ' + (data?.error || 'desconocida'));
-                return;
-            }
-
+            if (error) { toast('Error RPC: ' + error.message); return; }
+            if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
             closeModalCDE();
             fetchTasks();
+            toast('Transición aplicada');
         }
 
         // ==== HISTORIAL ====
@@ -472,9 +685,7 @@
             box.innerHTML = '<p class="text-slate-400">Cargando...</p>';
 
             const { data, error } = await supabaseClient
-                .from('transiciones_cde')
-                .select('*')
-                .eq('pendiente_id', id)
+                .from('transiciones_cde').select('*').eq('pendiente_id', id)
                 .order('created_at', { ascending: false });
 
             if (error) { box.innerHTML = `<p class="text-red-500">${escapeHtml(error.message)}</p>`; return; }
@@ -494,17 +705,9 @@
                 </div>
             `).join('');
         }
-
         function closeHistorial() {
             document.getElementById('modal-hist').classList.add('hidden');
             document.getElementById('modal-hist').classList.remove('flex');
-        }
-
-        // ==== UTIL ====
-        function escapeHtml(s) {
-            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[c]));
         }
 
         // ==== ARRANQUE ====
