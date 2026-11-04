@@ -1,5 +1,5 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad } from './utils.js';
+import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad, critColor } from './utils.js';
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
@@ -23,7 +23,6 @@ function getProcessedTasks() {
     result.sort((a, b) => {
         let valA = a[tableState.sortBy] || '';
         let valB = b[tableState.sortBy] || '';
-        // Si ordenamos por criticidad, ordenamos por peso
         if (tableState.sortBy === 'criticidad') {
             const weights = { 'Muy alto': 4, 'Alto': 3, 'Medio': 2, 'Bajo': 1 };
             valA = weights[getCriticidad(a)] || 0;
@@ -99,13 +98,15 @@ export function renderTabla(container) {
                 </thead>
                 <tbody id="task-list" class="divide-y divide-slate-100">
                     ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
-                    ${tasks.map(t => `
+                    ${tasks.map(t => {
+                        const crit = getCriticidad(t); 
+                        return `
                         <tr class="hover:bg-slate-50 transition">
                             ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>` : ''}
                             ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
                             ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
                             ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
-                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(getCriticidad(t))}">${getCriticidad(t)}</td>` : ''}
+                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)}">${crit}</td>` : ''}
                             ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
                             ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
                             ${visiblePropDefs.map(pd => {
@@ -125,7 +126,7 @@ export function renderTabla(container) {
                                 ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
                             </td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         </div>
@@ -141,11 +142,21 @@ window.toggleSort = toggleSort; window.toggleCol = toggleCol; window.toggleProp 
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
     document.getElementById('modal-title').innerText = "Nuevo Contenedor";
-    ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => document.getElementById(id).value = '');
+    
+    ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    
     document.getElementById('task-importancia').value = 'Medio';
     document.getElementById('task-estado').value = 'No iniciado';
-    const grSel = document.getElementById('task-grupo'); grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
-    const rsSel = document.getElementById('task-responsable'); rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    
+    const grSel = document.getElementById('task-grupo'); 
+    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+    
+    const rsSel = document.getElementById('task-responsable'); 
+    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    
     renderCustomProps(null);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
@@ -161,8 +172,15 @@ export function editTask(id) {
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
-    const grSel = document.getElementById('task-grupo'); grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || '';
-    const rsSel = document.getElementById('task-responsable'); rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || '';
+    
+    const grSel = document.getElementById('task-grupo'); 
+    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
+    grSel.value = t.grupo || '';
+    
+    const rsSel = document.getElementById('task-responsable'); 
+    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); 
+    rsSel.value = t.responsable_id || '';
+    
     renderCustomProps(t.id);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
@@ -203,7 +221,7 @@ export async function saveTask(e) {
         grupo: document.getElementById('task-grupo').value || null,
         responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
         responsable_id: respId,
-        importancia: document.getElementById('task-importancia').value, // <-- Guardamos Importancia
+        importancia: document.getElementById('task-importancia').value,
         estado: document.getElementById('task-estado').value,
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
