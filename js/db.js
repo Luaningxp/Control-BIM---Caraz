@@ -1,15 +1,13 @@
-// CONFIGURACIÓN DE SUPABASE
-const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';
+export const supabaseClient = window.supabase.createClient('https://zsrczkdpluafuoczfokw.supabase.co', 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A');
 
-export const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ESTADO GLOBAL DE LA APLICACIÓN
 export const state = {
     currentUser: null,
     currentRol: 'operador',
+    currentCargo: '',
     isAdmin: false,
     isCoordinador: false,
+    isSupervisor: false,
+    isModelador: false,
     tasksCache: [],
     gruposCache: [],
     perfilesCache: [],
@@ -22,7 +20,6 @@ export const state = {
     charts: {}
 };
 
-// FUNCIÓN PARA CARGAR TODOS LOS DATOS DE GOLPE
 export async function fetchAll() {
     try {
         const [t, g, p, pd, pv, m] = await Promise.all([
