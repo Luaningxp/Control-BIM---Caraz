@@ -26,8 +26,23 @@ export function renderKanban(container) {
                         <div class="kb-body">
                             ${items.map(t => {
                                 const crit = getCriticidad(t);
+                                
+                                // Lógica de permisos para arrastrar
+                                let canDrag = true;
+                                // Si está archivado, solo admin y coordinador pueden arrastrarlo
+                                if ((t.estado_cde === 'Archived') && (!state.isAdmin && !state.isCoordinador)) {
+                                    canDrag = false;
+                                }
+                                // Si no es admin/coordinador, solo puede mover sus propias tareas
+                                if (!state.isAdmin && !state.isCoordinador && t.user_id !== state.currentUser.id) {
+                                    canDrag = false;
+                                }
+
                                 return `
-                                <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm" draggable="${state.isAdmin || state.isCoordinador}" ondragstart="window.onDragStart(event, ${t.id})" ondragend="window.onDragEnd(event)">
+                                <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm ${canDrag ? '' : 'opacity-70'}" 
+                                     draggable="${canDrag}" 
+                                     ondragstart="window.onDragStart(event, ${t.id})" 
+                                     ondragend="window.onDragEnd(event)">
                                     <div class="flex justify-between gap-2 mb-1">
                                         <span class="font-mono text-[10px] text-slate-400">${t.codigo_contenedor || '–'}</span>
                                         ${cdeBadge(t.estado_cde, t.codigo_aptitud)}
@@ -48,14 +63,30 @@ export function renderKanban(container) {
 }
 
 export function onDragStart(e, id) {
-    if (!state.isAdmin && !state.isCoordinador) { e.preventDefault(); return; }
+    // Si no hay ID, o no tiene permitido el arrastre (por el atributo draggable="false"), cancelar
+    if (e.currentTarget.getAttribute('draggable') !== 'true') {
+        e.preventDefault();
+        return;
+    }
     state.dragId = id;
     e.dataTransfer.effectAllowed = 'move';
     e.currentTarget.classList.add('dragging');
 }
-export function onDragEnd(e) { e.currentTarget.classList.remove('dragging'); state.dragId = null; }
-export function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('drag-over'); }
-export function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+export function onDragEnd(e) { 
+    e.currentTarget.classList.remove('dragging'); 
+    state.dragId = null; 
+}
+
+export function onDragOver(e) { 
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'move'; 
+    e.currentTarget.classList.add('drag-over'); 
+}
+
+export function onDragLeave(e) { 
+    e.currentTarget.classList.remove('drag-over'); 
+}
 
 export async function onDrop(e, nuevoEstado) {
     e.preventDefault();
@@ -68,8 +99,13 @@ export async function onDrop(e, nuevoEstado) {
     if (!t || (t.estado_cde || 'WIP') === nuevoEstado) return;
     
     const aptitud = APTITUD_DEFAULT[nuevoEstado] || null;
+    
+    // Llamamos a la RPC (el backend validará si el rol tiene permiso real)
     const { data, error } = await supabaseClient.rpc('transicionar_cde', {
-        p_pendiente_id: id, p_estado_nuevo: nuevoEstado, p_aptitud_nueva: aptitud, p_comentario: 'Movido vía Kanban'
+        p_pendiente_id: id, 
+        p_estado_nuevo: nuevoEstado, 
+        p_aptitud_nueva: aptitud, 
+        p_comentario: 'Movido vía Kanban'
     });
     
     if (error) { toast('Error: ' + error.message); return; }
