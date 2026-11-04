@@ -3,7 +3,8 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    visibleCols: { codigo: true, actividad: true, grupo: true, responsable: true, importancia: true, urgencia: true, criticidad: true, estado: true, cde: true },
+    // Agregamos 'inicio' a las columnas visibles
+    visibleCols: { codigo: true, actividad: true, inicio: true, grupo: true, responsable: true, importancia: true, urgencia: true, criticidad: true, estado: true, cde: true },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
 
@@ -77,6 +78,7 @@ export function renderTabla(container) {
                     <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i></button>
                     <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('inicio')" ${tableState.visibleCols.inicio ? 'checked' : ''} class="rounded text-sky-600"> Inicio Prog.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('importancia')" ${tableState.visibleCols.importancia ? 'checked' : ''} class="rounded text-sky-600"> Importancia</label>
@@ -97,6 +99,7 @@ export function renderTabla(container) {
                     <tr>
                         ${tableState.visibleCols.codigo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')">Código ${getSortIcon('codigo_contenedor')}</th>` : ''}
                         ${tableState.visibleCols.actividad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')">Actividad ${getSortIcon('actividad')}</th>` : ''}
+                        ${tableState.visibleCols.inicio ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')">Inicio Prog. ${getSortIcon('fecha_inicio_programado')}</th>` : ''}
                         ${tableState.visibleCols.grupo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')">Grupo ${getSortIcon('grupo')}</th>` : ''}
                         ${tableState.visibleCols.responsable ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')">Responsable ${getSortIcon('responsable_id')}</th>` : ''}
                         ${tableState.visibleCols.importancia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')">Importancia ${getSortIcon('importancia')}</th>` : ''}
@@ -116,6 +119,7 @@ export function renderTabla(container) {
                         <tr class="hover:bg-slate-50 transition">
                             ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>` : ''}
                             ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
+                            ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
                             ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
                             ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
                             
@@ -159,7 +163,7 @@ export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
     document.getElementById('modal-title').innerText = "Nuevo Contenedor";
     
-    ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
+    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -186,12 +190,14 @@ export function editTask(id) {
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
     
-    // Verificamos que el campo exista antes de asignarlo
     const impEl = document.getElementById('task-importancia');
     if (impEl) impEl.value = t.importancia || 'Medio';
     
     const urgEl = document.getElementById('task-urgencia');
     if (urgEl) urgEl.value = t.urgencia || 'Medio';
+
+    const iniEl = document.getElementById('task-fecha-inicio');
+    if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
 
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
@@ -241,6 +247,7 @@ export async function saveTask(e) {
     const id = document.getElementById('task-id').value;
     const respId = document.getElementById('task-responsable').value || null;
     const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
+    
     const payload = {
         actividad: document.getElementById('task-actividad').value,
         grupo: document.getElementById('task-grupo').value || null,
@@ -249,6 +256,7 @@ export async function saveTask(e) {
         importancia: document.getElementById('task-importancia').value,
         urgencia: document.getElementById('task-urgencia').value,
         estado: document.getElementById('task-estado').value,
+        fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null, // <-- Nuevo
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
         nota: document.getElementById('task-nota').value
