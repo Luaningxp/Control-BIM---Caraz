@@ -2,16 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Control BIM · Hospital Caraz II-1 (Supabase)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Control BIM · Hospital Caraz II-1</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <!-- Supabase JS Client -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client (Única declaración) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.45rem 0.65rem; font-size: 0.875rem; background: #fff; }
+        .inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15); }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; text-align: left; padding: 0.6rem 0.8rem; background: #f1f5f9; }
+        td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans">
+<body class="min-h-screen flex flex-col">
 
     <!-- LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
@@ -19,7 +30,7 @@
             <div class="text-center">
                 <div class="w-12 h-12 bg-sky-600 text-white rounded-lg grid place-items-center mx-auto text-xl mb-2">🏥</div>
                 <h2 class="font-bold text-lg text-slate-900">Control BIM · Caraz II-1</h2>
-                <p class="text-xs text-slate-500">Inicia sesión para acceder al CDE</p>
+                <p class="text-xs text-slate-500">Inicia sesión con tu cuenta autorizada</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-3">
                 <div>
@@ -30,7 +41,7 @@
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Contraseña</label>
                     <input type="password" id="login-password" required class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-sky-600">
                 </div>
-                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded text-sm transition">Ingresar</button>
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded text-sm transition">Ingresar al CDE</button>
             </form>
             <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium"></div>
         </div>
@@ -38,14 +49,13 @@
 
     <!-- MAIN APP SCREEN -->
     <div id="app-screen" class="hidden flex-col min-h-screen">
-        <!-- Header -->
-        <header class="bg-white border-b border-slate-200">
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-slate-900 text-white grid place-items-center text-base">🏥</div>
                     <div>
-                        <h1 class="font-bold text-slate-900 leading-tight">Control BIM Hospital Caraz II-1</h1>
-                        <p class="text-xs text-slate-500">Usuario: <b id="user-display" class="text-sky-600"></b> (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded"></span>)</p>
+                        <h1 class="font-bold text-slate-900 leading-tight">Control del Equipo BIM</h1>
+                        <p class="text-xs text-slate-500">Usuario: <b id="user-display" class="text-sky-600"></b> (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700"></span>)</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -59,14 +69,12 @@
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
-            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200">
-                <h3 class="font-bold text-sm text-slate-800">Tablero de Entregables</h3>
-                <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar Data</button>
+            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-sm text-slate-800">Base de Entregables en Tiempo Real (Supabase)</h3>
+                <button onclick="fetchTasks()" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
             </div>
 
-            <!-- Tasks Table -->
             <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -79,9 +87,7 @@
                             <th class="p-3 text-center">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="task-list" class="divide-y divide-slate-100">
-                        <!-- Dynamic items -->
-                    </tbody>
+                    <tbody id="task-list" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
         </main>
@@ -95,22 +101,22 @@
                 <input type="hidden" id="task-id">
                 <div>
                     <label class="block font-semibold text-slate-600 mb-1">Actividad</label>
-                    <input type="text" id="task-actividad" required class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-sky-600">
+                    <input type="text" id="task-actividad" required class="inp">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Grupo</label>
-                        <input type="text" id="task-grupo" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-sky-600">
+                        <input type="text" id="task-grupo" class="inp">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Responsable</label>
-                        <input type="text" id="task-responsable" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-sky-600">
+                        <input type="text" id="task-responsable" class="inp">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Criticidad</label>
-                        <select id="task-criticidad" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-sky-600">
+                        <select id="task-criticidad" class="inp">
                             <option>Muy alto</option>
                             <option>Alto</option>
                             <option>Medio</option>
@@ -119,7 +125,7 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Estado</label>
-                        <select id="task-estado" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:border-sky-600">
+                        <select id="task-estado" class="inp">
                             <option>No iniciado</option>
                             <option>En proceso</option>
                             <option>En espera</option>
@@ -136,24 +142,22 @@
         </div>
     </div>
 
-    <!-- Script Application Logic -->
     <script>
-        // CONFIGURACIÓN DE TU PROYECTO SUPABASE
-        const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co'; // <--- Reemplaza con tu URL
-        const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';               // <--- Reemplaza con tu Anon Key
+        // CONFIGURACIÓN SUPABASE (Reemplaza con tus datos reales)
+        const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';
 
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentUser = null;
         let isAdmin = false;
 
-        // Login Handler
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const errorDiv = document.getElementById('login-error');
 
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
             if (error) {
                 errorDiv.innerText = "Error: Credenciales inválidas";
@@ -165,17 +169,16 @@
         }
 
         async function handleLogout() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             location.reload();
         }
 
         async function initApp() {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await supabaseClient.auth.getUser();
             if (!user) return;
 
             currentUser = user;
-            // Definimos Administrador si el correo coincide o si tiene meta-data admin
-            isAdmin = currentUser.email.includes('admin'); 
+            isAdmin = currentUser.email.toLowerCase().includes('admin');
 
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
@@ -184,7 +187,6 @@
             document.getElementById('user-display').innerText = currentUser.email;
             document.getElementById('role-display').innerText = isAdmin ? 'Administrador' : 'Operador / Modelador';
 
-            // Ocultar acciones exclusivas si no es Admin
             if (!isAdmin) {
                 document.getElementById('btn-new-task').classList.add('hidden');
             }
@@ -193,20 +195,20 @@
         }
 
         async function fetchTasks() {
-            const { data: tasks, error } = await supabase.from('pendientes_bim').select('*').order('id', { ascending: false });
-            if (error) return console.error(error);
+            const { data: tasks, error } = await supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false });
+            if (error) { console.error(error); return; }
 
             const tbody = document.getElementById('task-list');
             tbody.innerHTML = tasks.map(t => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3 font-medium">${t.actividad}</td>
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-3 font-medium text-slate-900">${t.actividad}</td>
                     <td class="p-3 text-slate-500">${t.grupo || '-'}</td>
                     <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-600">${t.responsable || 'Sin asignar'}</span></td>
                     <td class="p-3 font-semibold text-slate-700">${t.criticidad}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${t.estado}</span></td>
                     <td class="p-3 text-center">
-                        <button onclick="editTask(${t.id}, '${t.actividad}', '${t.grupo}', '${t.responsable}', '${t.criticidad}', '${t.estado}')" class="text-sky-600 hover:underline mr-2"><i class="fa-solid fa-pen"></i></button>
-                        ${isAdmin ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:underline"><i class="fa-solid fa-trash"></i></button>` : ''}
+                        <button onclick="editTask(${t.id}, '${t.actividad}', '${t.grupo}', '${t.responsable}', '${t.criticidad}', '${t.estado}')" class="text-sky-600 hover:text-sky-800 mr-3"><i class="fa-solid fa-pen"></i></button>
+                        ${isAdmin ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `).join('');
@@ -216,6 +218,8 @@
             document.getElementById('modal-title').innerText = "Nuevo Pendiente";
             document.getElementById('task-id').value = '';
             document.getElementById('task-actividad').value = '';
+            document.getElementById('task-grupo').value = '';
+            document.getElementById('task-responsable').value = '';
             document.getElementById('modal-task').classList.remove('hidden');
             document.getElementById('modal-task').classList.add('flex');
         }
@@ -228,13 +232,6 @@
             document.getElementById('task-responsable').value = responsable !== 'null' ? responsable : '';
             document.getElementById('task-criticidad').value = criticidad;
             document.getElementById('task-estado').value = estado;
-            
-            // Deshabilitar campos críticos si no es admin
-            if(!isAdmin) {
-                document.getElementById('task-actividad').disabled = true;
-                document.getElementById('task-grupo').disabled = true;
-                document.getElementById('task-responsable').disabled = true;
-            }
 
             document.getElementById('modal-task').classList.remove('hidden');
             document.getElementById('modal-task').classList.add('flex');
@@ -257,9 +254,9 @@
             };
 
             if (id) {
-                await supabase.from('pendientes_bim').update(payload).eq('id', id);
+                await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
             } else {
-                await supabase.from('pendientes_bim').insert([payload]);
+                await supabaseClient.from('pendientes_bim').insert([payload]);
             }
 
             closeModal();
@@ -268,14 +265,13 @@
 
         async function deleteTask(id) {
             if (confirm("¿Estás seguro de eliminar este registro?")) {
-                await supabase.from('pendientes_bim').delete().eq('id', id);
+                await supabaseClient.from('pendientes_bim').delete().eq('id', id);
                 fetchTasks();
             }
         }
 
-        // Comprobar sesión guardada al iniciar
         window.onload = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await supabaseClient.auth.getUser();
             if (user) initApp();
         };
     </script>
