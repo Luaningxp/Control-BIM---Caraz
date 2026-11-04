@@ -29,32 +29,111 @@
         .kpi-card { transition: transform .15s ease; }
         .kpi-card:hover { transform: translateY(-2px); }
         .chart-box { position: relative; height: 280px; }
+        /* ==== LOGIN PROFESIONAL ==== */
+.login-bg {
+    position: fixed; inset: 0;
+    background-image: url('assets/fondo.jpeg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 0;
+}
+.login-bg::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.72) 50%, rgba(2,132,199,0.35) 100%);
+    backdrop-filter: blur(2px);
+}
+.login-card {
+    position: relative;
+    z-index: 1;
+    background: rgba(255,255,255,0.97);
+    border-radius: 1rem;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.35);
+    padding: 2rem;
+    max-width: 26rem;
+    width: 100%;
+    border: 1px solid rgba(255,255,255,0.6);
+}
+.login-logo-box {
+    background: #fff;
+    border-radius: .75rem;
+    padding: .75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+.login-logo-box img {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+}
+.login-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, #cbd5e1, transparent);
+    margin: .25rem 0;
+}
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- LOGIN -->
-    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full space-y-4">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-sky-600 text-white rounded-lg grid place-items-center mx-auto text-xl mb-2">🏥</div>
-                <h2 class="font-bold text-lg text-slate-900">Control BIM · Caraz II-1</h2>
-                <p class="text-xs text-slate-500">CDE alineado a ISO 19650</p>
-            </div>
-            <form onsubmit="handleLogin(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Correo Electrónico</label>
-                    <input type="email" id="login-email" required class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-sky-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Contraseña</label>
-                    <input type="password" id="login-password" required class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-sky-600">
-                </div>
-                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded text-sm transition">Ingresar al CDE</button>
-            </form>
-            <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium"></div>
+  <!-- LOGIN -->
+<div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden">
+    <div class="login-bg"></div>
+
+    <div class="login-card">
+        <!-- Logos -->
+        <div class="login-logo-box mb-5">
+            <img src="assets/suyay.png" alt="SUYAY">
+            <div class="w-px h-10 bg-slate-200"></div>
+            <img src="assets/anin.png" alt="ANIN">
         </div>
+
+        <!-- Títulos -->
+        <div class="text-center mb-5">
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-600">Consorcio SUYAY II</p>
+            <h2 class="font-bold text-xl text-slate-900 mt-1 leading-tight">Control del Equipo BIM</h2>
+            <p class="text-[11px] text-slate-500 mt-1">Paquete 8 · Caraz · Hospital II-1</p>
+            <p class="text-[10px] text-slate-400 mt-1 italic">CDE alineado a ISO 19650</p>
+        </div>
+
+        <div class="login-divider"></div>
+
+        <!-- Form -->
+        <form onsubmit="handleLogin(event)" class="space-y-3 mt-4">
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
+                <div class="relative">
+                    <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="email" id="login-email" required
+                           class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+                           placeholder="usuario@consorciosuyay.com">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Contraseña</label>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="password" id="login-password" required
+                           class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+                           placeholder="••••••••">
+                </div>
+            </div>
+            <button type="submit"
+                    class="w-full bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-md shadow-sky-600/20">
+                <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Ingresar al CDE
+            </button>
+        </form>
+
+        <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium mt-3"></div>
+
+        <p class="text-center text-[10px] text-slate-400 mt-5">
+            © Consorcio SUYAY II · ANIN · Paquete 8 · Caraz
+        </p>
     </div>
+</div>
 
     <!-- APP -->
     <div id="app-screen" class="hidden flex-col min-h-screen">
