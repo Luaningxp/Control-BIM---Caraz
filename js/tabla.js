@@ -3,11 +3,11 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    visibleCols: { codigo: true, actividad: true, grupo: true, responsable: true, criticidad: true, estado: true, cde: true },
+    // Agregamos importancia y urgencia al control de columnas
+    visibleCols: { codigo: true, actividad: true, grupo: true, responsable: true, importancia: true, urgencia: true, criticidad: true, estado: true, cde: true },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
 
-// REGLAS DE PERMISOS
 export function canEdit(t) { 
     if (state.isAdmin || state.isCoordinador || state.isSupervisor) return true;
     if (state.isModelador && t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id) return true;
@@ -32,6 +32,10 @@ function getProcessedTasks() {
             const weights = { 'Muy alto': 4, 'Alto': 3, 'Medio': 2, 'Bajo': 1 };
             valA = weights[getCriticidad(a)] || 0;
             valB = weights[getCriticidad(b)] || 0;
+        } else if (tableState.sortBy === 'importancia' || tableState.sortBy === 'urgencia') {
+            const weights = { 'Muy alto': 4, 'Alto': 3, 'Medio': 2, 'Bajo': 1 };
+            valA = weights[a[tableState.sortBy]] || 0;
+            valB = weights[b[tableState.sortBy]] || 0;
         } else if (tableState.sortBy.startsWith('prop_')) {
             const pid = parseInt(tableState.sortBy.split('_')[1]);
             const pvA = state.propValsCache.find(v => v.pendiente_id === a.id && v.propiedad_id === pid);
@@ -76,7 +80,9 @@ export function renderTabla(container) {
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('importancia')" ${tableState.visibleCols.importancia ? 'checked' : ''} class="rounded text-sky-600"> Importancia</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('urgencia')" ${tableState.visibleCols.urgencia ? 'checked' : ''} class="rounded text-sky-600"> Urgencia</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad (Auto)</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado Op.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO</label>
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
@@ -94,6 +100,8 @@ export function renderTabla(container) {
                         ${tableState.visibleCols.actividad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')">Actividad ${getSortIcon('actividad')}</th>` : ''}
                         ${tableState.visibleCols.grupo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')">Grupo ${getSortIcon('grupo')}</th>` : ''}
                         ${tableState.visibleCols.responsable ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')">Responsable ${getSortIcon('responsable_id')}</th>` : ''}
+                        ${tableState.visibleCols.importancia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')">Importancia ${getSortIcon('importancia')}</th>` : ''}
+                        ${tableState.visibleCols.urgencia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')">Urgencia ${getSortIcon('urgencia')}</th>` : ''}
                         ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Criticidad ${getSortIcon('criticidad')}</th>` : ''}
                         ${tableState.visibleCols.estado ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')">Estado ${getSortIcon('estado')}</th>` : ''}
                         ${tableState.visibleCols.cde ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')">CDE ISO ${getSortIcon('estado_cde')}</th>` : ''}
@@ -111,7 +119,11 @@ export function renderTabla(container) {
                             ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
                             ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
                             ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+                            
+                            ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px]">${t.importancia || 'Medio'}</td>` : ''}
+                            ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px]">${t.urgencia || 'Medio'}</td>` : ''}
                             ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)}">${crit}</td>` : ''}
+                            
                             ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
                             ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
                             ${visiblePropDefs.map(pd => {
@@ -154,6 +166,7 @@ export function openModal() {
     });
     
     document.getElementById('task-importancia').value = 'Medio';
+    document.getElementById('task-urgencia').value = 'Medio'; // IMPORTANTE
     document.getElementById('task-estado').value = 'No iniciado';
     
     const grSel = document.getElementById('task-grupo'); 
@@ -173,6 +186,7 @@ export function editTask(id) {
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
     document.getElementById('task-importancia').value = t.importancia || 'Medio';
+    document.getElementById('task-urgencia').value = t.urgencia || 'Medio'; // IMPORTANTE
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
@@ -227,6 +241,7 @@ export async function saveTask(e) {
         responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
         responsable_id: respId,
         importancia: document.getElementById('task-importancia').value,
+        urgencia: document.getElementById('task-urgencia').value, // IMPORTANTE
         estado: document.getElementById('task-estado').value,
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
