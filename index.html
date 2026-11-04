@@ -41,6 +41,7 @@
                 </button>
             </form>
             <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium mt-3"></div>
+            <p class="text-center text-[10px] text-slate-400 mt-5">© Consorcio SUYAY II · ANIN · Paquete 8 · Caraz</p>
         </div>
     </div>
 
@@ -59,7 +60,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="btn-new-task" onclick="openModal()" class="hidden px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                    <button id="btn-new-task" onclick="window.openModal()" class="hidden px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
                         + Nuevo Contenedor
                     </button>
                     <button onclick="handleLogout()" class="px-3 py-2 text-xs border border-slate-300 rounded-lg hover:bg-slate-100 transition text-slate-600">
@@ -71,18 +72,17 @@
 
         <nav class="bg-white border-b border-slate-200 sticky top-16 z-20">
             <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto" id="tabs-nav">
-                <button data-tab="mitrabajo" onclick="switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hidden">👤 Mi Trabajo</button>
-                <button data-tab="dashboard" onclick="switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
-                <button data-tab="tabla" onclick="switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
-                <button data-tab="kanban" onclick="switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
-                <button data-tab="eisenhower" onclick="switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
-                <button data-tab="manpower" onclick="switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⏱ MANPOWER</button>
-                <button id="tab-config-btn" data-tab="config" onclick="switchTab('config')" class="tab-btn hidden px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⚙️ Configuración</button>
+                <button data-tab="mitrabajo" onclick="window.switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hidden">👤 Mi Trabajo</button>
+                <button data-tab="dashboard" onclick="window.switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
+                <button data-tab="tabla" onclick="window.switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
+                <button data-tab="kanban" onclick="window.switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
+                <button data-tab="eisenhower" onclick="window.switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
+                <button data-tab="manpower" onclick="window.switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⏱ MANPOWER</button>
+                <button id="tab-config-btn" data-tab="config" onclick="window.switchTab('config')" class="tab-btn hidden px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⚙️ Configuración</button>
             </div>
         </nav>
 
         <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
-            <!-- AQUI SE INYECTAN LAS VISTAS DINAMICAMENTE -->
             <div id="view-container"></div>
         </main>
     </div>
@@ -91,7 +91,7 @@
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
             <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
-            <form onsubmit="saveTask(event)" class="space-y-3 text-xs">
+            <form onsubmit="window.saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
                     <label class="block font-semibold text-slate-600 mb-1">Actividad *</label>
@@ -135,18 +135,60 @@
                     <label class="block font-semibold text-slate-600 mb-1">Nota / restricción</label>
                     <textarea id="task-nota" rows="2" class="inp"></textarea>
                 </div>
-
-                <!-- PROPIEDADES PERSONALIZADAS -->
                 <div id="custom-props-container" class="border-t border-slate-200 pt-3 mt-3 hidden">
                     <p class="text-[11px] font-bold text-slate-700 mb-2">Propiedades Personalizadas</p>
                     <div id="custom-props-inputs" class="space-y-2"></div>
                 </div>
-
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                    <button type="button" onclick="window.closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
                     <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL CDE -->
+    <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
+            <h3 class="font-bold text-sm text-slate-800">Transición CDE · ISO 19650</h3>
+            <p id="cde-current" class="text-[11px] text-slate-500"></p>
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Estado destino</label>
+                    <select id="cde-estado" class="inp">
+                        <option value="WIP">WIP</option><option value="Shared">Shared</option>
+                        <option value="Published">Published</option><option value="Archived">Archived</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Aptitud</label>
+                    <select id="cde-aptitud" class="inp">
+                        <option value="">— No cambiar —</option>
+                        <option value="S0">S0 · WIP</option><option value="S1">S1 · Coordinación</option>
+                        <option value="S3">S3 · Revisión</option><option value="S4">S4 · Aprobación</option>
+                        <option value="A1">A1 · Autorizado</option><option value="CR">CR · As-built</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Comentario (auditoría)</label>
+                    <textarea id="cde-comentario" rows="2" class="inp" placeholder="Motivo de la transición..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="window.closeModalCDE()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600 text-xs">Cancelar</button>
+                <button type="button" onclick="window.confirmarTransicion()" class="px-4 py-1.5 bg-teal-600 text-white font-semibold rounded hover:bg-teal-700 text-xs">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL -->
+    <div id="modal-hist" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-sm text-slate-800">Historial CDE</h3>
+                <button onclick="document.getElementById('modal-hist').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="hist-content" class="space-y-2 text-xs"></div>
         </div>
     </div>
 
