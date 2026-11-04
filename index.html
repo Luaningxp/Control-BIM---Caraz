@@ -96,17 +96,15 @@
         </main>
     </div>
 
-    <!-- MODAL TASK -->
+        <!-- MODAL TASK -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
             <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
             <form onsubmit="window.saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Importancia (Impacto)</label>
-                    <select id="task-importancia" class="inp">
-                        <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
-                    </select>
+                    <label class="block font-semibold text-slate-600 mb-1">Actividad *</label>
+                    <input type="text" id="task-actividad" required class="inp">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -120,8 +118,8 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Criticidad</label>
-                        <select id="task-criticidad" class="inp">
+                        <label class="block font-semibold text-slate-600 mb-1">Importancia</label>
+                        <select id="task-importancia" class="inp">
                             <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
                         </select>
                     </div>
