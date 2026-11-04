@@ -181,11 +181,18 @@ export function openModal() {
 export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
+    
     document.getElementById('modal-title').innerText = "Editar Contenedor";
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
-    document.getElementById('task-importancia').value = t.importancia || 'Medio';
-    document.getElementById('task-urgencia').value = t.urgencia || 'Medio';
+    
+    // Verificamos que el campo exista antes de asignarlo
+    const impEl = document.getElementById('task-importancia');
+    if (impEl) impEl.value = t.importancia || 'Medio';
+    
+    const urgEl = document.getElementById('task-urgencia');
+    if (urgEl) urgEl.value = t.urgencia || 'Medio';
+
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
