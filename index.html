@@ -173,27 +173,45 @@
             location.reload();
         }
 
-        async function initApp() {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) return;
+async function initApp() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
 
-            currentUser = user;
-            isAdmin = currentUser.email.toLowerCase().includes('admin');
+    currentUser = user;
 
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app-screen').classList.remove('hidden');
-            document.getElementById('app-screen').classList.add('flex');
-            
-            document.getElementById('user-display').innerText = currentUser.email;
-            document.getElementById('role-display').innerText = isAdmin ? 'Administrador' : 'Operador / Modelador';
+    // Consultar el rol del usuario logueado en la tabla 'perfiles'
+    const { data: perfil, error } = await supabaseClient
+        .from('perfiles')
+        .select('rol')
+        .eq('id', currentUser.id)
+        .maybeSingle();
 
-            if (!isAdmin) {
-                document.getElementById('btn-new-task').classList.add('hidden');
-            }
+    if (error) {
+        console.error("Error al consultar perfil:", error);
+    }
 
-            fetchTasks();
+    // Comprobar si el rol es 'admin' (convertimos a minúsculas por seguridad)
+    isAdmin = perfil && String(perfil.rol).trim().toLowerCase() === 'admin';
+
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app-screen').classList.remove('hidden');
+    document.getElementById('app-screen').classList.add('flex');
+    
+    document.getElementById('user-display').innerText = currentUser.email;
+    document.getElementById('role-display').innerText = isAdmin ? 'Administrador' : 'Operador / Modelador';
+
+    // Mostrar u ocultar el botón de nuevo pendiente según el rol
+    const btnNew = document.getElementById('btn-new-task');
+    if (btnNew) {
+        if (isAdmin) {
+            btnNew.classList.remove('hidden');
+        } else {
+            btnNew.classList.add('hidden');
         }
+    }
 
+    fetchTasks();
+}
         async function fetchTasks() {
             const { data: tasks, error } = await supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false });
             if (error) { console.error(error); return; }
