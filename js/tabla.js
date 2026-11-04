@@ -1,7 +1,9 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast } from './utils.js';
 
-export function canEdit(t) { return state.isAdmin || state.isCoordinador || (t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id); }
+export function canEdit(t) { 
+    return state.isAdmin || state.isCoordinador || (t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id); 
+}
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador; }
 
@@ -30,7 +32,7 @@ export function renderTabla(container) {
                             <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>
                             <td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>
                             <td class="p-3 text-center whitespace-nowrap">
-                                ${canEdit(t) ? `<button onclick='window.editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})' class="text-sky-600 hover:text-sky-800 mr-2"><i class="fa-solid fa-pen"></i></button>` : ''}
+                                ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2"><i class="fa-solid fa-pen"></i></button>` : ''}
                                 ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
                                 ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>` : ''}
                             </td>
@@ -42,7 +44,6 @@ export function renderTabla(container) {
     `;
 }
 
-// Logica para abrir modal, guardar y editar (con propiedades personalizadas)
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
     document.getElementById('modal-title').innerText = "Nuevo Contenedor";
@@ -50,21 +51,22 @@ export function openModal() {
     document.getElementById('task-criticidad').value = 'Alto';
     document.getElementById('task-estado').value = 'No iniciado';
     
-    // Poblar selects
     const grSel = document.getElementById('task-grupo');
     grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     const rsSel = document.getElementById('task-responsable');
     rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
 
-    // Renderizar propiedades personalizadas (vacías)
     renderCustomProps(null);
 
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
 }
 
-export function editTask(t) {
-    if (!canEdit(t)) return;
+// AHORA RECIBE EL ID EN LUGAR DEL OBJETO COMPLETO
+export function editTask(id) {
+    const t = state.tasksCache.find(x => x.id === id);
+    if (!t || !canEdit(t)) return;
+    
     document.getElementById('modal-title').innerText = "Editar Contenedor";
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
@@ -77,21 +79,23 @@ export function editTask(t) {
     const grSel = document.getElementById('task-grupo');
     grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     grSel.value = t.grupo || '';
+    
     const rsSel = document.getElementById('task-responsable');
     rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     rsSel.value = t.responsable_id || '';
 
-    // Renderizar propiedades personalizadas (con valores)
     renderCustomProps(t.id);
 
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
 }
 
+// ESTA FUNCIÓN ES LA QUE DIBUJA LOS INPUTS DINÁMICOS
 function renderCustomProps(pendienteId) {
     const container = document.getElementById('custom-props-container');
     const inputs = document.getElementById('custom-props-inputs');
     
+    // Si no hay parámetros creados en Configuración, ocultar la sección
     if (state.propDefsCache.length === 0) {
         container.classList.add('hidden');
         return;
@@ -100,15 +104,21 @@ function renderCustomProps(pendienteId) {
 
     inputs.innerHTML = state.propDefsCache.map(pd => {
         let valor = '';
+        // Buscar si esta tarea ya tiene un valor guardado para este parámetro
         if (pendienteId) {
             const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
-            if (pv) valor = pd.tipo === 'numero' ? pv.valor_numero : pd.tipo === 'fecha' ? pv.valor_fecha : pd.tipo === 'booleano' ? pv.valor_booleano : pv.valor_texto;
+            if (pv) {
+                valor = pd.tipo === 'numero' ? (pv.valor_numero !== null ? pv.valor_numero : '') : 
+                        pd.tipo === 'fecha' ? (pv.valor_fecha || '') : 
+                        pd.tipo === 'booleano' ? pv.valor_booleano : 
+                        (pv.valor_texto || '');
+            }
         }
 
         let inputHtml = '';
-        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${valor || ''}">`;
-        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor || ''}">`;
-        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor || ''}">`;
+        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${escapeHtml(valor)}">`;
+        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor}">`;
+        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor}">`;
         else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
         else if (pd.tipo === 'seleccion') {
             const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
@@ -157,7 +167,7 @@ export async function saveTask(e) {
         taskId = data[0].id;
     }
 
-    // Guardar propiedades personalizadas
+    // Guardar parámetros personalizados
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid);
@@ -165,7 +175,6 @@ export async function saveTask(e) {
         let val = input.type === 'checkbox' ? input.checked : input.value;
         if (val === '' || val === false) val = null;
 
-        // Buscar si ya existe
         const existente = state.propValsCache.find(v => v.pendiente_id === parseInt(taskId) && v.propiedad_id === pid);
         
         const propPayload = { pendiente_id: parseInt(taskId), propiedad_id: pid, valor_texto: null, valor_numero: null, valor_fecha: null, valor_booleano: null };
