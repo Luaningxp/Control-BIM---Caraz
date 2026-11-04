@@ -142,7 +142,7 @@ export function renderConfig(container) {
                         </select>
                     </div>
                     <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button type="button" onclick="document.getElementById('modal-cargo').classList.add('hidden')" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                        <button type="button" onclick="window.closeCargoModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
                         <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
                     </div>
                 </form>
@@ -162,6 +162,11 @@ export function openGrupoModal(id) {
     document.getElementById('modal-grupo').classList.add('flex');
 }
 
+export function closeGrupoModal() {
+    document.getElementById('modal-grupo').classList.add('hidden');
+    document.getElementById('modal-grupo').classList.remove('flex');
+}
+
 export async function saveGrupo(e) {
     e.preventDefault();
     const id = document.getElementById('grupo-id').value;
@@ -174,7 +179,7 @@ export async function saveGrupo(e) {
         ? await supabaseClient.from('grupos_bim').update(payload).eq('id', id)
         : await supabaseClient.from('grupos_bim').insert([payload]);
     if (error) { toast('Error: ' + error.message); return; }
-    document.getElementById('modal-grupo').classList.add('hidden');
+    closeGrupoModal();
     await fetchAll(); window.renderView(); toast('Grupo guardado');
 }
 
@@ -241,12 +246,18 @@ export function openCargoModal(userId) {
     document.getElementById('modal-cargo').classList.add('flex');
 }
 
+// ESTA ES LA FUNCIÓN QUE FALTABA:
+export function closeCargoModal() {
+    document.getElementById('modal-cargo').classList.add('hidden');
+    document.getElementById('modal-cargo').classList.remove('flex');
+}
+
 export async function saveCargo(e) {
     e.preventDefault();
     const id = document.getElementById('cargo-user-id').value;
     const cargo = document.getElementById('cargo-value').value || null;
     const { error } = await supabaseClient.from('perfiles').update({ cargo }).eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    document.getElementById('modal-cargo').classList.add('hidden');
+    closeCargoModal();
     await fetchAll(); window.renderView(); toast('Cargo actualizado');
 }
