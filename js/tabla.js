@@ -1,27 +1,13 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast } from './utils.js';
+import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad } from './utils.js';
 
-// ESTADO LOCAL DE LA TABLA
 let tableState = {
-    sortBy: 'id',
-    sortDir: 'desc',
-    showColMenu: false, // Controla si el menú de columnas está abierto o cerrado
-    visibleCols: {
-        codigo: true,
-        actividad: true,
-        grupo: true,
-        responsable: true,
-        criticidad: true,
-        estado: true,
-        cde: true
-    },
-    visibleProps: {}, // Guardará el estado de visibilidad de los parámetros personalizados
-    filters: { search: '', grupo: '', responsable: '' }
+    sortBy: 'id', sortDir: 'desc', showColMenu: false,
+    visibleCols: { codigo: true, actividad: true, grupo: true, responsable: true, criticidad: true, estado: true, cde: true },
+    visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
 
-export function canEdit(t) { 
-    return state.isAdmin || state.isCoordinador || (t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id); 
-}
+export function canEdit(t) { return state.isAdmin || state.isCoordinador || (t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id); }
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador; }
 
@@ -37,7 +23,12 @@ function getProcessedTasks() {
     result.sort((a, b) => {
         let valA = a[tableState.sortBy] || '';
         let valB = b[tableState.sortBy] || '';
-        if (tableState.sortBy.startsWith('prop_')) {
+        // Si ordenamos por criticidad, ordenamos por peso
+        if (tableState.sortBy === 'criticidad') {
+            const weights = { 'Muy alto': 4, 'Alto': 3, 'Medio': 2, 'Bajo': 1 };
+            valA = weights[getCriticidad(a)] || 0;
+            valB = weights[getCriticidad(b)] || 0;
+        } else if (tableState.sortBy.startsWith('prop_')) {
             const pid = parseInt(tableState.sortBy.split('_')[1]);
             const pvA = state.propValsCache.find(v => v.pendiente_id === a.id && v.propiedad_id === pid);
             const pvB = state.propValsCache.find(v => v.pendiente_id === b.id && v.propiedad_id === pid);
@@ -51,41 +42,16 @@ function getProcessedTasks() {
     return result;
 }
 
-function toggleSort(col) {
-    if (tableState.sortBy === col) tableState.sortDir = tableState.sortDir === 'asc' ? 'desc' : 'asc';
-    else { tableState.sortBy = col; tableState.sortDir = 'asc'; }
-    window.renderView();
-}
-
-// Alternar visibilidad de columna y forzar el re-render
-function toggleCol(col) {
-    tableState.visibleCols[col] = !tableState.visibleCols[col];
-    window.renderView();
-}
-
-// Alternar visibilidad de un parámetro personalizado
-function toggleProp(pid) {
-    tableState.visibleProps[pid] = tableState.visibleProps[pid] === false ? true : false;
-    window.renderView();
-}
-
-// Abrir/cerrar el menú
-function toggleColMenu() {
-    tableState.showColMenu = !tableState.showColMenu;
-    window.renderView();
-}
-
-function getSortIcon(col) {
-    if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>';
-    return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>';
-}
+function toggleSort(col) { if (tableState.sortBy === col) tableState.sortDir = tableState.sortDir === 'asc' ? 'desc' : 'asc'; else { tableState.sortBy = col; tableState.sortDir = 'asc'; } window.renderView(); }
+function toggleCol(col) { tableState.visibleCols[col] = !tableState.visibleCols[col]; window.renderView(); }
+function toggleProp(pid) { tableState.visibleProps[pid] = tableState.visibleProps[pid] === false ? true : false; window.renderView(); }
+function toggleColMenu() { tableState.showColMenu = !tableState.showColMenu; window.renderView(); }
+function getSortIcon(col) { if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>'; return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>'; }
 
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: p.email.split('@')[0] }));
-
-    // Filtrar parámetros visibles
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
     container.innerHTML = `
@@ -95,59 +61,24 @@ export function renderTabla(container) {
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="tbl-search" placeholder="Buscar actividad o código..." value="${tableState.filters.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
-                <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5">
-                    <option value="">Todos los grupos</option>
-                    ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
-                </select>
-                <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5">
-                    <option value="">Todos los responsables</option>
-                    ${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-                </select>
+                <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los grupos</option>${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}</select>
+                <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los responsables</option>${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select>
             </div>
             
             <div class="flex items-center gap-2">
-                <!-- MENÚ DE COLUMNAS POR CLIC -->
                 <div class="relative">
-                    <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
-                        <i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                    </button>
-                    
-                    <!-- Dropdown (se muestra si showColMenu es true) -->
+                    <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i></button>
                     <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
-                        <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase">Fijas</div>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código
-                        </label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo
-                        </label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable
-                        </label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad
-                        </label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado Op.
-                        </label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                            <input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO
-                        </label>
-                        
-                        ${state.propDefsCache.length > 0 ? `
-                            <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>
-                            ${state.propDefsCache.map(pd => `
-                                <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
-                                    <input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}
-                                </label>
-                            `).join('')}
-                        ` : ''}
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad (Auto)</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado Op.</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO</label>
+                        ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
                     </div>
                 </div>
-                
-                <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition">
-                    <i class="fa-solid fa-rotate-right mr-1"></i> Refrescar
-                </button>
+                <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Refrescar</button>
             </div>
         </div>
 
@@ -159,16 +90,10 @@ export function renderTabla(container) {
                         ${tableState.visibleCols.actividad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')">Actividad ${getSortIcon('actividad')}</th>` : ''}
                         ${tableState.visibleCols.grupo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')">Grupo ${getSortIcon('grupo')}</th>` : ''}
                         ${tableState.visibleCols.responsable ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')">Responsable ${getSortIcon('responsable_id')}</th>` : ''}
-                        ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Crit. ${getSortIcon('criticidad')}</th>` : ''}
+                        ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Criticidad ${getSortIcon('criticidad')}</th>` : ''}
                         ${tableState.visibleCols.estado ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')">Estado ${getSortIcon('estado')}</th>` : ''}
                         ${tableState.visibleCols.cde ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')">CDE ISO ${getSortIcon('estado_cde')}</th>` : ''}
-                        
-                        ${visiblePropDefs.map(pd => `
-                            <th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')">
-                                ${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}
-                            </th>
-                        `).join('')}
-
+                        ${visiblePropDefs.map(pd => `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</th>`).join('')}
                         <th class="p-3 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -180,10 +105,9 @@ export function renderTabla(container) {
                             ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
                             ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
                             ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
-                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold text-slate-700">${escapeHtml(t.criticidad)}</td>` : ''}
+                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(getCriticidad(t))}">${getCriticidad(t)}</td>` : ''}
                             ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
                             ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
-                            
                             ${visiblePropDefs.map(pd => {
                                 const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
                                 let displayVal = '-';
@@ -195,7 +119,6 @@ export function renderTabla(container) {
                                 }
                                 return `<td class="p-3 text-slate-600 text-[11px]">${displayVal}</td>`;
                             }).join('')}
-
                             <td class="p-3 text-center whitespace-nowrap">
                                 ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
                                 ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
@@ -208,43 +131,23 @@ export function renderTabla(container) {
         </div>
     `;
 
-    // Escuchar los filtros. 
-    // OJO: Usamos 'oninput' y 'onchange' directo en el elemento para evitar que se pierda el foco al re-renderizar.
-    document.getElementById('tbl-search').addEventListener('input', (e) => {
-        tableState.filters.search = e.target.value;
-        // Solo re-renderizamos la tabla sin perder el foco usando un pequeño timeout
-        setTimeout(() => window.renderView(), 300); 
-    });
-    document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => {
-        tableState.filters.grupo = e.target.value;
-        window.renderView();
-    });
-    document.getElementById('tbl-fil-resp').addEventListener('change', (e) => {
-        tableState.filters.responsable = e.target.value;
-        window.renderView();
-    });
+    document.getElementById('tbl-search').addEventListener('input', (e) => { tableState.filters.search = e.target.value; setTimeout(() => window.renderView(), 300); });
+    document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => { tableState.filters.grupo = e.target.value; window.renderView(); });
+    document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
 }
 
-// Hacemos globales las funciones para que el HTML las lea
-window.toggleSort = toggleSort;
-window.toggleCol = toggleCol;
-window.toggleProp = toggleProp;
-window.toggleColMenu = toggleColMenu;
+window.toggleSort = toggleSort; window.toggleCol = toggleCol; window.toggleProp = toggleProp; window.toggleColMenu = toggleColMenu;
 
-// ... AQUÍ VA EL RESTO DE TU CÓDIGO (openModal, editTask, saveTask, etc.) QUE NO HA CAMBIADO ...
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
     document.getElementById('modal-title').innerText = "Nuevo Contenedor";
     ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('task-criticidad').value = 'Alto';
+    document.getElementById('task-importancia').value = 'Medio';
     document.getElementById('task-estado').value = 'No iniciado';
-    const grSel = document.getElementById('task-grupo');
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
-    const rsSel = document.getElementById('task-responsable');
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    const grSel = document.getElementById('task-grupo'); grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+    const rsSel = document.getElementById('task-responsable'); rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     renderCustomProps(null);
-    document.getElementById('modal-task').classList.remove('hidden');
-    document.getElementById('modal-task').classList.add('flex');
+    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
 
 export function editTask(id) {
@@ -253,20 +156,15 @@ export function editTask(id) {
     document.getElementById('modal-title').innerText = "Editar Contenedor";
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
-    document.getElementById('task-criticidad').value = t.criticidad || 'Alto';
+    document.getElementById('task-importancia').value = t.importancia || 'Medio';
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
-    const grSel = document.getElementById('task-grupo');
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
-    grSel.value = t.grupo || '';
-    const rsSel = document.getElementById('task-responsable');
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
-    rsSel.value = t.responsable_id || '';
+    const grSel = document.getElementById('task-grupo'); grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || '';
+    const rsSel = document.getElementById('task-responsable'); rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || '';
     renderCustomProps(t.id);
-    document.getElementById('modal-task').classList.remove('hidden');
-    document.getElementById('modal-task').classList.add('flex');
+    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
 
 function renderCustomProps(pendienteId) {
@@ -305,7 +203,7 @@ export async function saveTask(e) {
         grupo: document.getElementById('task-grupo').value || null,
         responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
         responsable_id: respId,
-        criticidad: document.getElementById('task-criticidad').value,
+        importancia: document.getElementById('task-importancia').value, // <-- Guardamos Importancia
         estado: document.getElementById('task-estado').value,
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
@@ -323,8 +221,7 @@ export async function saveTask(e) {
     }
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
-        const pid = parseInt(input.dataset.pid);
-        const type = input.dataset.type;
+        const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
         let val = input.type === 'checkbox' ? input.checked : input.value;
         if (val === '' || val === false) val = null;
         const existente = state.propValsCache.find(v => v.pendiente_id === parseInt(taskId) && v.propiedad_id === pid);
@@ -338,15 +235,11 @@ export async function saveTask(e) {
         if (existente) await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
-    closeModal();
-    await fetchAll();
-    window.renderView();
-    toast('Guardado');
+    closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
 }
 
 export async function deleteTask(id) {
-    if (!canDelete()) return;
-    if (!confirm("¿Eliminar este contenedor?")) return;
+    if (!canDelete()) return; if (!confirm("¿Eliminar este contenedor?")) return;
     const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
     await fetchAll(); window.renderView();
@@ -354,29 +247,14 @@ export async function deleteTask(id) {
 
 export function openModalCDE(id) {
     if (!canTransition()) return;
-    state.cdeTargetId = id;
-    document.getElementById('cde-current').innerText = `Contenedor #${id}`;
-    document.getElementById('cde-estado').value = 'Shared';
-    document.getElementById('cde-aptitud').value = 'S1';
-    document.getElementById('cde-comentario').value = '';
-    document.getElementById('modal-cde').classList.remove('hidden');
-    document.getElementById('modal-cde').classList.add('flex');
+    state.cdeTargetId = id; document.getElementById('cde-current').innerText = `Contenedor #${id}`; document.getElementById('cde-estado').value = 'Shared'; document.getElementById('cde-aptitud').value = 'S1'; document.getElementById('cde-comentario').value = '';
+    document.getElementById('modal-cde').classList.remove('hidden'); document.getElementById('modal-cde').classList.add('flex');
 }
-
-export function closeModalCDE() {
-    document.getElementById('modal-cde').classList.add('hidden');
-    document.getElementById('modal-cde').classList.remove('flex');
-    state.cdeTargetId = null;
-}
-
+export function closeModalCDE() { document.getElementById('modal-cde').classList.add('hidden'); document.getElementById('modal-cde').classList.remove('flex'); state.cdeTargetId = null; }
 export async function confirmarTransicion() {
     if (!state.cdeTargetId) return;
-    const estado = document.getElementById('cde-estado').value;
-    const aptitud = document.getElementById('cde-aptitud').value || null;
-    const comentario = document.getElementById('cde-comentario').value || null;
-    const { data, error } = await supabaseClient.rpc('transicionar_cde', {
-        p_pendiente_id: state.cdeTargetId, p_estado_nuevo: estado, p_aptitud_nueva: aptitud, p_comentario: comentario
-    });
+    const estado = document.getElementById('cde-estado').value; const aptitud = document.getElementById('cde-aptitud').value || null; const comentario = document.getElementById('cde-comentario').value || null;
+    const { data, error } = await supabaseClient.rpc('transicionar_cde', { p_pendiente_id: state.cdeTargetId, p_estado_nuevo: estado, p_aptitud_nueva: aptitud, p_comentario: comentario });
     if (error) { toast('Error RPC: ' + error.message); return; }
     if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
     closeModalCDE(); await fetchAll(); window.renderView(); toast('Transición aplicada');
