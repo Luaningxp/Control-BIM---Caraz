@@ -3,7 +3,6 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    // Agregamos importancia y urgencia al control de columnas
     visibleCols: { codigo: true, actividad: true, grupo: true, responsable: true, importancia: true, urgencia: true, criticidad: true, estado: true, cde: true },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
@@ -166,7 +165,7 @@ export function openModal() {
     });
     
     document.getElementById('task-importancia').value = 'Medio';
-    document.getElementById('task-urgencia').value = 'Medio'; // IMPORTANTE
+    document.getElementById('task-urgencia').value = 'Medio'; 
     document.getElementById('task-estado').value = 'No iniciado';
     
     const grSel = document.getElementById('task-grupo'); 
@@ -186,7 +185,7 @@ export function editTask(id) {
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
     document.getElementById('task-importancia').value = t.importancia || 'Medio';
-    document.getElementById('task-urgencia').value = t.urgencia || 'Medio'; // IMPORTANTE
+    document.getElementById('task-urgencia').value = t.urgencia || 'Medio';
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
@@ -241,7 +240,7 @@ export async function saveTask(e) {
         responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
         responsable_id: respId,
         importancia: document.getElementById('task-importancia').value,
-        urgencia: document.getElementById('task-urgencia').value, // IMPORTANTE
+        urgencia: document.getElementById('task-urgencia').value,
         estado: document.getElementById('task-estado').value,
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
