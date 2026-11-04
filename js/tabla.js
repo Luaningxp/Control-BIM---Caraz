@@ -7,9 +7,14 @@ let tableState = {
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
 
-export function canEdit(t) { return state.isAdmin || state.isCoordinador || (t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id); }
+// REGLAS DE PERMISOS
+export function canEdit(t) { 
+    if (state.isAdmin || state.isCoordinador || state.isSupervisor) return true;
+    if (state.isModelador && t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id) return true;
+    return false;
+}
 export function canDelete() { return state.isAdmin; }
-export function canTransition() { return state.isAdmin || state.isCoordinador; }
+export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 
 function getProcessedTasks() {
     let result = [...state.tasksCache];
@@ -71,7 +76,7 @@ export function renderTabla(container) {
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad (Auto)</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado Op.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO</label>
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
