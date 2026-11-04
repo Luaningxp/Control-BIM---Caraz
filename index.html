@@ -3,137 +3,46 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Control BIM · Hospital Caraz II-1 · ISO 19650</title>
+    <title>Control BIM · Hospital Caraz II-1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; color: #1e293b; }
-        .inp { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.45rem 0.65rem; font-size: 0.875rem; background: #fff; }
-        .inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15); }
-        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; text-align: left; padding: 0.6rem 0.8rem; background: #f1f5f9; }
-        td { padding: 0.55rem 0.8rem; border-top: 1px solid #f1f5f9; font-size: 0.82rem; vertical-align: top; }
-        .badge-cde { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; }
-        .tab-active { border-color: #0284c7 !important; color: #0284c7 !important; }
-        .kb-col { background: #f1f5f9; border-radius: 0.75rem; min-height: 200px; display: flex; flex-direction: column; }
-        .kb-col.drag-over { background: #e0f2fe; outline: 2px dashed #0284c7; outline-offset: -4px; }
-        .kb-card { cursor: grab; user-select: none; transition: transform .12s ease, box-shadow .12s ease; }
-        .kb-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-1px); }
-        .kb-card.dragging { opacity: .45; cursor: grabbing; transform: rotate(1.5deg) scale(.98); }
-        .kb-body { overflow-y: auto; padding: 0 .5rem .5rem .5rem; flex: 1; }
-        .eis-q { border-radius: 0.75rem; padding: .75rem; border-width: 1px; }
-        .eis-body { max-height: 52vh; overflow-y: auto; }
-        .kpi-card { transition: transform .15s ease; }
-        .kpi-card:hover { transform: translateY(-2px); }
-        .chart-box { position: relative; height: 280px; }
-        /* ==== LOGIN PROFESIONAL ==== */
-.login-bg {
-    position: fixed; inset: 0;
-    background-image: url('assets/fondo.jpeg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    z-index: 0;
-}
-.login-bg::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.72) 50%, rgba(2,132,199,0.35) 100%);
-    backdrop-filter: blur(2px);
-}
-.login-card {
-    position: relative;
-    z-index: 1;
-    background: rgba(255,255,255,0.97);
-    border-radius: 1rem;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.35);
-    padding: 2rem;
-    max-width: 26rem;
-    width: 100%;
-    border: 1px solid rgba(255,255,255,0.6);
-}
-.login-logo-box {
-    background: #fff;
-    border-radius: .75rem;
-    padding: .75rem 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-}
-.login-logo-box img {
-    height: 48px;
-    width: auto;
-    object-fit: contain;
-}
-.login-divider {
-    height: 1px;
-    background: linear-gradient(to right, transparent, #cbd5e1, transparent);
-    margin: .25rem 0;
-}
-    </style>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- LOGIN -->
-<div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden">
-    <div class="login-bg"></div>
-
-    <div class="login-card">
-        <!-- Logos -->
-        <div class="login-logo-box mb-5">
-            <img src="assets/suyay.png" alt="SUYAY">
-            <div class="w-px h-10 bg-slate-200"></div>
-            <img src="assets/anin.png" alt="ANIN">
-        </div>
-
-        <!-- Títulos -->
-        <div class="text-center mb-5">
-            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-600">Consorcio SUYAY II</p>
-            <h2 class="font-bold text-xl text-slate-900 mt-1 leading-tight">Control del Equipo BIM</h2>
-            <p class="text-[11px] text-slate-500 mt-1">Paquete 8 · Caraz · Hospital II-1</p>
-            <p class="text-[10px] text-slate-400 mt-1 italic">CDE alineado a ISO 19650</p>
-        </div>
-
-        <div class="login-divider"></div>
-
-        <!-- Form -->
-        <form onsubmit="handleLogin(event)" class="space-y-3 mt-4">
-            <div>
-                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
-                <div class="relative">
-                    <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="email" id="login-email" required
-                           class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
-                           placeholder="usuario@consorciosuyay.com">
-                </div>
+    <!-- LOGIN -->
+    <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden">
+        <div class="login-bg"></div>
+        <div class="login-card">
+            <div class="login-logo-box mb-5">
+                <img src="assets/suyay.png" alt="SUYAY">
+                <div class="w-px h-10 bg-slate-200"></div>
+                <img src="assets/anin.png" alt="ANIN">
             </div>
-            <div>
-                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Contraseña</label>
-                <div class="relative">
-                    <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="password" id="login-password" required
-                           class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
-                           placeholder="••••••••">
-                </div>
+            <div class="text-center mb-5">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-600">Consorcio SUYAY II</p>
+                <h2 class="font-bold text-xl text-slate-900 mt-1 leading-tight">Control del Equipo BIM</h2>
+                <p class="text-[11px] text-slate-500 mt-1">Paquete 8 · Caraz · Hospital II-1</p>
             </div>
-            <button type="submit"
-                    class="w-full bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-md shadow-sky-600/20">
-                <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Ingresar al CDE
-            </button>
-        </form>
-
-        <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium mt-3"></div>
-
-        <p class="text-center text-[10px] text-slate-400 mt-5">
-            © Consorcio SUYAY II · ANIN · Paquete 8 · Caraz
-        </p>
+            <div class="h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent my-4"></div>
+            <form onsubmit="handleLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
+                    <input type="email" id="login-email" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" placeholder="usuario@consorciosuyay.com">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Contraseña</label>
+                    <input type="password" id="login-password" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" placeholder="••••••••">
+                </div>
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-md shadow-sky-600/20">
+                    <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Ingresar al CDE
+                </button>
+            </form>
+            <div id="login-error" class="text-xs text-red-600 text-center hidden font-medium mt-3"></div>
+        </div>
     </div>
-</div>
 
     <!-- APP -->
     <div id="app-screen" class="hidden flex-col min-h-screen">
@@ -142,9 +51,9 @@
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-slate-900 text-white grid place-items-center text-base">🏥</div>
                     <div>
-                        <h1 class="font-bold text-slate-900 leading-tight">Control del Equipo BIM · CDE ISO 19650</h1>
+                        <h1 class="font-bold text-slate-900 leading-tight">Control BIM</h1>
                         <p class="text-xs text-slate-500">
-                            Usuario: <b id="user-display" class="text-sky-600"></b>
+                            <b id="user-display" class="text-sky-600"></b>
                             (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700"></span>)
                         </p>
                     </div>
@@ -161,181 +70,26 @@
         </header>
 
         <nav class="bg-white border-b border-slate-200 sticky top-16 z-20">
-            <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+            <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto" id="tabs-nav">
+                <button data-tab="mitrabajo" onclick="switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hidden">👤 Mi Trabajo</button>
                 <button data-tab="dashboard" onclick="switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
                 <button data-tab="tabla" onclick="switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Base</button>
                 <button data-tab="kanban" onclick="switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
                 <button data-tab="eisenhower" onclick="switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
+                <button data-tab="manpower" onclick="switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⏱ MANPOWER</button>
                 <button id="tab-config-btn" data-tab="config" onclick="switchTab('config')" class="tab-btn hidden px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⚙️ Configuración</button>
             </div>
         </nav>
 
         <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
-
-            <!-- DASHBOARD -->
-            <section id="view-dashboard" class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h3 class="font-bold text-sm text-slate-800">Dashboard de métricas · ISO 19650</h3>
-                        <p class="text-[11px] text-slate-500">PPC, cumplimiento, avance CDE y desempeño por responsable.</p>
-                    </div>
-                    <button onclick="fetchAll()" class="text-xs text-sky-600 hover:underline font-medium">
-                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-                    </button>
-                </div>
-                <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
-                <div class="grid lg:grid-cols-3 gap-3">
-                    <div class="card p-4 lg:col-span-2">
-                        <h4 class="font-semibold text-sm text-slate-800 mb-2">PPC semanal (últimas 8 semanas)</h4>
-                        <div class="chart-box"><canvas id="chart-ppc"></canvas></div>
-                    </div>
-                    <div class="card p-4">
-                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Distribución por estado CDE</h4>
-                        <div class="chart-box"><canvas id="chart-cde"></canvas></div>
-                    </div>
-                </div>
-                <div class="grid lg:grid-cols-2 gap-3">
-                    <div class="card p-4">
-                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Abiertas vs Vencidas por responsable</h4>
-                        <div class="chart-box"><canvas id="chart-resp"></canvas></div>
-                    </div>
-                    <div class="card p-4">
-                        <h4 class="font-semibold text-sm text-slate-800 mb-2">Criticidad vs Estado operativo</h4>
-                        <div class="chart-box"><canvas id="chart-crit"></canvas></div>
-                    </div>
-                </div>
-                <div class="card overflow-x-auto">
-                    <div class="p-4 pb-2">
-                        <h4 class="font-semibold text-sm text-slate-800">Desempeño por responsable</h4>
-                        <p class="text-[11px] text-slate-500">PPC = cerradas en fecha / cerradas totales. Carga ponderada = suma de peso por criticidad en abiertas.</p>
-                    </div>
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                            <tr>
-                                <th class="p-3">Responsable</th>
-                                <th class="p-3">Abiertas</th>
-                                <th class="p-3">Vencidas</th>
-                                <th class="p-3">% Venc.</th>
-                                <th class="p-3">Cerradas</th>
-                                <th class="p-3">PPC</th>
-                                <th class="p-3">Carga pond.</th>
-                            </tr>
-                        </thead>
-                        <tbody id="perf-table" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- TABLA -->
-            <section id="view-tabla" class="hidden">
-                <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
-                    <div>
-                        <h3 class="font-bold text-sm text-slate-800">Contenedores de Información</h3>
-                        <p class="text-[11px] text-slate-500">WIP → Shared → Published → Archived · Códigos S0–S4</p>
-                    </div>
-                    <button onclick="fetchAll()" class="text-xs text-sky-600 hover:underline font-medium">
-                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-                    </button>
-                </div>
-                <div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                            <tr>
-                                <th class="p-3">Código</th>
-                                <th class="p-3">Actividad</th>
-                                <th class="p-3">Grupo</th>
-                                <th class="p-3">Responsable</th>
-                                <th class="p-3">Crit.</th>
-                                <th class="p-3">Estado op.</th>
-                                <th class="p-3">CDE ISO</th>
-                                <th class="p-3 text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="task-list" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- KANBAN -->
-            <section id="view-kanban" class="hidden">
-                <div class="flex justify-between items-center mb-3">
-                    <div>
-                        <h3 class="font-bold text-sm text-slate-800">Tablero Kanban · Flujo CDE</h3>
-                        <p class="text-[11px] text-slate-500">Arrastra un contenedor entre columnas. Las transiciones se validan contra la RPC ISO 19650.</p>
-                    </div>
-                    <button onclick="fetchAll()" class="text-xs text-sky-600 hover:underline font-medium">
-                        <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-                    </button>
-                </div>
-                <div id="kanban-board" class="grid grid-cols-1 md:grid-cols-4 gap-3"></div>
-            </section>
-
-            <!-- EISENHOWER -->
-            <section id="view-eisenhower" class="hidden">
-                <div class="mb-3">
-                    <h3 class="font-bold text-sm text-slate-800">Matriz Eisenhower · Priorización</h3>
-                    <p class="text-[11px] text-slate-500">Urgente = vence en ≤7 días o ya venció. Importante = criticidad Muy alto / Alto. Solo contenedores abiertos (no Archived).</p>
-                </div>
-                <div id="eisenhower-board" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-            </section>
-
-            <!-- CONFIGURACIÓN (solo admin) -->
-            <section id="view-config" class="hidden space-y-4">
-                <div class="grid lg:grid-cols-2 gap-3">
-                    <div class="card p-4">
-                        <div class="flex justify-between items-center mb-3">
-                            <div>
-                                <h3 class="font-bold text-sm text-slate-800">Grupos BIM</h3>
-                                <p class="text-[11px] text-slate-500">Alta, edición y desactivación.</p>
-                            </div>
-                            <button onclick="openGrupoModal()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded">+ Nuevo grupo</button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                                    <tr>
-                                        <th class="p-3">Nombre</th>
-                                        <th class="p-3">Activo</th>
-                                        <th class="p-3 text-center">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="grupos-table" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card p-4">
-                        <div class="flex justify-between items-center mb-3">
-                            <div>
-                                <h3 class="font-bold text-sm text-slate-800">Usuarios / Responsables</h3>
-                                <p class="text-[11px] text-slate-500">Cargo editable por admin.</p>
-                            </div>
-                            <button onclick="loadPerfiles()" class="text-xs text-sky-600 hover:underline font-medium">
-                                <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                                    <tr>
-                                        <th class="p-3">Email</th>
-                                        <th class="p-3">Rol</th>
-                                        <th class="p-3">Cargo</th>
-                                        <th class="p-3 text-center">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="perfiles-table" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
+            <!-- AQUI SE INYECTAN LAS VISTAS DINAMICAMENTE -->
+            <div id="view-container"></div>
         </main>
     </div>
 
     <!-- MODAL TASK -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
             <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
             <form onsubmit="saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
@@ -346,15 +100,11 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Grupo</label>
-                        <select id="task-grupo" class="inp">
-                            <option value="">— Sin grupo —</option>
-                        </select>
+                        <select id="task-grupo" class="inp"></select>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Responsable</label>
-                        <select id="task-responsable" class="inp">
-                            <option value="">— Sin asignar —</option>
-                        </select>
+                        <select id="task-responsable" class="inp"></select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -365,7 +115,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Estado operativo</label>
+                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
                         <select id="task-estado" class="inp">
                             <option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option><option>Cerrado</option>
                         </select>
@@ -385,10 +135,13 @@
                     <label class="block font-semibold text-slate-600 mb-1">Nota / restricción</label>
                     <textarea id="task-nota" rows="2" class="inp"></textarea>
                 </div>
-                <div class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-                    <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
-                    Se crea en <b>WIP · S0</b>. Para moverlo de estado CDE usa el tablero Kanban o el botón <b>CDE</b> (RPC ISO).
+
+                <!-- PROPIEDADES PERSONALIZADAS -->
+                <div id="custom-props-container" class="border-t border-slate-200 pt-3 mt-3 hidden">
+                    <p class="text-[11px] font-bold text-slate-700 mb-2">Propiedades Personalizadas</p>
+                    <div id="custom-props-inputs" class="space-y-2"></div>
                 </div>
+
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                     <button type="button" onclick="closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
                     <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
@@ -397,857 +150,9 @@
         </div>
     </div>
 
-    <!-- MODAL CDE -->
-    <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800">Transición CDE · ISO 19650</h3>
-            <p id="cde-current" class="text-[11px] text-slate-500"></p>
-            <div class="space-y-2 text-xs">
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Estado destino</label>
-                    <select id="cde-estado" class="inp">
-                        <option value="WIP">WIP (Work in Progress)</option>
-                        <option value="Shared">Shared</option>
-                        <option value="Published">Published</option>
-                        <option value="Archived">Archived</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Código de aptitud</label>
-                    <select id="cde-aptitud" class="inp">
-                        <option value="">— No cambiar —</option>
-                        <option value="S0">S0 · WIP</option>
-                        <option value="S1">S1 · Coordinación</option>
-                        <option value="S2">S2 · Información</option>
-                        <option value="S3">S3 · Revisión / comentarios</option>
-                        <option value="S4">S4 · Aprobación de etapa</option>
-                        <option value="A1">A1 · Autorizado (fase)</option>
-                        <option value="B1">B1 · Autorizado (parcial)</option>
-                        <option value="CR">CR · Registro de cambios</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Comentario (auditoría)</label>
-                    <textarea id="cde-comentario" rows="2" class="inp" placeholder="Motivo de la transición..."></textarea>
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="closeModalCDE()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600 text-xs">Cancelar</button>
-                <button type="button" onclick="confirmarTransicion()" class="px-4 py-1.5 bg-teal-600 text-white font-semibold rounded hover:bg-teal-700 text-xs">Confirmar transición</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL HISTORIAL -->
-    <div id="modal-hist" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-sm text-slate-800">Historial CDE</h3>
-                <button onclick="closeHistorial()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="hist-content" class="space-y-2 text-xs"></div>
-        </div>
-    </div>
-
-    <!-- MODAL GRUPO -->
-    <div id="modal-grupo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800" id="grupo-modal-title">Nuevo grupo</h3>
-            <form onsubmit="saveGrupo(event)" class="space-y-3 text-xs">
-                <input type="hidden" id="grupo-id">
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Nombre *</label>
-                    <input type="text" id="grupo-nombre" required class="inp">
-                </div>
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" id="grupo-activo" checked class="w-4 h-4">
-                    <label class="text-slate-600 font-semibold">Activo</label>
-                </div>
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="closeGrupoModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
-                    <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL CARGO -->
-    <div id="modal-cargo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800">Editar cargo</h3>
-            <form onsubmit="saveCargo(event)" class="space-y-3 text-xs">
-                <input type="hidden" id="cargo-user-id">
-                <p id="cargo-user-email" class="text-slate-500"></p>
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Cargo</label>
-                    <select id="cargo-value" class="inp">
-                        <option value="">— Sin cargo —</option>
-                        <option>BIM Manager</option>
-                        <option>Coordinador BIM</option>
-                        <option>Supervisor BIM</option>
-                        <option>Modelador BIM</option>
-                    </select>
-                </div>
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="closeCargoModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
-                    <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
 
-    <script>
-        const SUPABASE_URL = 'https://zsrczkdpluafuoczfokw.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let currentUser = null;
-        let currentRol = 'operador';
-        let isAdmin = false;
-        let isCoordinador = false;
-        let cdeTargetId = null;
-        let tasksCache = [];
-        let gruposCache = [];
-        let perfilesCache = [];
-        let currentTab = 'dashboard';
-        let charts = {};
-
-        const CDE_COLORS = {
-            WIP: 'background:#f1f5f9;color:#334155;',
-            Shared: 'background:#fef3c7;color:#92400e;',
-            Published: 'background:#ccfbf1;color:#115e59;',
-            Archived: 'background:#e2e8f0;color:#64748b;'
-        };
-        const CDE_META = {
-            WIP:       { titulo: 'WIP',       sub: 'En trabajo',       icon: 'fa-pen-ruler',   color: 'slate' },
-            Shared:    { titulo: 'Shared',    sub: 'En coordinación',  icon: 'fa-share-nodes', color: 'amber' },
-            Published: { titulo: 'Published', sub: 'Publicado',        icon: 'fa-stamp',       color: 'teal'  },
-            Archived:  { titulo: 'Archived',  sub: 'Archivado',        icon: 'fa-box-archive', color: 'slate' }
-        };
-        const ESTADOS_CDE = ['WIP', 'Shared', 'Published', 'Archived'];
-        const APTITUD_DEFAULT = { WIP: 'S0', Shared: 'S1', Published: 'A1', Archived: null };
-
-        const cdeBadge = (estado, aptitud) =>
-            `<span class="badge-cde" style="${CDE_COLORS[estado] || ''}">${estado || 'WIP'} · ${aptitud || '—'}</span>`;
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const errorDiv = document.getElementById('login-error');
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                errorDiv.innerText = "Error: Credenciales inválidas";
-                errorDiv.classList.remove('hidden');
-            } else {
-                currentUser = data.user;
-                initApp();
-            }
-        }
-        async function handleLogout() {
-            await supabaseClient.auth.signOut();
-            location.reload();
-        }
-
-        async function initApp() {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) return;
-            currentUser = user;
-
-            const { data: perfil } = await supabaseClient
-                .from('perfiles').select('rol').eq('id', currentUser.id).maybeSingle();
-
-            currentRol = (perfil?.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
-            isAdmin = currentRol === 'admin';
-            isCoordinador = currentRol === 'coordinador_bim';
-
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app-screen').classList.remove('hidden');
-            document.getElementById('app-screen').classList.add('flex');
-            document.getElementById('user-display').innerText = currentUser.email;
-            document.getElementById('role-display').innerText =
-                isAdmin ? 'Administrador' : isCoordinador ? 'Coordinador BIM' : 'Modelador / Operador';
-
-            if (isAdmin || isCoordinador) document.getElementById('btn-new-task').classList.remove('hidden');
-            if (isAdmin) document.getElementById('tab-config-btn').classList.remove('hidden');
-
-            switchTab('dashboard');
-            await fetchAll();
-        }
-
-        const canEdit = (t) => (isAdmin || isCoordinador) || (t.estado_cde === 'WIP' && t.user_id === currentUser?.id);
-        const canDelete = () => isAdmin;
-        const canTransition = () => isAdmin || isCoordinador;
-
-        function switchTab(tab) {
-            currentTab = tab;
-            ['dashboard', 'tabla', 'kanban', 'eisenhower', 'config'].forEach(t => {
-                const el = document.getElementById('view-' + t);
-                if (el) el.classList.toggle('hidden', t !== tab);
-                const btn = document.querySelector(`[data-tab="${t}"]`);
-                if (btn) btn.classList.toggle('tab-active', t === tab);
-            });
-            render();
-        }
-
-        function render() {
-            if (currentTab === 'dashboard') renderDashboard();
-            else if (currentTab === 'tabla') renderTabla();
-            else if (currentTab === 'kanban') renderKanban();
-            else if (currentTab === 'eisenhower') renderEisenhower();
-            else if (currentTab === 'config') renderConfig();
-        }
-
-        async function fetchAll() {
-            const [tRes, gRes, pRes] = await Promise.all([
-                supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
-                supabaseClient.from('grupos_bim').select('*').order('nombre'),
-                supabaseClient.from('perfiles').select('id,email,rol,cargo').order('email')
-            ]);
-            if (tRes.error) toast('Error tasks: ' + tRes.error.message);
-            tasksCache = tRes.data || [];
-            gruposCache = gRes.data || [];
-            perfilesCache = pRes.data || [];
-            render();
-        }
-        async function fetchTasks() { return fetchAll(); }
-        async function loadPerfiles() {
-            const { data, error } = await supabaseClient.from('perfiles').select('id,email,rol,cargo').order('email');
-            if (error) { toast('Error: ' + error.message); return; }
-            perfilesCache = data || [];
-            renderConfig();
-        }
-
-        // ===== DASHBOARD =====
-        const WEIGHT = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
-        const DAY = 86400000;
-        const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
-
-        function daysToDeadline(t) {
-            if (!t.fecha_fin) return null;
-            const f = new Date(t.fecha_fin + 'T00:00:00');
-            return Math.round((f - today()) / DAY);
-        }
-        const isCerrado = (t) => t.estado === 'Cerrado';
-
-        function semaforo(t) {
-            if (isCerrado(t)) return 'Cerrado';
-            if (!t.fecha_fin) return 'Sin fecha';
-            const d = daysToDeadline(t);
-            if (d < 0) return 'Vencida';
-            if (d <= 7) return 'Por vencer';
-            return 'En plazo';
-        }
-
-        function calcularPPC(ventanaDias) {
-            const ref = today();
-            const inicio = new Date(ref.getTime() - ventanaDias * DAY);
-            const cerradas = tasksCache.filter(t => {
-                if (!t.fecha_cierre) return false;
-                const k = new Date(t.fecha_cierre + 'T00:00:00');
-                return k >= inicio && k <= ref;
-            });
-            if (!cerradas.length) return { ppc: null, total: 0, enPlazo: 0 };
-            const enPlazo = cerradas.filter(t => {
-                if (!t.fecha_fin) return false;
-                return new Date(t.fecha_cierre + 'T00:00:00') <= new Date(t.fecha_fin + 'T00:00:00');
-            }).length;
-            return { ppc: Math.round((enPlazo / cerradas.length) * 100), total: cerradas.length, enPlazo };
-        }
-
-        function calcularKPIs() {
-            const total = tasksCache.length;
-            const abiertas = tasksCache.filter(t => !isCerrado(t));
-            const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida');
-            const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
-            const sinFecha = abiertas.filter(t => !t.fecha_fin);
-            const ppc = calcularPPC(28);
-            return {
-                total, abiertas: abiertas.length, vencidas: vencidas.length,
-                porVencer: porVencer.length, sinFecha: sinFecha.length,
-                ppc: ppc.ppc, ppcTotal: ppc.total, ppcEnPlazo: ppc.enPlazo
-            };
-        }
-
-        function renderDashboard() {
-            const k = calcularKPIs();
-            const KPI = [
-                { label: 'PPC (28 días)', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} en plazo`, color: 'teal', icon: 'fa-chart-line' },
-                { label: 'Total', value: k.total, sub: 'contenedores', color: 'sky', icon: 'fa-cubes' },
-                { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
-                { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
-                { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
-                { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
-            ];
-            document.getElementById('kpi-grid').innerHTML = KPI.map(x => `
-                <div class="card kpi-card p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
-                        <i class="fa-solid ${x.icon} text-${x.color}-500 text-xs"></i>
-                    </div>
-                    <p class="text-2xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
-                    <p class="text-[10px] text-slate-400">${x.sub}</p>
-                </div>
-            `).join('');
-
-            renderChartPPC();
-            renderChartCDE();
-            renderChartResp();
-            renderChartCrit();
-            renderPerfTable();
-        }
-
-        function renderChartPPC() {
-            const labels = [], data = [];
-            for (let i = 7; i >= 0; i--) {
-                const ref = today();
-                const inicio = new Date(ref.getTime() - (7 + i * 7) * DAY);
-                const fin = new Date(ref.getTime() - i * 7 * DAY);
-                const cerradas = tasksCache.filter(t => {
-                    if (!t.fecha_cierre) return false;
-                    const k = new Date(t.fecha_cierre + 'T00:00:00');
-                    return k >= inicio && k < fin;
-                });
-                const enPlazo = cerradas.filter(t => t.fecha_fin && new Date(t.fecha_cierre + 'T00:00:00') <= new Date(t.fecha_fin + 'T00:00:00')).length;
-                labels.push(`S-${i}`);
-                data.push(cerradas.length ? Math.round((enPlazo / cerradas.length) * 100) : null);
-            }
-            charts.ppc?.destroy();
-            charts.ppc = new Chart(document.getElementById('chart-ppc'), {
-                type: 'line',
-                data: { labels, datasets: [{ label: 'PPC %', data, borderColor: '#0d9488', backgroundColor: 'rgba(13,148,136,.12)', fill: true, tension: .35, pointRadius: 4, pointBackgroundColor: '#0d9488', spanGaps: true }] },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y !== null ? c.parsed.y + '%' : 'sin datos' } } },
-                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
-                }
-            });
-        }
-
-        function renderChartCDE() {
-            const counts = ESTADOS_CDE.map(e => tasksCache.filter(t => (t.estado_cde || 'WIP') === e).length);
-            charts.cde?.destroy();
-            charts.cde = new Chart(document.getElementById('chart-cde'), {
-                type: 'doughnut',
-                data: { labels: ESTADOS_CDE, datasets: [{ data: counts, backgroundColor: ['#94a3b8', '#f59e0b', '#14b8a6', '#64748b'], borderColor: '#fff', borderWidth: 2 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } }
-            });
-        }
-
-        function renderChartResp() {
-            const map = {};
-            tasksCache.forEach(t => {
-                const r = t.responsable || 'Sin asignar';
-                if (!map[r]) map[r] = { abiertas: 0, vencidas: 0 };
-                if (!isCerrado(t)) {
-                    map[r].abiertas++;
-                    if (semaforo(t) === 'Vencida') map[r].vencidas++;
-                }
-            });
-            const resp = Object.keys(map).sort();
-            charts.resp?.destroy();
-            charts.resp = new Chart(document.getElementById('chart-resp'), {
-                type: 'bar',
-                data: {
-                    labels: resp,
-                    datasets: [
-                        { label: 'Abiertas', data: resp.map(r => map[r].abiertas), backgroundColor: '#0284c7', borderRadius: 4 },
-                        { label: 'Vencidas', data: resp.map(r => map[r].vencidas), backgroundColor: '#dc2626', borderRadius: 4 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } }
-            });
-        }
-
-        function renderChartCrit() {
-            const CRIT = ['Muy alto', 'Alto', 'Medio', 'Bajo'];
-            const EST = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
-            const colors = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
-            const datasets = EST.map((e, i) => ({
-                label: e,
-                data: CRIT.map(c => tasksCache.filter(t => t.criticidad === c && t.estado === e).length),
-                backgroundColor: colors[i],
-                borderRadius: 4
-            }));
-            charts.crit?.destroy();
-            charts.crit = new Chart(document.getElementById('chart-crit'), {
-                type: 'bar',
-                data: { labels: CRIT, datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-                    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }
-                }
-            });
-        }
-
-        function renderPerfTable() {
-            const map = {};
-            tasksCache.forEach(t => {
-                const r = t.responsable || 'Sin asignar';
-                if (!map[r]) map[r] = { abiertas: 0, vencidas: 0, cerradas: 0, cerradasPlazo: 0, carga: 0 };
-                if (isCerrado(t)) {
-                    map[r].cerradas++;
-                    if (t.fecha_fin && t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= new Date(t.fecha_fin + 'T00:00:00')) {
-                        map[r].cerradasPlazo++;
-                    }
-                } else {
-                    map[r].abiertas++;
-                    if (semaforo(t) === 'Vencida') map[r].vencidas++;
-                    map[r].carga += WEIGHT[t.criticidad] || 1;
-                }
-            });
-            const rows = Object.keys(map).sort().map(r => {
-                const m = map[r];
-                return {
-                    r, ...m,
-                    pctVenc: m.abiertas ? Math.round((m.vencidas / m.abiertas) * 100) : 0,
-                    ppc: m.cerradas ? Math.round((m.cerradasPlazo / m.cerradas) * 100) : null
-                };
-            });
-            document.getElementById('perf-table').innerHTML = rows.map(x => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3 font-semibold text-slate-800">${escapeHtml(x.r)}</td>
-                    <td class="p-3">${x.abiertas}</td>
-                    <td class="p-3 ${x.vencidas ? 'text-red-600 font-semibold' : ''}">${x.vencidas}</td>
-                    <td class="p-3 ${x.pctVenc >= 50 ? 'text-red-600 font-bold' : x.pctVenc >= 25 ? 'text-amber-600 font-semibold' : ''}">${x.pctVenc}%</td>
-                    <td class="p-3">${x.cerradas}</td>
-                    <td class="p-3">${x.ppc !== null ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${x.ppc >= 80 ? 'bg-teal-100 text-teal-800' : x.ppc >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}">${x.ppc}%</span>` : '—'}</td>
-                    <td class="p-3 font-semibold">${x.carga.toFixed(1)}</td>
-                </tr>
-            `).join('') || '<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin datos</td></tr>';
-        }
-
-        // ===== TABLA =====
-        function nombreResponsable(t) {
-            if (t.responsable_id) {
-                const p = perfilesCache.find(p => p.id === t.responsable_id);
-                if (p) return p.cargo ? `${p.email.split('@')[0]} · ${p.cargo}` : p.email;
-            }
-            return t.responsable || 'Sin asignar';
-        }
-
-        function renderTabla() {
-            const tbody = document.getElementById('task-list');
-            if (!tasksCache.length) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-slate-400 py-6">Sin contenedores aún</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = tasksCache.map(t => `
-                <tr class="hover:bg-slate-50 transition">
-                    <td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>
-                    <td class="p-3 font-medium text-slate-900 max-w-xs">
-                        ${escapeHtml(t.actividad)}
-                        ${t.nota ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5">${escapeHtml(t.nota)}</div>` : ''}
-                    </td>
-                    <td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>
-                    <td class="p-3 text-slate-600 text-[11px]"><span class="bg-slate-100 px-2 py-0.5 rounded font-semibold">${escapeHtml(nombreResponsable(t))}</span></td>
-                    <td class="p-3 font-semibold text-slate-700">${escapeHtml(t.criticidad)}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>
-                    <td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>
-                    <td class="p-3 text-center whitespace-nowrap">
-                        ${canEdit(t) ? `<button onclick='editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})' class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
-                        ${canTransition() ? `<button onclick="openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
-                        <button onclick="openHistorial(${t.id})" class="text-slate-500 hover:text-slate-700 mr-2" title="Historial"><i class="fa-solid fa-clock-rotate-left"></i></button>
-                        ${canDelete() ? `<button onclick="deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // ===== KANBAN =====
-        function kanbanCard(t) {
-            const d = daysToDeadline(t);
-            return `
-                <div class="kb-card bg-white rounded-lg border border-slate-200 p-2.5 mb-2 shadow-sm"
-                     draggable="${canTransition()}"
-                     data-id="${t.id}"
-                     ondragstart="onDragStart(event, ${t.id})"
-                     ondragend="onDragEnd(event)">
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="font-mono text-[10px] text-slate-400">${t.codigo_contenedor || '–'}</span>
-                        ${cdeBadge(t.estado_cde, t.codigo_aptitud)}
-                    </div>
-                    <p class="text-[12px] font-medium text-slate-800 mt-1.5 leading-snug line-clamp-3">${escapeHtml(t.actividad)}</p>
-                    <div class="flex items-center justify-between mt-2 text-[10px] text-slate-500">
-                        <span class="truncate"><i class="fa-solid fa-user mr-1"></i>${escapeHtml(nombreResponsable(t))}</span>
-                        <span class="font-semibold ${critColor(t.criticidad)}">${escapeHtml(t.criticidad || '–')}</span>
-                    </div>
-                    ${t.fecha_fin ? `<div class="mt-1 text-[10px] ${d !== null && d < 0 ? 'text-red-600 font-semibold' : d !== null && d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
-                        <i class="fa-regular fa-calendar mr-1"></i>${fmtDate(t.fecha_fin)} ${d !== null && d < 0 ? `· ${Math.abs(d)}d atraso` : ''}
-                    </div>` : ''}
-                    <div class="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
-                        ${canEdit(t) ? `<button onclick="event.stopPropagation();editTask(${JSON.stringify(t).replace(/'/g, "&apos;")})" class="text-sky-600 hover:text-sky-800" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
-                        <button onclick="event.stopPropagation();openHistorial(${t.id})" class="text-slate-500 hover:text-slate-700" title="Historial"><i class="fa-solid fa-clock-rotate-left text-[11px]"></i></button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderKanban() {
-            const board = document.getElementById('kanban-board');
-            board.innerHTML = ESTADOS_CDE.map(estado => {
-                const meta = CDE_META[estado];
-                const items = tasksCache.filter(t => (t.estado_cde || 'WIP') === estado);
-                return `
-                    <div class="kb-col p-2" data-estado="${estado}"
-                         ondragover="onDragOver(event)"
-                         ondragleave="onDragLeave(event)"
-                         ondrop="onDrop(event, '${estado}')">
-                        <div class="flex items-center justify-between px-2 py-2 mb-1">
-                            <div class="flex items-center gap-2">
-                                <span class="w-6 h-6 rounded bg-${meta.color}-100 text-${meta.color}-700 grid place-items-center">
-                                    <i class="fa-solid ${meta.icon} text-[11px]"></i>
-                                </span>
-                                <div>
-                                    <p class="text-[12px] font-bold text-slate-800 leading-tight">${meta.titulo}</p>
-                                    <p class="text-[10px] text-slate-500">${meta.sub}</p>
-                                </div>
-                            </div>
-                            <span class="text-[11px] font-bold bg-white text-slate-600 rounded-full px-2 py-0.5 border border-slate-200">${items.length}</span>
-                        </div>
-                        <div class="kb-body">${items.map(kanbanCard).join('') || '<p class="text-[11px] text-slate-400 text-center py-4">Vacío</p>'}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        let dragId = null;
-        function onDragStart(e, id) {
-            if (!canTransition()) { e.preventDefault(); return; }
-            dragId = id;
-            e.dataTransfer.effectAllowed = 'move';
-            e.currentTarget.classList.add('dragging');
-        }
-        function onDragEnd(e) { e.currentTarget.classList.remove('dragging'); dragId = null; }
-        function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('drag-over'); }
-        function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
-        async function onDrop(e, nuevoEstado) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-            const id = dragId;
-            dragId = null;
-            if (!id) return;
-            const t = tasksCache.find(x => x.id === id);
-            if (!t) return;
-            const estadoActual = t.estado_cde || 'WIP';
-            if (estadoActual === nuevoEstado) return;
-            if (!canTransition()) { toast('Tu rol no permite mover entre estados CDE'); return; }
-            const aptitud = APTITUD_DEFAULT[nuevoEstado];
-            const { data, error } = await supabaseClient.rpc('transicionar_cde', {
-                p_pendiente_id: id,
-                p_estado_nuevo: nuevoEstado,
-                p_aptitud_nueva: aptitud,
-                p_comentario: `Movido vía Kanban a ${nuevoEstado}`
-            });
-            if (error) { toast('Error: ' + error.message); return; }
-            if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'transición inválida')); return; }
-            toast(`Movido a ${nuevoEstado}${aptitud ? ' · ' + aptitud : ''}`);
-            fetchAll();
-        }
-
-        // ===== EISENHOWER =====
-        function renderEisenhower() {
-            const board = document.getElementById('eisenhower-board');
-            const activos = tasksCache.filter(t => t.estado_cde !== 'Archived' && !isCerrado(t));
-            const isUrgente = (t) => t.fecha_fin && daysToDeadline(t) <= 7;
-            const isImportante = (t) => t.criticidad === 'Muy alto' || t.criticidad === 'Alto';
-            const Q = [
-                { titulo: 'Hacer ya',     sub: 'Urgente + Importante',     color: 'red',   items: activos.filter(t =>  isUrgente(t) &&  isImportante(t)) },
-                { titulo: 'Programar',    sub: 'Importante, no urgente',   color: 'sky',   items: activos.filter(t => !isUrgente(t) &&  isImportante(t)) },
-                { titulo: 'Delegar',      sub: 'Urgente, no importante',   color: 'amber', items: activos.filter(t =>  isUrgente(t) && !isImportante(t)) },
-                { titulo: 'Eliminar / posponer', sub: 'Ni urgente ni importante', color: 'slate', items: activos.filter(t => !isUrgente(t) && !isImportante(t)) }
-            ];
-            board.innerHTML = Q.map(q => `
-                <div class="eis-q bg-${q.color}-50 border-${q.color}-200">
-                    <div class="flex items-center justify-between mb-2">
-                        <div>
-                            <h4 class="text-[13px] font-bold text-${q.color}-800">${q.titulo}</h4>
-                            <p class="text-[10px] text-${q.color}-600">${q.sub}</p>
-                        </div>
-                        <span class="text-[11px] font-bold bg-white border border-${q.color}-200 text-${q.color}-700 rounded-full px-2 py-0.5">${q.items.length}</span>
-                    </div>
-                    <div class="eis-body space-y-1.5">
-                        ${q.items.slice(0, 50).map(t => `
-                            <div class="bg-white rounded border border-slate-200 p-2 text-[11px]">
-                                <p class="font-medium text-slate-800 leading-snug line-clamp-2">${escapeHtml(t.actividad)}</p>
-                                <div class="flex justify-between items-center mt-1 text-[10px] text-slate-500">
-                                    <span>${escapeHtml(nombreResponsable(t))}</span>
-                                    <span>${t.fecha_fin ? fmtDate(t.fecha_fin) : 'sin fecha'}</span>
-                                </div>
-                            </div>
-                        `).join('') || '<p class="text-[11px] text-slate-400 text-center py-3">Sin actividades</p>'}
-                        ${q.items.length > 50 ? `<p class="text-[10px] text-slate-400 text-center">+${q.items.length - 50} más</p>` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // ===== CONFIG =====
-        function renderConfig() {
-            document.getElementById('grupos-table').innerHTML = gruposCache.map(g => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3 font-medium">${escapeHtml(g.nombre)}</td>
-                    <td class="p-3">${g.activo ? '<span class="text-teal-600 font-semibold">Sí</span>' : '<span class="text-slate-400">No</span>'}</td>
-                    <td class="p-3 text-center whitespace-nowrap">
-                        <button onclick="openGrupoModal(${g.id})" class="text-sky-600 hover:text-sky-800 mr-2"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="deleteGrupo(${g.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                </tr>
-            `).join('') || '<tr><td colspan="3" class="text-center text-slate-400 py-4">Sin grupos</td></tr>';
-
-            document.getElementById('perfiles-table').innerHTML = perfilesCache.map(p => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-3">${escapeHtml(p.email)}</td>
-                    <td class="p-3"><span class="uppercase text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded">${escapeHtml(p.rol)}</span></td>
-                    <td class="p-3">${escapeHtml(p.cargo || '—')}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="openCargoModal('${p.id}')" class="text-sky-600 hover:text-sky-800"><i class="fa-solid fa-pen"></i></button>
-                    </td>
-                </tr>
-            `).join('') || '<tr><td colspan="4" class="text-center text-slate-400 py-4">Sin usuarios</td></tr>';
-        }
-
-        function openGrupoModal(id) {
-            const g = id ? gruposCache.find(x => x.id === id) : null;
-            document.getElementById('grupo-modal-title').innerText = g ? 'Editar grupo' : 'Nuevo grupo';
-            document.getElementById('grupo-id').value = g?.id || '';
-            document.getElementById('grupo-nombre').value = g?.nombre || '';
-            document.getElementById('grupo-activo').checked = g ? !!g.activo : true;
-            document.getElementById('modal-grupo').classList.remove('hidden');
-            document.getElementById('modal-grupo').classList.add('flex');
-        }
-        function closeGrupoModal() {
-            document.getElementById('modal-grupo').classList.add('hidden');
-            document.getElementById('modal-grupo').classList.remove('flex');
-        }
-        async function saveGrupo(e) {
-            e.preventDefault();
-            const id = document.getElementById('grupo-id').value;
-            const payload = {
-                nombre: document.getElementById('grupo-nombre').value.trim(),
-                activo: document.getElementById('grupo-activo').checked
-            };
-            if (!payload.nombre) { toast('Nombre requerido'); return; }
-            const { error } = id
-                ? await supabaseClient.from('grupos_bim').update(payload).eq('id', id)
-                : await supabaseClient.from('grupos_bim').insert([payload]);
-            if (error) { toast('Error: ' + error.message); return; }
-            closeGrupoModal();
-            await fetchAll();
-            toast('Grupo guardado');
-        }
-        async function deleteGrupo(id) {
-            if (!confirm('¿Eliminar este grupo? Las actividades que lo usaban quedarán sin grupo.')) return;
-            const { error } = await supabaseClient.from('grupos_bim').delete().eq('id', id);
-            if (error) { toast('Error: ' + error.message); return; }
-            await fetchAll();
-        }
-
-        function openCargoModal(userId) {
-            const p = perfilesCache.find(x => x.id === userId);
-            if (!p) return;
-            document.getElementById('cargo-user-id').value = p.id;
-            document.getElementById('cargo-user-email').innerText = p.email;
-            document.getElementById('cargo-value').value = p.cargo || '';
-            document.getElementById('modal-cargo').classList.remove('hidden');
-            document.getElementById('modal-cargo').classList.add('flex');
-        }
-        function closeCargoModal() {
-            document.getElementById('modal-cargo').classList.add('hidden');
-            document.getElementById('modal-cargo').classList.remove('flex');
-        }
-        async function saveCargo(e) {
-            e.preventDefault();
-            const id = document.getElementById('cargo-user-id').value;
-            const cargo = document.getElementById('cargo-value').value || null;
-            const { error } = await supabaseClient.from('perfiles').update({ cargo }).eq('id', id);
-            if (error) { toast('Error: ' + error.message); return; }
-            closeCargoModal();
-            await loadPerfiles();
-            toast('Cargo actualizado');
-        }
-
-        // ===== HELPERS =====
-        function fmtDate(iso) {
-            if (!iso) return '–';
-            const [y, m, d] = iso.split('-');
-            return `${d}/${m}/${y.slice(2)}`;
-        }
-        function critColor(c) {
-            return c === 'Muy alto' ? 'text-red-600' :
-                   c === 'Alto' ? 'text-orange-600' :
-                   c === 'Medio' ? 'text-amber-600' : 'text-slate-500';
-        }
-        function escapeHtml(s) {
-            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[c]));
-        }
-        function toast(msg) {
-            const el = document.getElementById('toast');
-            el.textContent = msg;
-            el.classList.remove('hidden');
-            clearTimeout(toast._t);
-            toast._t = setTimeout(() => el.classList.add('hidden'), 2600);
-        }
-
-        // ===== CRUD TASK =====
-        function fillGrupoResponsableSelects() {
-            const grSel = document.getElementById('task-grupo');
-            const gruposActivos = gruposCache.filter(g => g.activo);
-            grSel.innerHTML = '<option value="">— Sin grupo —</option>' +
-                gruposActivos.map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
-
-            const rsSel = document.getElementById('task-responsable');
-            rsSel.innerHTML = '<option value="">— Sin asignar —</option>' +
-                perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
-        }
-
-        function openModal() {
-            if (!isAdmin && !isCoordinador) return;
-            document.getElementById('modal-title').innerText = "Nuevo Contenedor";
-            ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('task-criticidad').value = 'Alto';
-            document.getElementById('task-estado').value = 'No iniciado';
-            fillGrupoResponsableSelects();
-            document.getElementById('modal-task').classList.remove('hidden');
-            document.getElementById('modal-task').classList.add('flex');
-        }
-
-        function editTask(t) {
-            if (!canEdit(t)) return;
-            document.getElementById('modal-title').innerText = "Editar Contenedor";
-            document.getElementById('task-id').value = t.id;
-            document.getElementById('task-actividad').value = t.actividad || '';
-            document.getElementById('task-criticidad').value = t.criticidad || 'Alto';
-            document.getElementById('task-estado').value = t.estado || 'No iniciado';
-            document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
-            document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
-            document.getElementById('task-nota').value = t.nota || '';
-            fillGrupoResponsableSelects();
-            document.getElementById('task-grupo').value = t.grupo || '';
-            document.getElementById('task-responsable').value = t.responsable_id || '';
-            document.getElementById('modal-task').classList.remove('hidden');
-            document.getElementById('modal-task').classList.add('flex');
-        }
-
-        function closeModal() {
-            document.getElementById('modal-task').classList.add('hidden');
-            document.getElementById('modal-task').classList.remove('flex');
-        }
-
-        async function saveTask(e) {
-            e.preventDefault();
-            const id = document.getElementById('task-id').value;
-            const respId = document.getElementById('task-responsable').value || null;
-            const respPerfil = respId ? perfilesCache.find(p => p.id === respId) : null;
-            const payload = {
-                actividad: document.getElementById('task-actividad').value,
-                grupo: document.getElementById('task-grupo').value || null,
-                responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
-                responsable_id: respId,
-                criticidad: document.getElementById('task-criticidad').value,
-                estado: document.getElementById('task-estado').value,
-                fecha_fin: document.getElementById('task-fecha-fin').value || null,
-                fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
-                nota: document.getElementById('task-nota').value
-            };
-            if (id) {
-                const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
-                if (error) { toast('Error: ' + error.message); return; }
-            } else {
-                if (!isAdmin && !isCoordinador) { toast('Solo admin/coordinador puede crear.'); return; }
-                payload.estado_cde = 'WIP';
-                payload.codigo_aptitud = 'S0';
-                payload.user_id = currentUser.id;
-                const { error } = await supabaseClient.from('pendientes_bim').insert([payload]);
-                if (error) { toast('Error: ' + error.message); return; }
-            }
-            closeModal();
-            await fetchAll();
-            toast('Guardado');
-        }
-
-        async function deleteTask(id) {
-            if (!canDelete()) return;
-            if (!confirm("¿Eliminar este contenedor? Se borrará también su historial CDE.")) return;
-            const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
-            if (error) { toast('Error: ' + error.message); return; }
-            await fetchAll();
-        }
-
-        // ===== CDE =====
-        function openModalCDE(id) {
-            if (!canTransition()) return;
-            cdeTargetId = id;
-            document.getElementById('cde-current').innerText = `Contenedor #${id}`;
-            document.getElementById('cde-estado').value = 'Shared';
-            document.getElementById('cde-aptitud').value = 'S1';
-            document.getElementById('cde-comentario').value = '';
-            document.getElementById('modal-cde').classList.remove('hidden');
-            document.getElementById('modal-cde').classList.add('flex');
-        }
-        function closeModalCDE() {
-            document.getElementById('modal-cde').classList.add('hidden');
-            document.getElementById('modal-cde').classList.remove('flex');
-            cdeTargetId = null;
-        }
-        async function confirmarTransicion() {
-            if (!cdeTargetId) return;
-            const estado = document.getElementById('cde-estado').value;
-            const aptitud = document.getElementById('cde-aptitud').value || null;
-            const comentario = document.getElementById('cde-comentario').value || null;
-            const { data, error } = await supabaseClient.rpc('transicionar_cde', {
-                p_pendiente_id: cdeTargetId,
-                p_estado_nuevo: estado,
-                p_aptitud_nueva: aptitud,
-                p_comentario: comentario
-            });
-            if (error) { toast('Error RPC: ' + error.message); return; }
-            if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
-            closeModalCDE();
-            await fetchAll();
-            toast('Transición aplicada');
-        }
-
-        // ===== HISTORIAL =====
-        async function openHistorial(id) {
-            document.getElementById('modal-hist').classList.remove('hidden');
-            document.getElementById('modal-hist').classList.add('flex');
-            const box = document.getElementById('hist-content');
-            box.innerHTML = '<p class="text-slate-400">Cargando...</p>';
-            const { data, error } = await supabaseClient
-                .from('transiciones_cde').select('*').eq('pendiente_id', id)
-                .order('created_at', { ascending: false });
-            if (error) { box.innerHTML = `<p class="text-red-500">${escapeHtml(error.message)}</p>`; return; }
-            if (!data.length) { box.innerHTML = '<p class="text-slate-400">Sin transiciones registradas aún.</p>'; return; }
-            box.innerHTML = data.map(x => `
-                <div class="border border-slate-200 rounded p-2">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold">${x.estado_anterior || '—'} → ${x.estado_nuevo}</span>
-                        <span class="text-[10px] text-slate-400">${new Date(x.created_at).toLocaleString()}</span>
-                    </div>
-                    <div class="text-[10px] text-slate-500 mt-1">
-                        Aptitud: ${x.aptitud_anterior || '—'} → ${x.aptitud_nueva || '—'}
-                        · Usuario: ${escapeHtml(x.usuario_email || 'desconocido')}
-                    </div>
-                    ${x.comentario ? `<div class="text-[11px] text-slate-600 mt-1 italic">“${escapeHtml(x.comentario)}”</div>` : ''}
-                </div>
-            `).join('');
-        }
-        function closeHistorial() {
-            document.getElementById('modal-hist').classList.add('hidden');
-            document.getElementById('modal-hist').classList.remove('flex');
-        }
-
-        // ===== ARRANQUE =====
-        window.onload = async () => {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (user) initApp();
-        };
-    </script>
+    <!-- SCRIPTS -->
+    <script src="js/app.js" type="module"></script>
 </body>
 </html>
