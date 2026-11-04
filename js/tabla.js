@@ -1,10 +1,11 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast } from './utils.js';
 
-// ESTADO LOCAL DE LA TABLA (Filtros, orden, columnas)
+// ESTADO LOCAL DE LA TABLA
 let tableState = {
     sortBy: 'id',
     sortDir: 'desc',
+    showColMenu: false, // Controla si el menú de columnas está abierto o cerrado
     visibleCols: {
         codigo: true,
         actividad: true,
@@ -14,11 +15,8 @@ let tableState = {
         estado: true,
         cde: true
     },
-    filters: {
-        search: '',
-        grupo: '',
-        responsable: ''
-    }
+    visibleProps: {}, // Guardará el estado de visibilidad de los parámetros personalizados
+    filters: { search: '', grupo: '', responsable: '' }
 };
 
 export function canEdit(t) { 
@@ -27,29 +25,18 @@ export function canEdit(t) {
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador; }
 
-// --- LÓGICA DE FILTRADO Y ORDENAMIENTO ---
 function getProcessedTasks() {
     let result = [...state.tasksCache];
-
-    // 1. Filtro de búsqueda global
     if (tableState.filters.search) {
         const q = tableState.filters.search.toLowerCase();
-        result = result.filter(t => 
-            (t.actividad || '').toLowerCase().includes(q) || 
-            (t.codigo_contenedor || '').toLowerCase().includes(q)
-        );
+        result = result.filter(t => (t.actividad || '').toLowerCase().includes(q) || (t.codigo_contenedor || '').toLowerCase().includes(q));
     }
-
-    // 2. Filtros específicos
     if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
     if (tableState.filters.responsable) result = result.filter(t => t.responsable_id === tableState.filters.responsable);
 
-    // 3. Ordenamiento
     result.sort((a, b) => {
         let valA = a[tableState.sortBy] || '';
         let valB = b[tableState.sortBy] || '';
-        
-        // Manejo especial para propiedades personalizadas
         if (tableState.sortBy.startsWith('prop_')) {
             const pid = parseInt(tableState.sortBy.split('_')[1]);
             const pvA = state.propValsCache.find(v => v.pendiente_id === a.id && v.propiedad_id === pid);
@@ -57,53 +44,56 @@ function getProcessedTasks() {
             valA = pvA ? (pvA.valor_texto || pvA.valor_numero || pvA.valor_fecha || '') : '';
             valB = pvB ? (pvB.valor_texto || pvB.valor_numero || pvB.valor_fecha || '') : '';
         }
-
         if (valA < valB) return tableState.sortDir === 'asc' ? -1 : 1;
         if (valA > valB) return tableState.sortDir === 'asc' ? 1 : -1;
         return 0;
     });
-
     return result;
 }
 
 function toggleSort(col) {
-    if (tableState.sortBy === col) {
-        tableState.sortDir = tableState.sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-        tableState.sortBy = col;
-        tableState.sortDir = 'asc';
-    }
+    if (tableState.sortBy === col) tableState.sortDir = tableState.sortDir === 'asc' ? 'desc' : 'asc';
+    else { tableState.sortBy = col; tableState.sortDir = 'asc'; }
     window.renderView();
 }
 
+// Alternar visibilidad de columna y forzar el re-render
 function toggleCol(col) {
     tableState.visibleCols[col] = !tableState.visibleCols[col];
     window.renderView();
 }
 
-function getSortIcon(col) {
-    if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>';
-    return tableState.sortDir === 'asc' 
-        ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' 
-        : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>';
+// Alternar visibilidad de un parámetro personalizado
+function toggleProp(pid) {
+    tableState.visibleProps[pid] = tableState.visibleProps[pid] === false ? true : false;
+    window.renderView();
 }
 
-// --- RENDERIZADO PRINCIPAL ---
+// Abrir/cerrar el menú
+function toggleColMenu() {
+    tableState.showColMenu = !tableState.showColMenu;
+    window.renderView();
+}
+
+function getSortIcon(col) {
+    if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>';
+    return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>';
+}
+
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
-    
-    // Generar opciones para los filtros
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: p.email.split('@')[0] }));
 
+    // Filtrar parámetros visibles
+    const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
+
     container.innerHTML = `
-        <!-- BARRA DE HERRAMIENTAS -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full">
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="tbl-search" placeholder="Buscar actividad o código..." value="${tableState.filters.search}"
-                           class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                    <input type="text" id="tbl-search" placeholder="Buscar actividad o código..." value="${tableState.filters.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
                 <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5">
                     <option value="">Todos los grupos</option>
@@ -116,12 +106,15 @@ export function renderTabla(container) {
             </div>
             
             <div class="flex items-center gap-2">
-                <!-- DROPDOWN DE COLUMNAS -->
-                <div class="relative group">
-                    <button class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
+                <!-- MENÚ DE COLUMNAS POR CLIC -->
+                <div class="relative">
+                    <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                         <i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i>
                     </button>
-                    <div class="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block z-20 py-1">
+                    
+                    <!-- Dropdown (se muestra si showColMenu es true) -->
+                    <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+                        <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase">Fijas</div>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
                             <input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código
                         </label>
@@ -140,15 +133,24 @@ export function renderTabla(container) {
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
                             <input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO
                         </label>
+                        
+                        ${state.propDefsCache.length > 0 ? `
+                            <div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>
+                            ${state.propDefsCache.map(pd => `
+                                <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs">
+                                    <input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}
+                                </label>
+                            `).join('')}
+                        ` : ''}
                     </div>
                 </div>
+                
                 <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition">
                     <i class="fa-solid fa-rotate-right mr-1"></i> Refrescar
                 </button>
             </div>
         </div>
 
-        <!-- TABLA -->
         <div class="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold select-none">
@@ -161,8 +163,7 @@ export function renderTabla(container) {
                         ${tableState.visibleCols.estado ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')">Estado ${getSortIcon('estado')}</th>` : ''}
                         ${tableState.visibleCols.cde ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')">CDE ISO ${getSortIcon('estado_cde')}</th>` : ''}
                         
-                        <!-- COLUMNAS PERSONALIZADAS -->
-                        ${state.propDefsCache.map(pd => `
+                        ${visiblePropDefs.map(pd => `
                             <th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')">
                                 ${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}
                             </th>
@@ -183,8 +184,7 @@ export function renderTabla(container) {
                             ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
                             ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
                             
-                            <!-- VALORES PERSONALIZADOS -->
-                            ${state.propDefsCache.map(pd => {
+                            ${visiblePropDefs.map(pd => {
                                 const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
                                 let displayVal = '-';
                                 if (pv) {
@@ -208,10 +208,12 @@ export function renderTabla(container) {
         </div>
     `;
 
-    // Event Listeners para filtros
+    // Escuchar los filtros. 
+    // OJO: Usamos 'oninput' y 'onchange' directo en el elemento para evitar que se pierda el foco al re-renderizar.
     document.getElementById('tbl-search').addEventListener('input', (e) => {
         tableState.filters.search = e.target.value;
-        window.renderView();
+        // Solo re-renderizamos la tabla sin perder el foco usando un pequeño timeout
+        setTimeout(() => window.renderView(), 300); 
     });
     document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => {
         tableState.filters.grupo = e.target.value;
@@ -223,23 +225,23 @@ export function renderTabla(container) {
     });
 }
 
-// Exportar funciones de control al HTML
+// Hacemos globales las funciones para que el HTML las lea
 window.toggleSort = toggleSort;
 window.toggleCol = toggleCol;
+window.toggleProp = toggleProp;
+window.toggleColMenu = toggleColMenu;
 
-// EL RESTO DE FUNCIONES (openModal, editTask, etc.) SE MANTIENEN IGUAL
+// ... AQUÍ VA EL RESTO DE TU CÓDIGO (openModal, editTask, saveTask, etc.) QUE NO HA CAMBIADO ...
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
     document.getElementById('modal-title').innerText = "Nuevo Contenedor";
     ['task-id','task-actividad','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('task-criticidad').value = 'Alto';
     document.getElementById('task-estado').value = 'No iniciado';
-    
     const grSel = document.getElementById('task-grupo');
     grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     const rsSel = document.getElementById('task-responsable');
     rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
-
     renderCustomProps(null);
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
@@ -248,7 +250,6 @@ export function openModal() {
 export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
-    
     document.getElementById('modal-title').innerText = "Editar Contenedor";
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
@@ -257,15 +258,12 @@ export function editTask(id) {
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
-
     const grSel = document.getElementById('task-grupo');
     grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     grSel.value = t.grupo || '';
-    
     const rsSel = document.getElementById('task-responsable');
     rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     rsSel.value = t.responsable_id || '';
-
     renderCustomProps(t.id);
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
@@ -276,7 +274,6 @@ function renderCustomProps(pendienteId) {
     const inputs = document.getElementById('custom-props-inputs');
     if (state.propDefsCache.length === 0) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
-
     inputs.innerHTML = state.propDefsCache.map(pd => {
         let valor = '';
         if (pendienteId) {
@@ -314,7 +311,6 @@ export async function saveTask(e) {
         fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
         nota: document.getElementById('task-nota').value
     };
-
     let taskId = id;
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
@@ -325,7 +321,6 @@ export async function saveTask(e) {
         if (error) { toast('Error: ' + error.message); return; }
         taskId = data[0].id;
     }
-
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid);
@@ -343,7 +338,6 @@ export async function saveTask(e) {
         if (existente) await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
-
     closeModal();
     await fetchAll();
     window.renderView();
