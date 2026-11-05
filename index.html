@@ -37,7 +37,7 @@
                         <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Correo Electrónico</label>
                         <input type="email" id="login-email" required 
                                class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-100" 
-                               placeholder="usuario@correo.com">
+                               placeholder="usuario@consorciosuyay.com">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Contraseña</label>
@@ -99,10 +99,10 @@
         </main>
     </div>
 
-        <!-- MODAL TASK -->
+           <!-- MODAL TASK -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
-            <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nuevo Contenedor</h3>
+            <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nueva Actividad</h3>
             <form onsubmit="window.saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
@@ -127,24 +127,36 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
-                        <select id="task-estado" class="inp">
-                            <option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option><option>Cerrado</option>
+                        <label class="block font-semibold text-slate-600 mb-1">Urgencia</label>
+                        <select id="task-urgencia" class="inp">
+                            <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
                         </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Fecha fin prog.</label>
-                        <input type="date" id="task-fecha-fin" class="inp">
+                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
+                        <select id="task-estado" class="inp">
+                            <option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option><option>Cerrado</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Fecha cierre</label>
+                        <label class="block font-semibold text-slate-600 mb-1">Cierre Real</label>
                         <input type="date" id="task-fecha-cierre" class="inp">
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Inicio Prog.</label>
+                        <input type="date" id="task-fecha-inicio" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Fin Prog.</label>
+                        <input type="date" id="task-fecha-fin" class="inp">
+                    </div>
+                </div>
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Nota / restricción</label>
+                    <label class="block font-semibold text-slate-600 mb-1">Nota</label>
                     <textarea id="task-nota" rows="2" class="inp"></textarea>
                 </div>
                 <div id="custom-props-container" class="border-t border-slate-200 pt-3 mt-3 hidden">
@@ -158,7 +170,6 @@
             </form>
         </div>
     </div>
-
     <!-- MODAL CDE -->
     <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
