@@ -59,6 +59,10 @@ function inicializarBuscadorRecursos() {
 
     nuevoInput.addEventListener('focus', () => mostrarDropdownRecursos(nuevoInput.value));
     nuevoInput.addEventListener('input', (e) => mostrarDropdownRecursos(e.target.value));
+    
+    // Prevenir que clics dentro del dropdown se propaguen y cierren
+    dropdown.addEventListener('mousedown', (e) => e.preventDefault());
+    dropdown.addEventListener('click', (e) => e.stopPropagation());
 
     document.addEventListener('click', (e) => {
         if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
