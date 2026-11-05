@@ -1,5 +1,9 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
+import { 
+    escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar,
+    confirmDelete // <-- Nuevo
+} from './utils.js';
 
 function isUserInvolved(t) {
     const esResponsable = t.responsable_id === state.currentUser.id;
@@ -260,7 +264,21 @@ export async function saveManpower(e) {
 }
 window.deleteManpower = async function(id) {
     if (!state.isAdmin) { toast('Solo los administradores pueden eliminar registros.'); return; }
-    if (!confirm("¿Eliminar este registro de horas? Esta acción no se puede deshacer.")) return;
+    
+    const r = state.manpowerCache.find(x => x.id === id);
+    if (!r) return;
+    
+    const p = state.perfilesCache.find(x => x.id === r.usuario_id);
+    const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+    const nombreUsuario = p ? nombreFormateado(p) : 'Desconocido';
+    const nombreActividad = t ? t.actividad : 'General';
+    
+    const confirmado = await confirmDelete({
+        title: 'Eliminar registro de horas',
+        message: `Vas a eliminar el registro de "${nombreUsuario}" del ${fmtDate(r.fecha)} (${parseFloat(r.porcentaje_dia || 0).toFixed(1)}% en "${nombreActividad}"). Esta acción no se puede deshacer.`
+    });
+    
+    if (!confirmado) return;
     
     const { error } = await supabaseClient.from('manpower_registros').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
