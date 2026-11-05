@@ -387,7 +387,7 @@ window.initResize = initResize;
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
-    if (!state.isAdmin && !state.isCoordinador) return;
+    if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return; // <-- Añadir supervisor
     document.getElementById('modal-title').innerText = "Nueva Actividad";
     
     ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
@@ -411,7 +411,6 @@ export function openModal() {
     
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
-
 export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
