@@ -24,6 +24,13 @@ export function canEdit(t) {
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 
+// Helper para nombre formateado en selects
+const nombreFormateado = (p) => {
+    const base = p.email.split('@')[0];
+    return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
+        .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
+};
+
 function getProcessedTasks() {
     let result = [...state.tasksCache];
     if (tableState.filters.search) {
@@ -81,7 +88,8 @@ function stopResize() { isResizing = false; currentCol = null; document.removeEv
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
+    // FILTRO DE RESPONSABLE USANDO NOMBRE FORMATEADO
+    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
@@ -217,9 +225,9 @@ export function openModal() {
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     
-    // CORRECCIÓN: Usar nombreResponsable en el select
+    // Usar nombreFormateado en el select
     const rsSel = document.getElementById('task-responsable'); 
-    if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
     renderCustomProps(null);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
@@ -250,9 +258,9 @@ export function editTask(id) {
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
     
-    // CORRECCIÓN: Usar nombreResponsable en el select
+    // Usar nombreFormateado en el select
     const rsSel = document.getElementById('task-responsable'); 
-    if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
+    if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
     
     renderCustomProps(t.id);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
