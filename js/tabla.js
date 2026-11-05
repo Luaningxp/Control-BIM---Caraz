@@ -10,16 +10,17 @@ const nombreFormateado = (p) => {
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
+    // ACTIVAMOS CRITICIDAD Y CDE POR DEFECTO
     visibleCols: { 
         codigo: true, actividad: true, grupo: true, responsable: true, 
-        importancia: true, urgencia: true, criticidad: false, 
-        estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
+        importancia: true, urgencia: true, criticidad: true, 
+        estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
     colWidths: {
         codigo: 100, actividad: 300, grupo: 120, responsable: 140, 
-        importancia: 90, urgencia: 90, estado: 100, inicio: 90, fin: 90, cierre: 90, nota: 200,
-        criticidad: 100, cde: 100
+        importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
+        inicio: 90, fin: 90, cierre: 90, nota: 200, cde: 100
     }
 };
 
@@ -71,7 +72,7 @@ function toggleProp(pid) { tableState.visibleProps[pid] = tableState.visibleProp
 function toggleColMenu() { tableState.showColMenu = !tableState.showColMenu; window.renderView(); }
 function getSortIcon(col) { if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>'; return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>'; }
 
-// --- SISTEMA DE REDIMENSIONADO ---
+// --- SISTEMA DE REDIMENSIONADO BLINDADO ---
 let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
 
 function initResize(e, colKey) {
@@ -80,9 +81,12 @@ function initResize(e, colKey) {
     startX = e.pageX;
     startWidth = tableState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('pointermove', doResize);
-    document.addEventListener('pointerup', stopResize);
+    document.body.style.userSelect = 'none'; // Bloquea la selección de texto
+    
+    // Usar mousemove clásico que es más compatible
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+    
     e.preventDefault();
     e.stopPropagation();
 }
@@ -90,7 +94,7 @@ function initResize(e, colKey) {
 function doResize(e) {
     if (!isResizing) return;
     const diff = e.pageX - startX;
-    const newWidth = Math.max(50, startWidth + diff);
+    const newWidth = Math.max(50, startWidth + diff); // Ancho mínimo 50px
     tableState.colWidths[currentCol] = newWidth;
     
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
@@ -111,8 +115,8 @@ function stopResize() {
     currentCol = null;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    document.removeEventListener('pointermove', doResize);
-    document.removeEventListener('pointerup', stopResize);
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
 }
 
 export function renderTabla(container) {
@@ -127,7 +131,8 @@ export function renderTabla(container) {
     };
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
-    const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize bg-slate-300 opacity-0 hover:opacity-100 transition-opacity z-30" onpointerdown="window.initResize(event, '${key}')" style="touch-action: none;"></div>`;
+    // Resizer más ancho y con color visible al hover
+    const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50";
     
     container.innerHTML = `
@@ -165,13 +170,14 @@ export function renderTabla(container) {
         </div>
 
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+            <!-- AÑADIDO relative PARA QUE EL RESIZER SE POSICIONE BIEN -->
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
-                <table class="w-full text-left text-xs" style="table-layout: fixed;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1200px;">
                     <thead class="sticky top-0 z-10 shadow-sm">
                         <tr class="bg-slate-100 border-b border-slate-200">
                             <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Información</th>
                             <th colspan="3" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Prioridad</th>
-                            <th colspan="5" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
+                            <th colspan="6" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
                             <th class="p-1 bg-slate-100"></th>
                         </tr>
                         <tr class="bg-slate-50">
@@ -189,6 +195,7 @@ export function renderTabla(container) {
                             ${tableState.visibleCols.fin ? `<th data-col="fin" style="${colStyle('fin')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_fin')"><div class="pr-2">Fin Prog. ${getSortIcon('fecha_fin')}</div>${resizer('fin')}</th>` : ''}
                             ${tableState.visibleCols.cierre ? `<th data-col="cierre" style="${colStyle('cierre')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')"><div class="pr-2">Cierre Real ${getSortIcon('fecha_cierre')}</div>${resizer('cierre')}</th>` : ''}
                             ${tableState.visibleCols.cde ? `<th data-col="cde" style="${colStyle('cde')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')"><div class="pr-2">CDE ISO ${getSortIcon('estado_cde')}</div>${resizer('cde')}</th>` : ''}
+                            
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
                             <th class="p-3 text-center sticky right-0 bg-slate-50 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)] w-[100px]">Acciones</th>
                         </tr>
