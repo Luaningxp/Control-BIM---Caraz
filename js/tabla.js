@@ -1,19 +1,24 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad, critColor } from './utils.js';
 
+// Helper para nombre formateado en selects
+const nombreFormateado = (p) => {
+    const base = p.email.split('@')[0];
+    return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
+        .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
+};
+
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-        codigo: true, // Visible por defecto
-        actividad: true, grupo: true, responsable: true, 
+        codigo: true, actividad: true, grupo: true, responsable: true, 
         importancia: true, urgencia: true, criticidad: false, 
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
     colWidths: {
-        codigo: 100,
-        actividad: 300, grupo: 120, responsable: 140, importancia: 90, 
-        urgencia: 90, estado: 100, inicio: 90, fin: 90, cierre: 90, nota: 200,
+        codigo: 100, actividad: 300, grupo: 120, responsable: 140, 
+        importancia: 90, urgencia: 90, estado: 100, inicio: 90, fin: 90, cierre: 90, nota: 200,
         criticidad: 100, cde: 100
     }
 };
@@ -75,7 +80,7 @@ function initResize(e, colKey) {
     startX = e.pageX;
     startWidth = tableState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none'; // Evita seleccionar texto mientras arrastras
+    document.body.style.userSelect = 'none';
     document.addEventListener('pointermove', doResize);
     document.addEventListener('pointerup', stopResize);
     e.preventDefault();
@@ -88,14 +93,12 @@ function doResize(e) {
     const newWidth = Math.max(50, startWidth + diff);
     tableState.colWidths[currentCol] = newWidth;
     
-    // Actualizar el th
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
     if (th) {
         th.style.width = `${newWidth}px`;
         th.style.minWidth = `${newWidth}px`;
         th.style.maxWidth = `${newWidth}px`;
     }
-    // Actualizar todos los td de esa columna
     document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => {
         td.style.width = `${newWidth}px`;
         td.style.minWidth = `${newWidth}px`;
@@ -119,12 +122,8 @@ export function renderTabla(container) {
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
     const estadoColors = {
-        'No iniciado': 'bg-slate-400',
-        'En proceso': 'bg-sky-500',
-        'En espera': 'bg-amber-500',
-        'Reprogramado': 'bg-purple-500',
-        'Cerrado': 'bg-teal-500',
-        'Terminado': 'bg-emerald-500'
+        'No iniciado': 'bg-slate-400', 'En proceso': 'bg-sky-500', 'En espera': 'bg-amber-500',
+        'Reprogramado': 'bg-purple-500', 'Cerrado': 'bg-teal-500', 'Terminado': 'bg-emerald-500'
     };
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
@@ -165,20 +164,16 @@ export function renderTabla(container) {
             </div>
         </div>
 
-        <!-- CONTENEDOR DE LA TABLA -->
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
-            <!-- overflow visible y x-auto permite ver el contenido y hacer scroll sin cortar el redimensionado -->
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
                 <table class="w-full text-left text-xs" style="table-layout: fixed;">
                     <thead class="sticky top-0 z-10 shadow-sm">
-                        <!-- AGRUPADOR DE COLUMNAS -->
                         <tr class="bg-slate-100 border-b border-slate-200">
                             <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Información</th>
                             <th colspan="3" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Prioridad</th>
                             <th colspan="5" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
-                            <th class="p-1 bg-slate-100"></th> <!-- Espacio para el botón de acción -->
+                            <th class="p-1 bg-slate-100"></th>
                         </tr>
-                        <!-- CABECERAS -->
                         <tr class="bg-slate-50">
                             ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
                             ${tableState.visibleCols.actividad ? `<th data-col="actividad" style="${colStyle('actividad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')"><div class="pr-2">Actividad ${getSortIcon('actividad')}</div>${resizer('actividad')}</th>` : ''}
@@ -252,7 +247,6 @@ export function renderTabla(container) {
     document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
 }
 
-
 window.toggleSort = toggleSort; 
 window.toggleCol = toggleCol; 
 window.toggleProp = toggleProp; 
@@ -277,7 +271,6 @@ export function openModal() {
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     
-    // Usar nombreFormateado en el select
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
@@ -293,14 +286,9 @@ export function editTask(id) {
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
     
-    const impEl = document.getElementById('task-importancia');
-    if (impEl) impEl.value = t.importancia || 'Medio';
-    
-    const urgEl = document.getElementById('task-urgencia');
-    if (urgEl) urgEl.value = t.urgencia || 'Medio';
-
-    const iniEl = document.getElementById('task-fecha-inicio');
-    if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
+    const impEl = document.getElementById('task-importancia'); if (impEl) impEl.value = t.importancia || 'Medio';
+    const urgEl = document.getElementById('task-urgencia'); if (urgEl) urgEl.value = t.urgencia || 'Medio';
+    const iniEl = document.getElementById('task-fecha-inicio'); if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
 
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
@@ -310,7 +298,6 @@ export function editTask(id) {
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
     
-    // Usar nombreFormateado en el select
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
     
