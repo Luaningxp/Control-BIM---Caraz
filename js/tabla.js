@@ -1,25 +1,20 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad, critColor } from './utils.js';
 
+// Estado local de la tabla
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    // Configuración por defecto: Solo las columnas solicitadas
     visibleCols: { 
-        codigo: false, 
-        actividad: true, 
-        grupo: true, 
-        responsable: true, 
-        importancia: true, 
-        urgencia: true, 
-        criticidad: false, // Oculta por defecto
-        estado: true, 
-        inicio: true, 
-        fin: true, 
-        cierre: true, 
-        nota: true, 
-        cde: false // Oculta por defecto
+        codigo: false, actividad: true, grupo: true, responsable: true, 
+        importancia: true, urgencia: true, criticidad: false, 
+        estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
     },
-    visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
+    visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
+    // GUARDAMOS LOS ANCHOS DE LAS COLUMNAS AQUÍ
+    colWidths: {
+        actividad: 250, grupo: 120, responsable: 150, importancia: 90, 
+        urgencia: 90, estado: 90, inicio: 90, fin: 90, cierre: 90, nota: 200
+    }
 };
 
 export function canEdit(t) { 
@@ -70,12 +65,57 @@ function toggleProp(pid) { tableState.visibleProps[pid] = tableState.visibleProp
 function toggleColMenu() { tableState.showColMenu = !tableState.showColMenu; window.renderView(); }
 function getSortIcon(col) { if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>'; return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>'; }
 
+// --- LÓGICA PARA REDIMENSIONAR COLUMNAS ---
+let isResizing = false;
+let currentCol = null;
+let startX = 0;
+let startWidth = 0;
+
+function initResize(e, colKey) {
+    isResizing = true;
+    currentCol = colKey;
+    startX = e.pageX;
+    startWidth = tableState.colWidths[colKey] || 100;
+    
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function doResize(e) {
+    if (!isResizing) return;
+    const diff = e.pageX - startX;
+    const newWidth = Math.max(50, startWidth + diff); // Ancho mínimo de 50px
+    tableState.colWidths[currentCol] = newWidth;
+    
+    // Actualizamos el ancho de la columna visualmente sin re-renderizar toda la tabla
+    const th = document.querySelector(`th[data-col="${currentCol}"]`);
+    if (th) {
+        th.style.width = `${newWidth}px`;
+        th.style.minWidth = `${newWidth}px`;
+        th.style.maxWidth = `${newWidth}px`;
+    }
+}
+
+function stopResize() {
+    isResizing = false;
+    currentCol = null;
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+}
+
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: p.email.split('@')[0] }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
+    // Helper para inyectar el estilo de ancho y el divisor
+    const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
+    const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-10" onmousedown="window.initResize(event, '${key}')"></div>`;
+    const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0";
+    
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full">
@@ -111,71 +151,69 @@ export function renderTabla(container) {
             </div>
         </div>
 
-        <div class="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold select-none">
-                    <tr>
-                        ${tableState.visibleCols.codigo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')">Código ${getSortIcon('codigo_contenedor')}</th>` : ''}
-                        ${tableState.visibleCols.actividad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')">Actividad ${getSortIcon('actividad')}</th>` : ''}
-                        ${tableState.visibleCols.grupo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')">Grupo ${getSortIcon('grupo')}</th>` : ''}
-                        ${tableState.visibleCols.responsable ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')">Responsable ${getSortIcon('responsable_id')}</th>` : ''}
-                        ${tableState.visibleCols.importancia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')">Importancia ${getSortIcon('importancia')}</th>` : ''}
-                        ${tableState.visibleCols.urgencia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')">Urgencia ${getSortIcon('urgencia')}</th>` : ''}
-                        ${tableState.visibleCols.estado ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')">Estado ${getSortIcon('estado')}</th>` : ''}
-                        ${tableState.visibleCols.inicio ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')">Inicio Prog. ${getSortIcon('fecha_inicio_programado')}</th>` : ''}
-                        ${tableState.visibleCols.fin ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_fin')">Fin Prog. ${getSortIcon('fecha_fin')}</th>` : ''}
-                        ${tableState.visibleCols.cierre ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')">Cierre Real ${getSortIcon('fecha_cierre')}</th>` : ''}
-                        ${tableState.visibleCols.nota ? `<th class="p-3">Nota</th>` : ''}
-                        ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Criticidad ${getSortIcon('criticidad')}</th>` : ''}
-                        ${tableState.visibleCols.cde ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')">CDE ISO ${getSortIcon('estado_cde')}</th>` : ''}
-                        ${visiblePropDefs.map(pd => `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</th>`).join('')}
-                        <th class="p-3 text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="task-list" class="divide-y divide-slate-100">
-                    ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
-                    ${tasks.map(t => {
-                        const crit = getCriticidad(t); 
-                        return `
-                        <tr class="hover:bg-slate-50 transition">
-                            ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>` : ''}
-                            ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
-                            ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
-                            ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
-                            
-                            ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px]">${t.importancia || 'Medio'}</td>` : ''}
-                            ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px]">${t.urgencia || 'Medio'}</td>` : ''}
-                            ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
-                            
-                            ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
-                            ${tableState.visibleCols.fin ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
-                            ${tableState.visibleCols.cierre ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
-                            ${tableState.visibleCols.nota ? `<td class="p-3 text-slate-500 text-[11px] max-w-[200px] truncate" title="${escapeHtml(t.nota || '')}">${escapeHtml(t.nota || '–')}</td>` : ''}
-
-                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)}">${crit}</td>` : ''}
-                            ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
-                            
-                            ${visiblePropDefs.map(pd => {
-                                const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
-                                let displayVal = '-';
-                                if (pv) {
-                                    if (pd.tipo === 'numero') displayVal = pv.valor_numero ?? '-';
-                                    else if (pd.tipo === 'fecha') displayVal = pv.valor_fecha ? fmtDate(pv.valor_fecha) : '-';
-                                    else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? '<i class="fa-solid fa-check text-teal-600"></i>' : '<i class="fa-solid fa-xmark text-slate-300"></i>';
-                                    else displayVal = pv.valor_texto || '-';
-                                }
-                                return `<td class="p-3 text-slate-600 text-[11px]">${displayVal}</td>`;
-                            }).join('')}
-                            
-                            <td class="p-3 text-center whitespace-nowrap">
-                                ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
-                                ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
-                                ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
-                            </td>
+        <!-- CONTENEDOR CON SCROLL HORIZONTAL Y ENCABEZADO FIJO -->
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto max-h-[70vh] overflow-y-auto custom-scrollbar relative">
+                <table class="w-full text-left text-xs table-fixed">
+                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold select-none sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
+                            ${tableState.visibleCols.actividad ? `<th data-col="actividad" style="${colStyle('actividad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')"><div class="pr-2">Actividad ${getSortIcon('actividad')}</div>${resizer('actividad')}</th>` : ''}
+                            ${tableState.visibleCols.grupo ? `<th data-col="grupo" style="${colStyle('grupo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')"><div class="pr-2">Grupo ${getSortIcon('grupo')}</div>${resizer('grupo')}</th>` : ''}
+                            ${tableState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')"><div class="pr-2">Responsable ${getSortIcon('responsable_id')}</div>${resizer('responsable')}</th>` : ''}
+                            ${tableState.visibleCols.importancia ? `<th data-col="importancia" style="${colStyle('importancia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')"><div class="pr-2">Importancia ${getSortIcon('importancia')}</div>${resizer('importancia')}</th>` : ''}
+                            ${tableState.visibleCols.urgencia ? `<th data-col="urgencia" style="${colStyle('urgencia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')"><div class="pr-2">Urgencia ${getSortIcon('urgencia')}</div>${resizer('urgencia')}</th>` : ''}
+                            ${tableState.visibleCols.estado ? `<th data-col="estado" style="${colStyle('estado')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')"><div class="pr-2">Estado ${getSortIcon('estado')}</div>${resizer('estado')}</th>` : ''}
+                            ${tableState.visibleCols.inicio ? `<th data-col="inicio" style="${colStyle('inicio')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')"><div class="pr-2">Inicio ${getSortIcon('fecha_inicio_programado')}</div>${resizer('inicio')}</th>` : ''}
+                            ${tableState.visibleCols.fin ? `<th data-col="fin" style="${colStyle('fin')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_fin')"><div class="pr-2">Fin Prog. ${getSortIcon('fecha_fin')}</div>${resizer('fin')}</th>` : ''}
+                            ${tableState.visibleCols.cierre ? `<th data-col="cierre" style="${colStyle('cierre')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')"><div class="pr-2">Cierre Real ${getSortIcon('fecha_cierre')}</div>${resizer('cierre')}</th>` : ''}
+                            ${tableState.visibleCols.nota ? `<th data-col="nota" style="${colStyle('nota')}" class="${thClass}"><div class="pr-2">Nota</div>${resizer('nota')}</th>` : ''}
+                            ${tableState.visibleCols.criticidad ? `<th data-col="criticidad" style="${colStyle('criticidad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')"><div class="pr-2">Criticidad ${getSortIcon('criticidad')}</div>${resizer('criticidad')}</th>` : ''}
+                            ${tableState.visibleCols.cde ? `<th data-col="cde" style="${colStyle('cde')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')"><div class="pr-2">CDE ISO ${getSortIcon('estado_cde')}</div>${resizer('cde')}</th>` : ''}
+                            ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
+                            <th class="p-3 text-center sticky right-0 bg-slate-100 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">Acciones</th>
                         </tr>
-                    `}).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
+                        ${tasks.map(t => {
+                            const crit = getCriticidad(t); 
+                            return `
+                            <tr class="hover:bg-slate-50 transition group">
+                                ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500 truncate">${t.codigo_contenedor || '–'}</td>` : ''}
+                                ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
+                                ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px] truncate" title="${escapeHtml(t.grupo || '')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
+                                ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px] truncate" title="${escapeHtml(nombreResponsable(t, state.perfilesCache))}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+                                ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.importancia || 'Medio'}</td>` : ''}
+                                ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.urgencia || 'Medio'}</td>` : ''}
+                                ${tableState.visibleCols.estado ? `<td class="p-3 truncate"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
+                                ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.fin ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.cierre ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.nota ? `<td class="p-3 text-slate-500 text-[11px] truncate" title="${escapeHtml(t.nota || '')}">${escapeHtml(t.nota || '–')}</td>` : ''}
+                                ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)} truncate">${crit}</td>` : ''}
+                                ${tableState.visibleCols.cde ? `<td class="p-3 truncate">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
+                                ${visiblePropDefs.map(pd => {
+                                    const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
+                                    let displayVal = '-';
+                                    if (pv) {
+                                        if (pd.tipo === 'numero') displayVal = pv.valor_numero ?? '-';
+                                        else if (pd.tipo === 'fecha') displayVal = pv.valor_fecha ? fmtDate(pv.valor_fecha) : '-';
+                                        else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? '<i class="fa-solid fa-check text-teal-600"></i>' : '<i class="fa-solid fa-xmark text-slate-300"></i>';
+                                        else displayVal = pv.valor_texto || '-';
+                                    }
+                                    return `<td class="p-3 text-slate-600 text-[11px] truncate">${displayVal}</td>`;
+                                }).join('')}
+                                <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10">
+                                    ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
+                                    ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
+                                    ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
+                                </td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
 
@@ -185,156 +223,4 @@ export function renderTabla(container) {
 }
 
 window.toggleSort = toggleSort; window.toggleCol = toggleCol; window.toggleProp = toggleProp; window.toggleColMenu = toggleColMenu;
-
-export function openModal() {
-    if (!state.isAdmin && !state.isCoordinador) return;
-    document.getElementById('modal-title').innerText = "Nuevo Contenedor";
-    
-    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-    
-    document.getElementById('task-importancia').value = 'Medio';
-    document.getElementById('task-urgencia').value = 'Medio'; 
-    document.getElementById('task-estado').value = 'No iniciado';
-    
-    const grSel = document.getElementById('task-grupo'); 
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
-    
-    const rsSel = document.getElementById('task-responsable'); 
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
-    
-    renderCustomProps(null);
-    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
-}
-
-export function editTask(id) {
-    const t = state.tasksCache.find(x => x.id === id);
-    if (!t || !canEdit(t)) return;
-    
-    document.getElementById('modal-title').innerText = "Editar Contenedor";
-    document.getElementById('task-id').value = t.id;
-    document.getElementById('task-actividad').value = t.actividad || '';
-    
-    const impEl = document.getElementById('task-importancia');
-    if (impEl) impEl.value = t.importancia || 'Medio';
-    
-    const urgEl = document.getElementById('task-urgencia');
-    if (urgEl) urgEl.value = t.urgencia || 'Medio';
-
-    const iniEl = document.getElementById('task-fecha-inicio');
-    if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
-
-    document.getElementById('task-estado').value = t.estado || 'No iniciado';
-    document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
-    document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
-    document.getElementById('task-nota').value = t.nota || '';
-    
-    const grSel = document.getElementById('task-grupo'); 
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
-    grSel.value = t.grupo || '';
-    
-    const rsSel = document.getElementById('task-responsable'); 
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); 
-    rsSel.value = t.responsable_id || '';
-    
-    renderCustomProps(t.id);
-    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
-}
-
-function renderCustomProps(pendienteId) {
-    const container = document.getElementById('custom-props-container');
-    const inputs = document.getElementById('custom-props-inputs');
-    if (state.propDefsCache.length === 0) { container.classList.add('hidden'); return; }
-    container.classList.remove('hidden');
-    inputs.innerHTML = state.propDefsCache.map(pd => {
-        let valor = '';
-        if (pendienteId) {
-            const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
-            if (pv) valor = pd.tipo === 'numero' ? (pv.valor_numero !== null ? pv.valor_numero : '') : pd.tipo === 'fecha' ? (pv.valor_fecha || '') : pd.tipo === 'booleano' ? pv.valor_booleano : (pv.valor_texto || '');
-        }
-        let inputHtml = '';
-        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${escapeHtml(valor)}">`;
-        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor}">`;
-        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor}">`;
-        else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
-        else if (pd.tipo === 'seleccion') {
-            const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
-            inputHtml = `<select class="inp custom-prop-input" data-pid="${pd.id}" data-type="seleccion"><option value="">— Seleccionar —</option>${opts}</select>`;
-        }
-        return `<div><label class="block font-semibold text-slate-600 mb-1">${escapeHtml(pd.nombre)} ${pd.requerido ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
-    }).join('');
-}
-
-export function closeModal() { document.getElementById('modal-task').classList.add('hidden'); document.getElementById('modal-task').classList.remove('flex'); }
-
-export async function saveTask(e) {
-    e.preventDefault();
-    const id = document.getElementById('task-id').value;
-    const respId = document.getElementById('task-responsable').value || null;
-    const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
-    
-    const payload = {
-        actividad: document.getElementById('task-actividad').value,
-        grupo: document.getElementById('task-grupo').value || null,
-        responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
-        responsable_id: respId,
-        importancia: document.getElementById('task-importancia').value,
-        urgencia: document.getElementById('task-urgencia').value,
-        estado: document.getElementById('task-estado').value,
-        fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null, // <-- Nuevo
-        fecha_fin: document.getElementById('task-fecha-fin').value || null,
-        fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
-        nota: document.getElementById('task-nota').value
-    };
-    let taskId = id;
-    if (id) {
-        const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
-        if (error) { toast('Error: ' + error.message); return; }
-    } else {
-        payload.estado_cde = 'WIP'; payload.codigo_aptitud = 'S0'; payload.user_id = state.currentUser.id;
-        const { data, error } = await supabaseClient.from('pendientes_bim').insert([payload]).select();
-        if (error) { toast('Error: ' + error.message); return; }
-        taskId = data[0].id;
-    }
-    const propInputs = document.querySelectorAll('.custom-prop-input');
-    for (const input of propInputs) {
-        const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
-        let val = input.type === 'checkbox' ? input.checked : input.value;
-        if (val === '' || val === false) val = null;
-        const existente = state.propValsCache.find(v => v.pendiente_id === parseInt(taskId) && v.propiedad_id === pid);
-        const propPayload = { pendiente_id: parseInt(taskId), propiedad_id: pid, valor_texto: null, valor_numero: null, valor_fecha: null, valor_booleano: null };
-        if (val !== null) {
-            if (type === 'texto' || type === 'seleccion') propPayload.valor_texto = val;
-            else if (type === 'numero') propPayload.valor_numero = parseFloat(val);
-            else if (type === 'fecha') propPayload.valor_fecha = val;
-            else if (type === 'booleano') propPayload.valor_booleano = val;
-        }
-        if (existente) await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
-        else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
-    }
-    closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
-}
-
-export async function deleteTask(id) {
-    if (!canDelete()) return; if (!confirm("¿Eliminar este contenedor?")) return;
-    const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
-    if (error) { toast('Error: ' + error.message); return; }
-    await fetchAll(); window.renderView();
-}
-
-export function openModalCDE(id) {
-    if (!canTransition()) return;
-    state.cdeTargetId = id; document.getElementById('cde-current').innerText = `Contenedor #${id}`; document.getElementById('cde-estado').value = 'Shared'; document.getElementById('cde-aptitud').value = 'S1'; document.getElementById('cde-comentario').value = '';
-    document.getElementById('modal-cde').classList.remove('hidden'); document.getElementById('modal-cde').classList.add('flex');
-}
-export function closeModalCDE() { document.getElementById('modal-cde').classList.add('hidden'); document.getElementById('modal-cde').classList.remove('flex'); state.cdeTargetId = null; }
-export async function confirmarTransicion() {
-    if (!state.cdeTargetId) return;
-    const estado = document.getElementById('cde-estado').value; const aptitud = document.getElementById('cde-aptitud').value || null; const comentario = document.getElementById('cde-comentario').value || null;
-    const { data, error } = await supabaseClient.rpc('transicionar_cde', { p_pendiente_id: state.cdeTargetId, p_estado_nuevo: estado, p_aptitud_nueva: aptitud, p_comentario: comentario });
-    if (error) { toast('Error RPC: ' + error.message); return; }
-    if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
-    closeModalCDE(); await fetchAll(); window.renderView(); toast('Transición aplicada');
-}
+window.initResize = initResize;
