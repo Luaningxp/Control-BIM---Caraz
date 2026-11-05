@@ -54,16 +54,24 @@ function inicializarBuscadorRecursos() {
     const dropdown = document.getElementById('recursos-dropdown');
     if (!input || !dropdown) return;
 
+    // Clonar para eliminar listeners viejos
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
+    // Mostrar dropdown al hacer focus
     nuevoInput.addEventListener('focus', () => mostrarDropdownRecursos(nuevoInput.value));
+    
+    // Mostrar dropdown al hacer clic (soluciona el problema del segundo clic)
+    nuevoInput.addEventListener('click', () => mostrarDropdownRecursos(nuevoInput.value));
+    
+    // Filtrar al escribir
     nuevoInput.addEventListener('input', (e) => mostrarDropdownRecursos(e.target.value));
     
-    // Prevenir que clics dentro del dropdown se propaguen y cierren
+    // Prevenir que clics dentro del dropdown se propaguen
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
     dropdown.addEventListener('click', (e) => e.stopPropagation());
 
+    // Cerrar al hacer clic fuera
     document.addEventListener('click', (e) => {
         if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
             dropdown.classList.add('hidden');
