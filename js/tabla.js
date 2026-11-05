@@ -3,6 +3,11 @@ import {
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar 
 } from './utils.js';
+import { 
+    escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
+    getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
+    confirmDelete // <-- Nuevo
+} from './utils.js';
 
 // --- HELPERS DE RECURSOS ---
 function getRecursosDeTarea(pendienteId) {
@@ -521,10 +526,23 @@ export async function saveTask(e) {
 }
 
 export async function deleteTask(id) {
-    if (!canDelete()) return; if (!confirm("¿Eliminar este contenedor?")) return;
+    if (!canDelete()) return;
+    
+    const t = state.tasksCache.find(x => x.id === id);
+    const nombre = t ? t.actividad : 'esta actividad';
+    
+    const confirmado = await confirmDelete({
+        title: 'Eliminar actividad',
+        message: `Vas a eliminar la actividad "${nombre}". Se borrarán también sus propiedades personalizadas, recursos asignados y registros de horas. Esta acción no se puede deshacer.`
+    });
+    
+    if (!confirmado) return;
+    
     const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    await fetchAll(); window.renderView();
+    await fetchAll(); 
+    window.renderView();
+    toast('Actividad eliminada');
 }
 
 export function openModalCDE(id) {
