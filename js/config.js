@@ -74,21 +74,23 @@ export function renderConfig(container) {
             </div>
 
             <!-- 3. USUARIOS -->
-            <div class="card p-4">
-                <h3 class="font-bold text-sm text-slate-800 mb-3">Usuarios</h3>
-                <div class="overflow-y-auto max-h-64">
-                    <table class="w-full text-left text-xs">
-                        <tbody class="divide-y divide-slate-100">
-                            ${state.perfilesCache.map(p => `
-                                <tr class="hover:bg-slate-50">
-                                    <td class="py-2"><div class="font-semibold">${escapeHtml(p.email)}</div><div class="text-[10px] text-slate-500">${escapeHtml(p.cargo || 'Sin cargo')}</div></td>
-                                    <td class="py-2 text-right">
-                                        <button onclick="window.openCargoModal('${p.id}')" class="text-sky-600 hover:text-sky-800"><i class="fa-solid fa-pen"></i></button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                <div class="card p-4">
+                    <h3 class="font-bold text-sm text-slate-800 mb-3">Usuarios</h3>
+                    <div class="overflow-y-auto max-h-64">
+                        <table class="w-full text-left text-xs">
+                            <tbody class="divide-y divide-slate-100">
+                                ${state.perfilesCache.map(p => `
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="py-2"><div class="font-semibold">${escapeHtml(p.email)}</div><div class="text-[10px] text-slate-500">${escapeHtml(p.cargo || 'Sin cargo')}</div></td>
+                                        <td class="py-2 text-right whitespace-nowrap">
+                                            <button onclick="window.openCargoModal('${p.id}')" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar cargo"><i class="fa-solid fa-pen"></i></button>
+                                            ${state.isAdmin ? `<button onclick="window.openPasswordModal('${p.id}')" class="text-amber-600 hover:text-amber-800" title="Cambiar contraseña"><i class="fa-solid fa-key"></i></button>` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -273,6 +275,28 @@ function renderModales() {
                 </form>
             </div>
         </div>
+        <!-- MODAL PASSWORD -->
+<div id="modal-password" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+        <h3 class="font-bold text-sm text-slate-800">Cambiar contraseña</h3>
+        <p id="password-user-email" class="text-[11px] text-slate-500"></p>
+        <form onsubmit="window.savePassword(event)" class="space-y-3 text-xs">
+            <input type="hidden" id="password-user-id">
+            <div>
+                <label class="block font-semibold text-slate-600 mb-1">Nueva contraseña</label>
+                <input type="text" id="password-new" required minlength="6" class="inp" placeholder="Mínimo 6 caracteres">
+            </div>
+            <div class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
+                <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
+                Comparte esta contraseña con el usuario de forma privada.
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="window.closePasswordModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                <button type="submit" class="px-4 py-1.5 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700">Actualizar contraseña</button>
+            </div>
+        </form>
+    </div>
+</div>
         <div id="modal-prop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
             <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
                 <h3 class="font-bold text-sm text-slate-800" id="prop-modal-title">Nuevo Parámetro</h3>
@@ -407,6 +431,46 @@ export async function saveCargo(e) {
     if (error) { toast('Error: ' + error.message); return; }
     closeCargoModal(); await fetchAll(); window.renderView(); toast('Cargo actualizado');
 }
+// --- CAMBIO DE CONTRASEÑA (solo admin) ---
+window.openPasswordModal = function(userId) {
+    if (!state.isAdmin) { toast('Solo el administrador puede cambiar contraseñas.'); return; }
+    const p = state.perfilesCache.find(x => x.id === userId);
+    if (!p) return;
+    document.getElementById('password-user-id').value = p.id;
+    document.getElementById('password-user-email').innerText = p.email;
+    document.getElementById('password-new').value = '';
+    document.getElementById('modal-password').classList.remove('hidden');
+    document.getElementById('modal-password').classList.add('flex');
+};
 
+window.closePasswordModal = function() {
+    document.getElementById('modal-password').classList.add('hidden');
+    document.getElementById('modal-password').classList.remove('flex');
+};
+
+window.savePassword = async function(e) {
+    e.preventDefault();
+    if (!state.isAdmin) { toast('Solo el administrador puede cambiar contraseñas.'); return; }
+    
+    const userId = document.getElementById('password-user-id').value;
+    const newPassword = document.getElementById('password-new').value;
+    
+    if (newPassword.length < 6) {
+        toast('La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
+    
+    // Llamar a la función RPC que crearemos en Supabase
+    const { data, error } = await supabaseClient.rpc('admin_update_password', {
+        target_user_id: userId,
+        new_password: newPassword
+    });
+    
+    if (error) { toast('Error: ' + error.message); return; }
+    if (!data || !data.ok) { toast('Error: ' + (data?.error || 'desconocido')); return; }
+    
+    toast('Contraseña actualizada correctamente');
+    window.closePasswordModal();
+};
 window.handleFileUpload = handleFileUpload;
 window.exportToExcel = exportToExcel;
