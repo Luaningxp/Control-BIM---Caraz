@@ -110,3 +110,65 @@ export function colorAvatar(seed) {
     for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
     return colores[Math.abs(hash) % colores.length];
 }
+// --- MODAL DE CONFIRMACIÓN CON TEXTO ---
+let confirmCallback = null;
+
+export function confirmDelete(options) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('modal-confirm');
+        const title = document.getElementById('confirm-title');
+        const message = document.getElementById('confirm-message');
+        const input = document.getElementById('confirm-input');
+        const btn = document.getElementById('confirm-btn');
+        const error = document.getElementById('confirm-error');
+        
+        if (!modal) { resolve(false); return; }
+        
+        title.textContent = options.title || 'Confirmar eliminación';
+        message.textContent = options.message || '¿Estás seguro de que quieres eliminar esto?';
+        input.value = '';
+        error.classList.add('hidden');
+        btn.disabled = true;
+        
+        confirmCallback = resolve;
+        
+        // Activar el botón solo si escribe "Eliminar"
+        const checkInput = () => {
+            if (input.value.trim() === 'Eliminar') {
+                btn.disabled = false;
+                error.classList.add('hidden');
+            } else {
+                btn.disabled = true;
+            }
+        };
+        input.addEventListener('input', checkInput);
+        
+        // Focus al abrir
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => input.focus(), 100);
+    });
+}
+
+window.closeConfirm = function() {
+    const modal = document.getElementById('modal-confirm');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (confirmCallback) { confirmCallback(false); confirmCallback = null; }
+};
+
+window.executeConfirm = function() {
+    const input = document.getElementById('confirm-input');
+    const error = document.getElementById('confirm-error');
+    
+    if (input.value.trim() !== 'Eliminar') {
+        error.classList.remove('hidden');
+        return;
+    }
+    
+    const modal = document.getElementById('modal-confirm');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    
+    if (confirmCallback) { confirmCallback(true); confirmCallback = null; }
+};
