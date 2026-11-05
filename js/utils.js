@@ -67,34 +67,28 @@ export const semaforo = (t) => {
 export const nombreResponsable = (t, perfiles) => {
     let email = '';
     
-    // Si la tarea tiene un ID de responsable, buscamos su correo en la lista de perfiles
+    // Buscar por ID
     if (t.responsable_id) {
         const p = perfiles.find(p => p.id === t.responsable_id);
         if (p) email = p.email;
     }
     
-    // Si no encontró por ID, usamos el texto guardado en el campo 'responsable'
-    if (!email) {
-        email = t.responsable || '';
-    }
+    // Si no hay ID, usar el campo de texto directo
+    if (!email) email = t.responsable || '';
 
-    // Si no hay ningún correo, retornamos "Sin asignar"
     if (!email) return 'Sin asignar';
 
-    // LÓGICA DE FORMATEO:
-    // 1. Tomamos solo la parte antes del '@'
-    // 2. Reemplazamos puntos y guiones bajos por espacios
-    // 3. Capitalizamos cada palabra
+    // Formateo: manuel.llenque@... -> Manuel Llenque
     const nombreBase = email.split('@')[0];
-    const nombreFormateado = nombreBase
+    return nombreBase
         .replace(/[._-]/g, ' ')
+        .replace(/\d+/g, '') // Elimina números por si acaso
+        .trim()
         .split(' ')
-        .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase())
+        .filter(p => p.length > 0)
+        .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
         .join(' ');
-
-    return nombreFormateado;
 };
-
 export const critColor = (c) => {
     return c === 'Muy alto' ? 'text-red-600' :
            c === 'Alto' ? 'text-orange-600' :
