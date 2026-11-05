@@ -620,14 +620,18 @@ export async function saveTask(e) {
     const id = document.getElementById('task-id').value;
     const respId = document.getElementById('task-responsable').value || null;
     const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
+    
+    // Capturar valores clave ANTES del payload
+    const estado = document.getElementById('task-estado').value;
+    const fechaCierre = document.getElementById('task-fecha-cierre').value;
 
+    // Validación: si se marca como Cerrado, debe tener fecha de cierre
     if (estado === 'Cerrado' && !fechaCierre) {
         toast('No puedes cerrar la actividad sin una Fecha de Cierre Real.');
         document.getElementById('task-fecha-cierre').focus();
         return;
     }
 
-    
     const payload = {
         actividad: document.getElementById('task-actividad').value,
         grupo: document.getElementById('task-grupo').value || null,
@@ -635,12 +639,13 @@ export async function saveTask(e) {
         responsable_id: respId,
         importancia: document.getElementById('task-importancia').value,
         urgencia: document.getElementById('task-urgencia').value,
-        estado: document.getElementById('task-estado').value,
+        estado: estado,  // <-- usar la variable ya capturada
         fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
         fecha_fin: document.getElementById('task-fecha-fin').value || null,
-        fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
+        fecha_cierre: fechaCierre || null,
         nota: document.getElementById('task-nota').value
     };
+    
     let taskId = id;
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
