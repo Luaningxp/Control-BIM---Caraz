@@ -15,8 +15,8 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- LOGIN -->
-    <div id="login-screen" class="login-overlay">
+        <!-- LOGIN -->
+    <div id="login-screen" class="login-page">
         <div class="login-box">
             <div class="login-header">
                 <div class="login-logos">
@@ -24,35 +24,35 @@
                     <div class="separator"></div>
                     <img src="assets/anin.png" alt="ANIN">
                 </div>
-                <h2 class="text-base font-bold text-slate-900">Control BIM</h2>
-                <p class="text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5">Consorcio SUYAY II</p>
-                <p class="text-[10px] text-slate-500 mt-0.5">Hospital Caraz II-1 · Paquete 8</p>
+                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Control BIM</h2>
+                <p class="text-xs font-bold text-sky-600 uppercase tracking-widest mt-1">Consorcio SUYAY II</p>
+                <p class="text-sm text-slate-500 mt-1 font-medium">Hospital Caraz II-1 · Paquete 8</p>
             </div>
 
             <div class="login-body">
                 <div id="login-error" class="login-error"></div>
                 
-                <form id="login-form" class="space-y-2.5">
+                <form id="login-form" class="space-y-4">
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Correo Electrónico</label>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Correo Electrónico</label>
                         <input type="email" id="login-email" required 
-                               class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-100" 
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" 
                                placeholder="usuario@consorciosuyay.com">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Contraseña</label>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Contraseña</label>
                         <input type="password" id="login-password" required 
-                               class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-100" 
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" 
                                placeholder="••••••••">
                     </div>
                     <button type="submit" id="btn-login" 
-                            class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 rounded text-xs transition shadow-sm flex justify-center items-center gap-1.5 mt-1">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar
+                            class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-lg shadow-sky-600/30 flex justify-center items-center gap-2 mt-2">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar al CDE
                     </button>
                 </form>
             </div>
-            <div class="bg-slate-50 p-2 text-center border-t border-slate-200">
-                <p class="text-[9px] text-slate-400 font-medium">© 2026 Consorcio SUYAY II · ANIN</p>
+            <div class="bg-slate-50 p-3 text-center border-t border-slate-200 rounded-b-2xl">
+                <p class="text-[10px] text-slate-400 font-semibold">© 2026 Consorcio SUYAY II · ANIN</p>
             </div>
         </div>
     </div>
