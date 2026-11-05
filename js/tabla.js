@@ -2,7 +2,7 @@ import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
-    confirmDelete 
+    confirmDelete, semaforo
 } from './utils.js';
 
 // --- HELPERS DE RECURSOS ---
@@ -54,32 +54,20 @@ function inicializarBuscadorRecursos() {
     const dropdown = document.getElementById('recursos-dropdown');
     if (!input || !dropdown) return;
 
-    // Clonar para eliminar listeners viejos
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
-    // Mostrar dropdown al hacer clic o focus
     nuevoInput.addEventListener('click', (e) => {
         e.stopPropagation();
         mostrarDropdownRecursos(nuevoInput.value);
     });
     nuevoInput.addEventListener('input', (e) => mostrarDropdownRecursos(e.target.value));
 
-    // Prevenir que el input pierda el foco al interactuar con el dropdown
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
 
-    // Cerrar al hacer clic fuera
-    const handlerClickFuera = (e) => {
+    document.addEventListener('click', (e) => {
         if (e.target !== nuevoInput && !dropdown.contains(e.target)) {
             dropdown.classList.add('hidden');
-        }
-    };
-    document.addEventListener('click', handlerClickFuera);
-
-    // Abrir si ya está abierto y se hace clic en el input
-    nuevoInput.addEventListener('mousedown', () => {
-        if (dropdown.classList.contains('hidden')) {
-            mostrarDropdownRecursos(nuevoInput.value);
         }
     });
 
@@ -138,7 +126,12 @@ let tableState = {
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
     },
     visibleProps: {}, 
-    filters: { search: '', grupo: '', responsable: '', recursos: '' }, // <-- Filtro de recursos
+    filters: { 
+        search: '', grupo: '', responsable: '', recursos: '',
+        iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
+        cierreDesde: '', cierreHasta: '',
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+    },
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
@@ -162,7 +155,6 @@ function getProcessedTasks() {
     }
     if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
     if (tableState.filters.responsable) result = result.filter(t => t.responsable_id === tableState.filters.responsable);
-    // Filtro de recursos
     if (tableState.filters.recursos) {
         result = result.filter(t => 
             state.actividadRecursosCache.some(r => 
@@ -170,6 +162,19 @@ function getProcessedTasks() {
             )
         );
     }
+
+    // Filtros de fecha
+    if (tableState.filters.iniDesde) result = result.filter(t => t.fecha_inicio_programado && t.fecha_inicio_programado >= tableState.filters.iniDesde);
+    if (tableState.filters.iniHasta) result = result.filter(t => t.fecha_inicio_programado && t.fecha_inicio_programado <= tableState.filters.iniHasta);
+    if (tableState.filters.finDesde) result = result.filter(t => t.fecha_fin && t.fecha_fin >= tableState.filters.finDesde);
+    if (tableState.filters.finHasta) result = result.filter(t => t.fecha_fin && t.fecha_fin <= tableState.filters.finHasta);
+    if (tableState.filters.cierreDesde) result = result.filter(t => t.fecha_cierre && t.fecha_cierre >= tableState.filters.cierreDesde);
+    if (tableState.filters.cierreHasta) result = result.filter(t => t.fecha_cierre && t.fecha_cierre <= tableState.filters.cierreHasta);
+
+    // Filtros de semáforo
+    if (tableState.filters.soloVencidas) result = result.filter(t => semaforo(t) === 'Vencida');
+    if (tableState.filters.soloPorVencer) result = result.filter(t => semaforo(t) === 'Por vencer');
+    if (tableState.filters.soloSinFecha) result = result.filter(t => semaforo(t) === 'Sin fecha');
 
     result.sort((a, b) => {
         let valA = a[tableState.sortBy] || '';
@@ -258,6 +263,8 @@ export function renderTabla(container) {
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50";
     
+    const filtrosActivos = Object.values(tableState.filters).filter(v => v !== '' && v !== false).length;
+
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full">
@@ -265,9 +272,10 @@ export function renderTabla(container) {
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="tbl-search" placeholder="Buscar actividad..." value="${tableState.filters.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
-                <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los grupos</option>${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}</select>
-                <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los responsables</option>${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select>
-                <select id="tbl-fil-recursos" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los recursos</option>${recursosOpts.map(p => `<option value="${p.id}" ${tableState.filters.recursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}</select>
+                <button onclick="window.toggleFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
+                    <i class="fa-solid fa-filter"></i> Filtros
+                    ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
             </div>
             <div class="flex items-center gap-2">
                 <div class="relative">
@@ -378,9 +386,109 @@ export function renderTabla(container) {
     `;
 
     document.getElementById('tbl-search').addEventListener('input', (e) => { tableState.filters.search = e.target.value; setTimeout(() => window.renderView(), 300); });
-    document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => { tableState.filters.grupo = e.target.value; window.renderView(); });
-    document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
-    document.getElementById('tbl-fil-recursos').addEventListener('change', (e) => { tableState.filters.recursos = e.target.value; window.renderView(); });
+
+    // Drawer de filtros
+    if (!document.getElementById('filter-drawer')) {
+        const drawerHtml = `
+            <div id="filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleFilterDrawer()"></div>
+            <div id="filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+                <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-sm text-slate-800">Filtros</h3>
+                    <button onclick="window.toggleFilterDrawer()" class="text-slate-400 hover:text-slate-700">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-4 space-y-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Grupo</label>
+                        <select id="drawer-fil-grupo" class="inp" onchange="window.applyFilter('grupo', this.value)">
+                            <option value="">Todos</option>
+                            ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Responsable</label>
+                        <select id="drawer-fil-resp" class="inp" onchange="window.applyFilter('responsable', this.value)">
+                            <option value="">Todos</option>
+                            ${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Recursos</label>
+                        <select id="drawer-fil-recursos" class="inp" onchange="window.applyFilter('recursos', this.value)">
+                            <option value="">Todos</option>
+                            ${recursosOpts.map(p => `<option value="${p.id}" ${tableState.filters.recursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
+                                <input type="date" id="drawer-ini-desde" class="inp" value="${tableState.filters.iniDesde || ''}" onchange="window.applyFilter('iniDesde', this.value)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
+                                <input type="date" id="drawer-ini-hasta" class="inp" value="${tableState.filters.iniHasta || ''}" onchange="window.applyFilter('iniHasta', this.value)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <h4 class="font-bold text-slate-700 mb-2">Fecha Fin Prog.</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
+                                <input type="date" id="drawer-fin-desde" class="inp" value="${tableState.filters.finDesde || ''}" onchange="window.applyFilter('finDesde', this.value)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
+                                <input type="date" id="drawer-fin-hasta" class="inp" value="${tableState.filters.finHasta || ''}" onchange="window.applyFilter('finHasta', this.value)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <h4 class="font-bold text-slate-700 mb-2">Cierre Real</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
+                                <input type="date" id="drawer-cierre-desde" class="inp" value="${tableState.filters.cierreDesde || ''}" onchange="window.applyFilter('cierreDesde', this.value)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
+                                <input type="date" id="drawer-cierre-hasta" class="inp" value="${tableState.filters.cierreHasta || ''}" onchange="window.applyFilter('cierreHasta', this.value)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4 space-y-2">
+                        <h4 class="font-bold text-slate-700 mb-2">Semáforo</h4>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="drawer-vencidas" class="rounded text-sky-600" ${tableState.filters.soloVencidas ? 'checked' : ''} onchange="window.applyFilter('soloVencidas', this.checked)">
+                            Solo vencidas
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="drawer-porVencer" class="rounded text-sky-600" ${tableState.filters.soloPorVencer ? 'checked' : ''} onchange="window.applyFilter('soloPorVencer', this.checked)">
+                            Solo por vencer (≤ 7 días)
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="drawer-sinFecha" class="rounded text-sky-600" ${tableState.filters.soloSinFecha ? 'checked' : ''} onchange="window.applyFilter('soloSinFecha', this.checked)">
+                            Solo sin fecha
+                        </label>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <button onclick="window.clearFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', drawerHtml);
+    }
 }
 
 window.toggleSort = toggleSort; 
@@ -389,10 +497,41 @@ window.toggleProp = toggleProp;
 window.toggleColMenu = toggleColMenu;
 window.initResize = initResize;
 
+// --- FILTROS AVANZADOS (DRAWER) ---
+window.toggleFilterDrawer = function() {
+    const drawer = document.getElementById('filter-drawer');
+    const overlay = document.getElementById('filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyFilter = function(key, value) {
+    tableState.filters[key] = value;
+    window.renderView();
+};
+
+window.clearFilters = function() {
+    tableState.filters = { 
+        search: '', grupo: '', responsable: '', recursos: '',
+        iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
+        cierreDesde: '', cierreHasta: '',
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+    };
+    window.renderView();
+};
+
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
-    if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return; // <-- Añadir supervisor
+    if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return;
     document.getElementById('modal-title').innerText = "Nueva Actividad";
     
     ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
@@ -416,6 +555,7 @@ export function openModal() {
     
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
+
 export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
@@ -505,7 +645,6 @@ export async function saveTask(e) {
         taskId = data[0].id;
     }
 
-    // Guardar propiedades personalizadas
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
@@ -523,7 +662,6 @@ export async function saveTask(e) {
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
 
-    // Guardar recursos
     await supabaseClient.from('actividad_recursos').delete().eq('pendiente_id', parseInt(taskId));
     if (recursosSeleccionados.size > 0) {
         const recursosData = Array.from(recursosSeleccionados).map(uid => ({
