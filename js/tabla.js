@@ -620,6 +620,13 @@ export async function saveTask(e) {
     const id = document.getElementById('task-id').value;
     const respId = document.getElementById('task-responsable').value || null;
     const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
+
+    if (estado === 'Cerrado' && !fechaCierre) {
+        toast('No puedes cerrar la actividad sin una Fecha de Cierre Real.');
+        document.getElementById('task-fecha-cierre').focus();
+        return;
+    }
+
     
     const payload = {
         actividad: document.getElementById('task-actividad').value,
