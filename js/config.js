@@ -1,6 +1,7 @@
+import { escapeHtml, toast, confirmDelete } from './utils.js';
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, toast } from './utils.js';
-import { escapeHtml, toast, confirmDelete } from './utils.js';
+
 
 export function renderConfig(container) {
     container.innerHTML = `
