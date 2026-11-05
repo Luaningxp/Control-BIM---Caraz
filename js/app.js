@@ -88,6 +88,7 @@ window.switchTab = function(tab) {
     window.renderView();
 }
 
+
 window.renderView = function() {
     const container = document.getElementById('view-container');
     if (!container) return;
@@ -119,5 +120,47 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('app-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('flex');
         await initApp(user);
+    }
+});
+window.togglePassword = function() {
+    const passInput = document.getElementById('login-password');
+    const eyeIcon = document.getElementById('eye-icon');
+    
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        eyeIcon.classList.remove('fa-eye');
+        eyeIcon.classList.add('fa-eye-slash');
+    } else {
+        passInput.type = 'password';
+        eyeIcon.classList.remove('fa-eye-slash');
+        eyeIcon.classList.add('fa-eye');
+    }
+};
+
+// Mostrar/ocultar el ojito según si hay texto escrito
+document.addEventListener('DOMContentLoaded', () => {
+    const passInput = document.getElementById('login-password');
+    const eyeBtn = document.querySelector('#login-password + button');
+    
+    if (passInput && eyeBtn) {
+        eyeBtn.style.opacity = '0';
+        eyeBtn.style.pointerEvents = 'none';
+        
+        passInput.addEventListener('input', (e) => {
+            if (e.target.value.length > 0) {
+                eyeBtn.style.opacity = '1';
+                eyeBtn.style.pointerEvents = 'auto';
+            } else {
+                eyeBtn.style.opacity = '0';
+                eyeBtn.style.pointerEvents = 'none';
+                // Si se borra el texto, volver a ocultar la contraseña
+                passInput.type = 'password';
+                const eyeIcon = document.getElementById('eye-icon');
+                if (eyeIcon) {
+                    eyeIcon.classList.remove('fa-eye-slash');
+                    eyeIcon.classList.add('fa-eye');
+                }
+            }
+        });
     }
 });
