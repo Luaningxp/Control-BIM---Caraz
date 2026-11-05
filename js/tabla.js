@@ -127,7 +127,8 @@ let tableState = {
     },
     visibleProps: {}, 
    filters: { 
-    search: '', grupo: '', responsable: '', recursos: '', estado: '',
+    search: '', grupo: '', responsable: '', recursos: '', 
+    estadosOcultos: [],  // <-- ahora es un array
     iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
     cierreDesde: '', cierreHasta: '',
     soloVencidas: false, soloPorVencer: false, soloSinFecha: false
@@ -163,7 +164,9 @@ function getProcessedTasks() {
             )
         );
     }
-    if (tableState.filters.estado) result = result.filter(t => t.estado === tableState.filters.estado);
+   if (tableState.filters.estadosOcultos && tableState.filters.estadosOcultos.length > 0) {
+    result = result.filter(t => !tableState.filters.estadosOcultos.includes(t.estado));
+}
 
     // Filtros de fecha
     if (tableState.filters.iniDesde) result = result.filter(t => t.fecha_inicio_programado && t.fecha_inicio_programado >= tableState.filters.iniDesde);
@@ -423,14 +426,18 @@ export function renderTabla(container) {
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
-                        <select id="drawer-fil-estado" class="inp" onchange="window.applyFilter('estado', this.value)">
-                            <option value="">Todos los estados</option>
-                            ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => 
-                                `<option value="${e}" ${tableState.filters.estado === e ? 'selected' : ''}>${e}</option>`
-                            ).join('')}
-                        </select>
-                    </div>
+    <label class="block font-semibold text-slate-600 mb-2">Ocultar estados</label>
+    <div class="space-y-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
+        ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => `
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="rounded text-red-600" 
+                       ${tableState.filters.estadosOcultos.includes(e) ? 'checked' : ''}
+                       onchange="window.toggleEstadoOculto('${e}', this.checked)">
+                <span class="text-slate-700">${e}</span>
+            </label>
+        `).join('')}
+    </div>
+</div>
 
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
@@ -531,14 +538,14 @@ window.applyFilter = function(key, value) {
 
 window.clearFilters = function() {
     tableState.filters = { 
-        search: '', grupo: '', responsable: '', recursos: '', estado: '',
+        search: '', grupo: '', responsable: '', recursos: '',
+        estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         cierreDesde: '', cierreHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false
     };
     window.renderView();
 };
-
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
@@ -732,3 +739,13 @@ export async function confirmarTransicion() {
     if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
     closeModalCDE(); await fetchAll(); window.renderView(); toast('Transición aplicada');
 }
+window.toggleEstadoOculto = function(estado, checked) {
+    if (checked) {
+        if (!tableState.filters.estadosOcultos.includes(estado)) {
+            tableState.filters.estadosOcultos.push(estado);
+        }
+    } else {
+        tableState.filters.estadosOcultos = tableState.filters.estadosOcultos.filter(e => e !== estado);
+    }
+    window.renderView();
+};
