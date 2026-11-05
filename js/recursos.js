@@ -2,14 +2,15 @@ import { state } from './db.js';
 import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
 
 export function renderRecursos(container) {
+    // Todos los registros (admin/coord ven todo, modelador solo lo suyo)
     const registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
     );
 
     if (registros.length === 0) {
         container.innerHTML = `<div class="card p-8 text-center text-slate-500">
-            <p class="text-sm font-semibold mb-1">Aún no hay registros de horas</p>
-            <p class="text-xs">Cuando los modeladores registren sus horas en la pestaña MANPOWER, aquí verás el análisis.</p>
+            <p class="text-sm font-semibold mb-1">Aún no hay registros de %</p>
+            <p class="text-xs">Cuando los modeladores registren su % diario, aquí verás el análisis.</p>
         </div>`;
         return;
     }
@@ -18,68 +19,82 @@ export function renderRecursos(container) {
     const hoy = new Date();
     hoy.setHours(0,0,0,0);
     
-    // Inicio de la semana actual (lunes)
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(diffLunes);
     inicioSemana.setHours(0,0,0,0);
     
-    // Inicio del mes actual
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
-    // --- CÁLCULO DE MÉTRICAS ---
-    const parseH = (h) => parseFloat(h || 0);
+    // --- CÁLCULO DE % REGISTRADO POR DÍA ---
+    // Para verificar que cada modelador llenó el 100% cada día hábil
+    const pctPorUsuarioDia = {};
+    registros.forEach(r => {
+        const key = `${r.usuario_id}|${r.fecha}`;
+        if (!pctPorUsuarioDia[key]) pctPorUsuarioDia[key] = 0;
+        pctPorUsuarioDia[key] += parseFloat(r.porcentaje_dia || 0);
+    });
 
-    const horasMes = registros
-        .filter(r => r.fecha && new Date(r.fecha + 'T00:00:00') >= inicioMes)
-        .reduce((s, r) => s + parseH(r.horas), 0);
+    // Para cada modelador, contar cuántos días hábiles del mes registró 100%
+    const modeladores = state.perfilesCache.filter(p => 
+        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
+    );
 
-    const horasSemana = registros
+    const diasDelMes = [];
+    const cursor = new Date(inicioMes);
+    while (cursor <= hoy) {
+        if (cursor.getDay() !== 0) { // Excluir domingos
+            diasDelMes.push(cursor.toISOString().split('T')[0]);
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const cumplimientoPorModelador = {};
+    modeladores.forEach(p => {
+        const diasCumplidos = diasDelMes.filter(d => {
+            const key = `${p.id}|${d}`;
+            return (pctPorUsuarioDia[key] || 0) >= 100;
+        }).length;
+        const diasRegistrados = diasDelMes.filter(d => {
+            const key = `${p.id}|${d}`;
+            return (pctPorUsuarioDia[key] || 0) > 0;
+        }).length;
+        cumplimientoPorModelador[p.id] = {
+            nombre: nombreFormateado(p),
+            avatar: p.id,
+            cumplidos: diasCumplidos,
+            registrados: diasRegistrados,
+            totalDias: diasDelMes.length
+        };
+    });
+
+    // KPIs globales
+    const totalPct = registros.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
+    const pctSemana = registros
         .filter(r => r.fecha && new Date(r.fecha + 'T00:00:00') >= inicioSemana)
-        .reduce((s, r) => s + parseH(r.horas), 0);
+        .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
+    
+    // Cobertura del día de hoy y ayer (para ver quién no llenó)
+    const ayer = new Date(hoy);
+    ayer.setDate(ayer.getDate() - 1);
+    while (ayer.getDay() === 0) { ayer.setDate(ayer.getDate() - 1); }
+    const ayerStr = ayer.toISOString().split('T')[0];
+    const hoyStr = hoy.toISOString().split('T')[0];
+    
+    const modeladoresPendientesHoy = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
+    const modeladoresPendientesAyer = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100).length;
 
-    // Agrupación por modelador
-    const porModelador = {};
-    registros.forEach(r => {
-        const p = state.perfilesCache.find(x => x.id === r.usuario_id);
-        const nombre = p ? nombreFormateado(p) : 'Desconocido';
-        if (!porModelador[nombre]) porModelador[nombre] = { horas: 0, registros: 0, avatar: p ? p.id : null };
-        porModelador[nombre].horas += parseH(r.horas);
-        porModelador[nombre].registros += 1;
-    });
-
-    const ordenados = Object.entries(porModelador).sort((a,b) => b[1].horas - a[1].horas);
-    const masCargado = ordenados[0] || ['—', { horas: 0 }];
-    const menosCargado = ordenados[ordenados.length - 1] || ['—', { horas: 0 }];
-    const totalHoras = ordenados.reduce((s, [, d]) => s + d.horas, 0);
-
-    // Concentración: % de horas del top 3
-    const top3Horas = ordenados.slice(0, 3).reduce((s, [, d]) => s + d.horas, 0);
-    const concentracion = totalHoras > 0 ? Math.round((top3Horas / totalHoras) * 100) : 0;
-
-    // Promedio semanal (basado en las semanas con registros)
-    const semanasUnicas = new Set();
-    registros.forEach(r => {
-        if (!r.fecha) return;
-        const d = new Date(r.fecha + 'T00:00:00');
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        const lunes = new Date(d.setDate(diff));
-        semanasUnicas.add(lunes.toISOString().split('T')[0]);
-    });
-    const promedioSemanal = semanasUnicas.size > 0 ? (totalHoras / semanasUnicas.size).toFixed(1) : 0;
-
-    // Agrupación por actividad
-    const porActividad = {};
+    // Agrupación por grupo (para ver qué grupos concentran horas)
+    const porGrupo = {};
     registros.forEach(r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
-        const act = t ? t.actividad : 'General (sin actividad)';
-        if (!porActividad[act]) porActividad[act] = 0;
-        porActividad[act] += parseH(r.horas);
+        const grupo = t ? t.grupo || 'Sin grupo' : 'General';
+        if (!porGrupo[grupo]) porGrupo[grupo] = 0;
+        porGrupo[grupo] += parseFloat(r.porcentaje_dia || 0);
     });
 
-    // Agrupación por semana (últimas 8)
+    // Agrupación por semana
     const semanas = {};
     registros.forEach(r => {
         if (!r.fecha) return;
@@ -89,7 +104,7 @@ export function renderRecursos(container) {
         const lunes = new Date(d.setDate(diff));
         const key = lunes.toISOString().split('T')[0];
         if (!semanas[key]) semanas[key] = 0;
-        semanas[key] += parseH(r.horas);
+        semanas[key] += parseFloat(r.porcentaje_dia || 0);
     });
     const semanasOrdenadas = Object.keys(semanas).sort().slice(-8);
 
@@ -97,118 +112,109 @@ export function renderRecursos(container) {
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div>
-                <h3 class="font-bold text-sm text-slate-800">Monitoreo de Horas Hombre</h3>
-                <p class="text-[11px] text-slate-500">Distribución, concentración y tendencia del esfuerzo del equipo.</p>
+                <h3 class="font-bold text-sm text-slate-800">Monitoreo de Horas Hombre (% Diario)</h3>
+                <p class="text-[11px] text-slate-500">Control de cumplimiento del 100% diario por modelador.</p>
             </div>
             <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
         </div>
 
         <!-- KPIs -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div class="card kpi-card p-3 border-l-4 border-sky-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Horas del Mes</p>
-                <p class="text-2xl font-bold mt-1 text-sky-700">${horasMes.toFixed(1)} h</p>
-                <p class="text-[10px] text-slate-400">Mes en curso</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total % Registrado</p>
+                <p class="text-2xl font-bold mt-1 text-sky-700">${totalPct.toFixed(0)}%</p>
+                <p class="text-[10px] text-slate-400">Histórico</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 border-teal-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Horas de la Semana</p>
-                <p class="text-2xl font-bold mt-1 text-teal-700">${horasSemana.toFixed(1)} h</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">% de la Semana</p>
+                <p class="text-2xl font-bold mt-1 text-teal-700">${pctSemana.toFixed(0)}%</p>
                 <p class="text-[10px] text-slate-400">Lun - Dom</p>
             </div>
-            <div class="card kpi-card p-3 border-l-4 border-rose-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Más Cargado</p>
-                <p class="text-lg font-bold mt-1 text-rose-700 truncate" title="${escapeHtml(masCargado[0])}">${escapeHtml(masCargado[0])}</p>
-                <p class="text-[10px] text-slate-400">${masCargado[1].horas.toFixed(1)} h</p>
+            <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesHoy > 0 ? 'border-red-500' : 'border-emerald-500'}">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Hoy</p>
+                <p class="text-2xl font-bold mt-1 ${modeladoresPendientesHoy > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesHoy}</p>
+                <p class="text-[10px] text-slate-400">No llenaron el 100%</p>
             </div>
-            <div class="card kpi-card p-3 border-l-4 border-amber-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Menos Cargado</p>
-                <p class="text-lg font-bold mt-1 text-amber-700 truncate" title="${escapeHtml(menosCargado[0])}">${escapeHtml(menosCargado[0])}</p>
-                <p class="text-[10px] text-slate-400">${menosCargado[1].horas.toFixed(1)} h</p>
-            </div>
-            <div class="card kpi-card p-3 border-l-4 border-violet-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Promedio/Semana</p>
-                <p class="text-2xl font-bold mt-1 text-violet-700">${promedioSemanal} h</p>
-                <p class="text-[10px] text-slate-400">Entre el equipo</p>
-            </div>
-            <div class="card kpi-card p-3 border-l-4 ${concentracion >= 70 ? 'border-red-500' : concentracion >= 50 ? 'border-amber-500' : 'border-emerald-500'}">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Concentración Top 3</p>
-                <p class="text-2xl font-bold mt-1 ${concentracion >= 70 ? 'text-red-700' : concentracion >= 50 ? 'text-amber-700' : 'text-emerald-700'}">${concentracion}%</p>
-                <p class="text-[10px] text-slate-400">Del total</p>
+            <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesAyer > 0 ? 'border-red-500' : 'border-emerald-500'}">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Ayer</p>
+                <p class="text-2xl font-bold mt-1 ${modeladoresPendientesAyer > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesAyer}</p>
+                <p class="text-[10px] text-slate-400">Del día anterior</p>
             </div>
         </div>
 
         <!-- Gráficos -->
         <div class="grid lg:grid-cols-3 gap-3 mb-4">
             <div class="card p-4 lg:col-span-2">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana (últimas 8)</h4>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">% Registrado por semana (últimas 8)</h4>
                 <div class="chart-box" style="height: 240px;"><canvas id="chart-horas-semana"></canvas></div>
             </div>
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Distribución del esfuerzo</h4>
-                <div class="chart-box" style="height: 240px;"><canvas id="chart-top-modeladores"></canvas></div>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">% por Grupo</h4>
+                <div class="chart-box" style="height: 240px;"><canvas id="chart-grupos"></canvas></div>
             </div>
         </div>
 
-        <!-- Tabla por modelador -->
+        <!-- Tabla cumplimiento por modelador -->
         <div class="card overflow-x-auto">
             <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Horas registradas por modelador</h4>
+                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento diario por modelador</h4>
+                <p class="text-[11px] text-slate-500">Días del mes en que registró 100% / días hábiles transcurridos.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                     <tr>
                         <th class="p-3">Modelador</th>
-                        <th class="p-3">Horas</th>
-                        <th class="p-3">% del total</th>
-                        <th class="p-3">Registros</th>
-                        <th class="p-3">Prom./Registro</th>
+                        <th class="p-3">Días al 100%</th>
+                        <th class="p-3">Días con registro</th>
+                        <th class="p-3">Total días hábiles</th>
+                        <th class="p-3">Cumplimiento</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    ${ordenados.map(([nombre, data]) => {
-                        const pct = totalHoras > 0 ? Math.round((data.horas / totalHoras) * 100) : 0;
-                        const prom = (data.horas / data.registros).toFixed(1);
+                    ${Object.values(cumplimientoPorModelador).sort((a,b) => b.cumplidos - a.cumplidos).map(m => {
+                        const pct = m.totalDias > 0 ? Math.round((m.cumplidos / m.totalDias) * 100) : 0;
+                        const color = pct >= 80 ? 'text-emerald-700' : pct >= 50 ? 'text-amber-700' : 'text-red-700';
                         return `<tr class="hover:bg-slate-50">
                             <td class="p-3 flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full ${colorAvatar(data.avatar || nombre)} text-white text-[9px] font-bold flex items-center justify-center">
-                                    ${getIniciales(nombre).toUpperCase()}
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar || m.nombre)} text-white text-[9px] font-bold flex items-center justify-center">
+                                    ${getIniciales(m.nombre).toUpperCase()}
                                 </div>
-                                <span class="font-semibold text-slate-800">${escapeHtml(nombre)}</span>
+                                <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
                             </td>
-                            <td class="p-3 font-bold text-sky-700">${data.horas.toFixed(1)} h</td>
+                            <td class="p-3 font-bold ${color}">${m.cumplidos}</td>
+                            <td class="p-3">${m.registrados}</td>
+                            <td class="p-3">${m.totalDias}</td>
                             <td class="p-3">
                                 <div class="flex items-center gap-2">
                                     <div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-sky-500" style="width: ${pct}%"></div>
+                                        <div class="h-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'}" style="width: ${pct}%"></div>
                                     </div>
-                                    <span class="text-slate-600">${pct}%</span>
+                                    <span class="${color} font-bold">${pct}%</span>
                                 </div>
                             </td>
-                            <td class="p-3">${data.registros}</td>
-                            <td class="p-3">${prom} h</td>
                         </tr>`;
                     }).join('')}
                 </tbody>
             </table>
         </div>
 
-        <!-- Tabla por actividad -->
+        <!-- Tabla por grupo -->
         <div class="card overflow-x-auto mt-4">
             <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Actividades con más horas invertidas</h4>
+                <h4 class="font-semibold text-sm text-slate-800">% registrado por Grupo</h4>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                     <tr>
-                        <th class="p-3">Actividad</th>
-                        <th class="p-3">Horas Totales</th>
+                        <th class="p-3">Grupo</th>
+                        <th class="p-3">% Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    ${Object.entries(porActividad).sort((a,b) => b[1] - a[1]).slice(0, 15).map(([act, horas]) => `
+                    ${Object.entries(porGrupo).sort((a,b) => b[1] - a[1]).map(([g, pct]) => `
                         <tr class="hover:bg-slate-50">
-                            <td class="p-3 text-slate-700 max-w-md truncate" title="${escapeHtml(act)}">${escapeHtml(act)}</td>
-                            <td class="p-3 font-bold text-sky-700">${horas.toFixed(1)} h</td>
+                            <td class="p-3 text-slate-700">${escapeHtml(g)}</td>
+                            <td class="p-3 font-bold text-sky-700">${pct.toFixed(0)}%</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -218,9 +224,9 @@ export function renderRecursos(container) {
 
     // Destruir gráficos previos
     if (state.charts.horasSemana) state.charts.horasSemana.destroy();
-    if (state.charts.topModeladores) state.charts.topModeladores.destroy();
+    if (state.charts.grupos) state.charts.grupos.destroy();
 
-    // Gráfico por semana
+    // Gráfico semanal
     state.charts.horasSemana = new Chart(document.getElementById('chart-horas-semana'), {
         type: 'bar',
         data: {
@@ -229,8 +235,8 @@ export function renderRecursos(container) {
                 return `Sem ${d.getDate()}/${d.getMonth()+1}`;
             }),
             datasets: [{
-                label: 'Horas',
-                data: semanasOrdenadas.map(s => semanas[s].toFixed(1)),
+                label: '% registrado',
+                data: semanasOrdenadas.map(s => semanas[s].toFixed(0)),
                 backgroundColor: '#0284c7',
                 borderRadius: 4
             }]
@@ -238,19 +244,19 @@ export function renderRecursos(container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' h' } }, x: { grid: { display: false } } }
+            scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
         }
     });
 
-    // Gráfico distribución por modelador (doughnut)
-    const topModeladores = ordenados.slice(0, 6);
-    state.charts.topModeladores = new Chart(document.getElementById('chart-top-modeladores'), {
+    // Gráfico por grupo
+    const gruposLabels = Object.keys(porGrupo);
+    state.charts.grupos = new Chart(document.getElementById('chart-grupos'), {
         type: 'doughnut',
         data: {
-            labels: topModeladores.map(m => m[0]),
+            labels: gruposLabels,
             datasets: [{
-                data: topModeladores.map(m => m[1].horas.toFixed(1)),
-                backgroundColor: ['#0284c7', '#0d9488', '#f59e0b', '#7c3aed', '#dc2626', '#64748b'],
+                data: gruposLabels.map(g => porGrupo[g].toFixed(0)),
+                backgroundColor: ['#0284c7', '#0d9488', '#f59e0b', '#7c3aed', '#dc2626', '#64748b', '#ec4899', '#22c55e'],
                 borderWidth: 2, borderColor: '#fff'
             }]
         },
