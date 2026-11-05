@@ -83,7 +83,7 @@ function initResize(e, colKey) {
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
     e.preventDefault();
-    e.stopPropagation();
+    e.stopPropagation(); // <-- IMPORTANTE: Evita que el clic se propague al th y dispare el sort
 }
 
 function doResize(e) {
@@ -103,9 +103,15 @@ function doResize(e) {
         td.style.minWidth = `${newWidth}px`;
         td.style.maxWidth = `${newWidth}px`;
     });
+    e.stopPropagation(); // <-- Evitar que el movimiento del mouse se propague
 }
 
-function stopResize() {
+function stopResize(e) {
+    // Solo detener la propagación si efectivamente se estaba redimensionando
+    if (isResizing) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
     isResizing = false;
     currentCol = null;
     document.body.style.cursor = '';
