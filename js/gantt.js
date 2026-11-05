@@ -5,15 +5,21 @@ let ganttState = {
     filterGrupo: '',
     filterResp: '',
     filterEstado: '',
-    viewMode: 'Week', // Day, Week, Month
+    viewMode: 'Week',
     currentGantt: null
 };
 
+const COLORES_ESTADO = {
+    'No iniciado': '#94a3b8',
+    'En proceso': '#0284c7',
+    'En espera': '#f59e0b',
+    'Reprogramado': '#7c3aed',
+    'Cerrado': '#0d9488'
+};
+
 export function renderGantt(container) {
-    // Solo tareas con fecha de inicio y fin (requisito del Gantt)
     const tareasConFechas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
     
-    // Aplicar filtros
     let tareas = tareasConFechas.filter(t => {
         const matchGrupo = !ganttState.filterGrupo || t.grupo === ganttState.filterGrupo;
         const matchResp = !ganttState.filterResp || t.responsable_id === ganttState.filterResp;
@@ -21,7 +27,6 @@ export function renderGantt(container) {
         return matchGrupo && matchResp && matchEstado;
     });
 
-    // Verificar si hay tareas
     const sinFechas = state.tasksCache.length - tareasConFechas.length;
 
     if (tareas.length === 0) {
@@ -39,6 +44,12 @@ export function renderGantt(container) {
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
     const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+
+    // Conteos por estado para la cabecera
+    const conteoEstado = {};
+    tareas.forEach(t => {
+        conteoEstado[t.estado] = (conteoEstado[t.estado] || 0) + 1;
+    });
 
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
@@ -68,17 +79,54 @@ export function renderGantt(container) {
             </div>
         </div>
 
+        <!-- CABECERA DE ESTADÍSTICAS POR ESTADO -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+            ${estadosOpts.map(estado => {
+                const count = conteoEstado[estado] || 0;
+                const color = COLORES_ESTADO[estado];
+                return `
+                    <div class="card p-2 flex items-center gap-2 border-l-4" style="border-left-color: ${color};">
+                        <div class="w-2.5 h-2.5 rounded-full" style="background: ${color};"></div>
+                        <div>
+                            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 leading-tight">${estado}</p>
+                            <p class="text-base font-bold text-slate-800 leading-none mt-0.5">${count}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+
+        <!-- LEYENDA + GANTT -->
         <div class="card p-4 overflow-hidden">
-            <div id="gantt-container" class="relative"></div>
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
+                <div class="flex flex-wrap items-center gap-3 text-[11px]">
+                    <span class="font-bold text-slate-600 uppercase tracking-wide mr-2">Leyenda:</span>
+                    ${estadosOpts.map(estado => `
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-3 h-3 rounded-sm" style="background: ${COLORES_ESTADO[estado]};"></div>
+                            <span class="text-slate-600">${estado}</span>
+                        </div>
+                    `).join('')}
+                    <div class="flex items-center gap-1.5 ml-2 pl-3 border-l border-slate-200">
+                        <div class="w-0.5 h-4 bg-red-500"></div>
+                        <span class="text-slate-600 font-semibold">Hoy</span>
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-400">Mostrando ${tareas.length} de ${state.tasksCache.length}</p>
+            </div>
+
+            <div id="gantt-wrapper" class="relative overflow-x-auto">
+                <div id="gantt-container" class="relative"></div>
+            </div>
         </div>
 
         <p class="text-[11px] text-slate-400 mt-2">
-            Mostrando <b>${tareas.length}</b> actividad(es) con fechas asignadas.
-            ${sinFechas > 0 ? ` <span class="text-amber-600">(${sinFechas} sin fechas no se muestran)</span>` : ''}
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            Las tareas que no tienen fecha de inicio o fin no se muestran en el Gantt.
+            ${sinFechas > 0 ? ` <span class="text-amber-600">(${sinFechas} sin fechas)</span>` : ''}
         </p>
     `;
 
-    // Listeners de filtros
     document.getElementById('gantt-fil-grupo').addEventListener('change', (e) => {
         ganttState.filterGrupo = e.target.value;
         window.renderView();
@@ -92,7 +140,6 @@ export function renderGantt(container) {
         window.renderView();
     });
 
-    // Renderizar el Gantt
     setTimeout(() => inicializarGantt(tareas), 100);
 }
 
@@ -100,37 +147,25 @@ function inicializarGantt(tareas) {
     const container = document.getElementById('gantt-container');
     if (!container) return;
 
-    // Destruir instancia anterior si existe
-    if (ganttState.currentGantt) {
-        ganttState.currentGantt = null;
-    }
+    if (ganttState.currentGantt) ganttState.currentGantt = null;
     container.innerHTML = '';
 
-    // Transformar tareas al formato que espera Frappe Gantt
     const tasksData = tareas.map(t => {
-        // Colores por estado
-        const colores = {
-            'No iniciado': '#94a3b8',
-            'En proceso': '#0284c7',
-            'En espera': '#f59e0b',
-            'Reprogramado': '#7c3aed',
-            'Cerrado': '#0d9488'
-        };
-        
+        const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
         return {
             id: String(t.id),
             name: `${t.codigo_contenedor || ''} ${t.actividad}`.substring(0, 70),
             start: t.fecha_inicio_programado,
             end: t.fecha_fin,
             progress: t.estado === 'Cerrado' ? 100 : t.estado === 'En proceso' ? 50 : 0,
-            custom_class: `gantt-estado-${t.estado.replace(/\s/g, '-').toLowerCase()}`,
+            dependencies: '',
+            custom_class: `gantt-bar-${estadoClase}`,
             _estado: t.estado,
             _grupo: t.grupo,
             _responsable: t.responsable
         };
     });
 
-    // Crear el Gantt
     try {
         ganttState.currentGantt = new Gantt('#gantt-container', tasksData, {
             view_mode: ganttState.viewMode,
@@ -146,39 +181,29 @@ function inicializarGantt(tareas) {
             custom_popup_html: (task) => {
                 const original = tareas.find(t => String(t.id) === task.id);
                 if (!original) return '';
+                const color = COLORES_ESTADO[original.estado] || '#94a3b8';
                 return `
-                    <div class="p-3 bg-white rounded-lg shadow-lg border border-slate-200 text-xs min-w-[220px]">
-                        <p class="font-bold text-slate-800 mb-1">${escapeHtml(original.codigo_contenedor || '')}</p>
-                        <p class="text-slate-700 mb-2">${escapeHtml(original.actividad)}</p>
-                        <div class="text-[11px] text-slate-500 space-y-0.5">
-                            <p><b>Inicio:</b> ${fmtDate(original.fecha_inicio_programado)}</p>
-                            <p><b>Fin:</b> ${fmtDate(original.fecha_fin)}</p>
-                            <p><b>Estado:</b> ${escapeHtml(original.estado)}</p>
-                            <p><b>Grupo:</b> ${escapeHtml(original.grupo || '-')}</p>
+                    <div class="p-3 bg-white rounded-lg shadow-lg border border-slate-200 text-xs min-w-[240px]">
+                        <div class="flex items-center gap-2 mb-1">
+                            <div class="w-2.5 h-2.5 rounded-full" style="background: ${color};"></div>
+                            <p class="font-bold text-slate-800">${escapeHtml(original.codigo_contenedor || '')}</p>
+                        </div>
+                        <p class="text-slate-700 mb-2 leading-snug">${escapeHtml(original.actividad)}</p>
+                        <div class="text-[11px] text-slate-500 space-y-0.5 pt-2 border-t border-slate-100">
+                            <p><b class="text-slate-700">Inicio:</b> ${fmtDate(original.fecha_inicio_programado)}</p>
+                            <p><b class="text-slate-700">Fin:</b> ${fmtDate(original.fecha_fin)}</p>
+                            <p><b class="text-slate-700">Estado:</b> <span style="color: ${color}; font-weight: 700;">${escapeHtml(original.estado)}</span></p>
+                            <p><b class="text-slate-700">Grupo:</b> ${escapeHtml(original.grupo || '-')}</p>
+                            <p><b class="text-slate-700">Resp:</b> ${escapeHtml(original.responsable || '-')}</p>
                         </div>
                     </div>
                 `;
             }
         });
 
-        // Aplicar colores por estado después de renderizar
-        setTimeout(() => {
-            const bars = document.querySelectorAll('.bar-wrapper .bar');
-            bars.forEach((bar, idx) => {
-                const t = tasksData[idx];
-                if (!t) return;
-                const color = {
-                    'No iniciado': '#94a3b8',
-                    'En proceso': '#0284c7',
-                    'En espera': '#f59e0b',
-                    'Reprogramado': '#7c3aed',
-                    'Cerrado': '#0d9488'
-                }[t._estado] || '#0284c7';
-                bar.style.fill = color;
-            });
-        }, 100);
+        // Aplicar colores por estado + añadir línea vertical de hoy
+        setTimeout(() => pintarColoresYHoy(tasksData), 150);
 
-        // Click en una barra abre el modal de edición
         ganttState.currentGantt.on_click = (task) => {
             window.editTask(parseInt(task.id));
         };
@@ -187,6 +212,99 @@ function inicializarGantt(tareas) {
         console.error('Error al crear Gantt:', err);
         container.innerHTML = `<div class="text-red-500 text-sm p-4">Error al renderizar el Gantt: ${err.message}</div>`;
     }
+}
+
+function pintarColoresYHoy(tasksData) {
+    // 1. Pintar las barras con su color por estado
+    const bars = document.querySelectorAll('.bar-wrapper .bar');
+    bars.forEach((bar, idx) => {
+        const t = tasksData[idx];
+        if (!t) return;
+        const color = COLORES_ESTADO[t._estado] || '#94a3b8';
+        bar.style.fill = color;
+        
+        // Cambiar el color del progress interno (más oscuro)
+        const progress = bar.querySelector('.bar-progress');
+        if (progress) progress.style.fill = color;
+    });
+
+    // 2. Añadir línea vertical de "hoy"
+    const ganttWrapper = document.getElementById('gantt-wrapper');
+    const ganttContainer = document.getElementById('gantt-container');
+    if (!ganttWrapper || !ganttContainer) return;
+    
+    // Eliminar líneas antiguas si existen
+    const oldLine = document.getElementById('gantt-today-line');
+    if (oldLine) oldLine.remove();
+
+    // Calcular la posición de hoy
+    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+    const startDate = new Date(tasksData.length > 0 ? tasksData[0].start : new Date());
+    
+    // Buscar la fecha mínima (fecha más antigua del gantt)
+    let minDate = null;
+    tasksData.forEach(t => {
+        const d = new Date(t.start + 'T00:00:00');
+        if (!minDate || d < minDate) minDate = d;
+    });
+    if (!minDate) return;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    // Días de diferencia desde el inicio del gantt
+    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
+    
+    // Calcular px de offset según el modo de vista
+    let offsetPx = 0;
+    if (ganttState.viewMode === 'Day') {
+        offsetPx = diffDays * colWidth;
+    } else if (ganttState.viewMode === 'Week') {
+        offsetPx = (diffDays / 7) * colWidth;
+    } else if (ganttState.viewMode === 'Month') {
+        offsetPx = (diffDays / 30) * colWidth;
+    }
+
+    // Ancho del label de tareas (por defecto ~150-200px)
+    const sidebarWidth = ganttContainer.querySelector('.side-header')?.offsetWidth || 200;
+    const finalLeft = sidebarWidth + offsetPx;
+
+    // Crear la línea vertical
+    const line = document.createElement('div');
+    line.id = 'gantt-today-line';
+    line.style.cssText = `
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: ${finalLeft}px;
+        width: 2px;
+        background: #ef4444;
+        z-index: 5;
+        pointer-events: none;
+    `;
+    
+    // Añadir etiqueta "HOY" arriba
+    line.innerHTML = `
+        <div style="
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        ">HOY</div>
+    `;
+
+    // Insertar la línea dentro del área de las barras (no en el header)
+    const ganttGrid = ganttContainer.querySelector('.grid-body') || ganttContainer;
+    ganttGrid.style.position = 'relative';
+    ganttGrid.appendChild(line);
 }
 
 window.setGanttView = function(mode) {
