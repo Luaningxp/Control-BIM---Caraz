@@ -1,12 +1,8 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
-    getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar 
-} from './utils.js';
-import { 
-    escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
-    confirmDelete // <-- Nuevo
+    confirmDelete 
 } from './utils.js';
 
 // --- HELPERS DE RECURSOS ---
