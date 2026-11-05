@@ -80,10 +80,16 @@ function initResize(e, colKey) {
     startWidth = tableState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    
+    // Desactivar clics en los encabezados mientras se redimensiona
+    document.querySelectorAll('th').forEach(th => {
+        th.style.pointerEvents = 'none';
+    });
+    
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
     e.preventDefault();
-    e.stopPropagation(); // <-- IMPORTANTE: Evita que el clic se propague al th y dispare el sort
+    e.stopPropagation();
 }
 
 function doResize(e) {
@@ -103,21 +109,28 @@ function doResize(e) {
         td.style.minWidth = `${newWidth}px`;
         td.style.maxWidth = `${newWidth}px`;
     });
-    e.stopPropagation(); // <-- Evitar que el movimiento del mouse se propague
+    e.preventDefault();
 }
 
 function stopResize(e) {
-    // Solo detener la propagación si efectivamente se estaba redimensionando
-    if (isResizing) {
-        e.stopPropagation();
-        e.preventDefault();
-    }
+    if (!isResizing) return;
+    
+    // Reactivar los clics en los encabezados
+    setTimeout(() => {
+        document.querySelectorAll('th').forEach(th => {
+            th.style.pointerEvents = 'auto';
+        });
+    }, 50); // Pequeño delay para asegurar que el click fantasma no se dispare
+    
     isResizing = false;
     currentCol = null;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     document.removeEventListener('mousemove', doResize);
     document.removeEventListener('mouseup', stopResize);
+    
+    e.preventDefault();
+    e.stopPropagation();
 }
 
 export function renderTabla(container) {
