@@ -6,6 +6,7 @@ import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }
 import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
+import { renderRecursos } from './recursos.js';
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -81,13 +82,12 @@ async function initApp(user) {
 
 window.switchTab = function(tab) {
     state.currentTab = tab;
-    ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'manpower', 'config'].forEach(t => {
+    ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'manpower', 'recursos', 'config'].forEach(t => {
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if(btn) btn.classList.toggle('tab-active', t === tab);
     });
     window.renderView();
 }
-
 
 window.renderView = function() {
     const container = document.getElementById('view-container');
@@ -99,6 +99,7 @@ window.renderView = function() {
     else if (state.currentTab === 'kanban') renderKanban(container);
     else if (state.currentTab === 'eisenhower') renderEisenhower(container);
     else if (state.currentTab === 'manpower') renderManpower(container);
+        else if (state.currentTab === 'recursos') renderRecursos(container);
     else if (state.currentTab === 'config') renderConfig(container);
 }
 
