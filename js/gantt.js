@@ -45,7 +45,6 @@ export function renderGantt(container) {
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
     const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
 
-    // Conteos por estado para la cabecera
     const conteoEstado = {};
     tareas.forEach(t => {
         conteoEstado[t.estado] = (conteoEstado[t.estado] || 0) + 1;
@@ -79,7 +78,6 @@ export function renderGantt(container) {
             </div>
         </div>
 
-        <!-- CABECERA DE ESTADÍSTICAS POR ESTADO -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
             ${estadosOpts.map(estado => {
                 const count = conteoEstado[estado] || 0;
@@ -96,7 +94,6 @@ export function renderGantt(container) {
             }).join('')}
         </div>
 
-        <!-- LEYENDA + GANTT -->
         <div class="card p-4 overflow-hidden">
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
                 <div class="flex flex-wrap items-center gap-3 text-[11px]">
@@ -201,7 +198,6 @@ function inicializarGantt(tareas) {
             }
         });
 
-        // Aplicar colores por estado + añadir línea vertical de hoy
         setTimeout(() => pintarColoresYHoy(tasksData), 150);
 
         ganttState.currentGantt.on_click = (task) => {
@@ -215,33 +211,25 @@ function inicializarGantt(tareas) {
 }
 
 function pintarColoresYHoy(tasksData) {
-    // 1. Pintar las barras con su color por estado
     const bars = document.querySelectorAll('.bar-wrapper .bar');
     bars.forEach((bar, idx) => {
         const t = tasksData[idx];
         if (!t) return;
         const color = COLORES_ESTADO[t._estado] || '#94a3b8';
         bar.style.fill = color;
-        
-        // Cambiar el color del progress interno (más oscuro)
         const progress = bar.querySelector('.bar-progress');
         if (progress) progress.style.fill = color;
     });
 
-    // 2. Añadir línea vertical de "hoy"
     const ganttWrapper = document.getElementById('gantt-wrapper');
     const ganttContainer = document.getElementById('gantt-container');
     if (!ganttWrapper || !ganttContainer) return;
     
-    // Eliminar líneas antiguas si existen
     const oldLine = document.getElementById('gantt-today-line');
     if (oldLine) oldLine.remove();
 
-    // Calcular la posición de hoy
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    const startDate = new Date(tasksData.length > 0 ? tasksData[0].start : new Date());
     
-    // Buscar la fecha mínima (fecha más antigua del gantt)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
@@ -252,10 +240,8 @@ function pintarColoresYHoy(tasksData) {
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    // Días de diferencia desde el inicio del gantt
     const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Calcular px de offset según el modo de vista
     let offsetPx = 0;
     if (ganttState.viewMode === 'Day') {
         offsetPx = diffDays * colWidth;
@@ -265,11 +251,9 @@ function pintarColoresYHoy(tasksData) {
         offsetPx = (diffDays / 30) * colWidth;
     }
 
-    // Ancho del label de tareas (por defecto ~150-200px)
     const sidebarWidth = ganttContainer.querySelector('.side-header')?.offsetWidth || 200;
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear la línea vertical
     const line = document.createElement('div');
     line.id = 'gantt-today-line';
     line.style.cssText = `
@@ -283,7 +267,6 @@ function pintarColoresYHoy(tasksData) {
         pointer-events: none;
     `;
     
-    // Añadir etiqueta "HOY" arriba
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -301,7 +284,6 @@ function pintarColoresYHoy(tasksData) {
         ">HOY</div>
     `;
 
-    // Insertar la línea dentro del área de las barras (no en el header)
     const ganttGrid = ganttContainer.querySelector('.grid-body') || ganttContainer;
     ganttGrid.style.position = 'relative';
     ganttGrid.appendChild(line);
