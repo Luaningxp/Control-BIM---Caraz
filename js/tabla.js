@@ -128,7 +128,7 @@ export function renderTabla(container) {
     };
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
-    const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-20" onmousedown="window.initResize(event, '${key}')"></div>`;
+    const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize bg-slate-300 opacity-0 hover:opacity-100 transition-opacity z-30" onpointerdown="window.initResize(event, '${key}')" style="touch-action: none;"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50";
     
     container.innerHTML = `
