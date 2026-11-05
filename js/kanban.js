@@ -67,12 +67,27 @@ export function renderKanban(container) {
                                 const d = daysToDeadline(t);
                                 const equipo = state.actividadRecursosCache.filter(r => r.pendiente_id === t.id);
                                 
-                                const isOwner = t.user_id === state.currentUser.id;
-                                const canDragThis = state.isAdmin || state.isCoordinador || state.isSupervisor || (state.isModelador && isOwner);
+                                // LÓGICA DE PERMISOS:
+                                // - Admin, Coordinador y Supervisor: pueden mover todo.
+                                // - Modelador: solo sus propias tareas (como responsable o recurso) y solo si NO está archivada.
+                                const esArchivada = t.estado_cde === 'Archived';
+                                const esOwner = t.user_id === state.currentUser.id;
+                                const esResponsable = t.responsable_id === state.currentUser.id;
+                                const esRecurso = state.actividadRecursosCache.some(r => 
+                                    r.pendiente_id === t.id && r.usuario_id === state.currentUser.id
+                                );
+                                const participa = esOwner || esResponsable || esRecurso;
+                                
+                                let canDrag = false;
+                                if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
+                                    canDrag = true; // Pueden mover todo, incluso archivadas (para desarchivar)
+                                } else if (state.isModelador && participa && !esArchivada) {
+                                    canDrag = true; // Modeladores: solo sus tareas activas
+                                }
 
                                 return `
-                                <div class="kb-card bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${canDragThis ? '' : 'opacity-70 cursor-not-allowed'}" 
-                                     draggable="${canDragThis}" 
+                                <div class="kb-card bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'opacity-70 cursor-not-allowed'}" 
+                                     draggable="${canDrag}" 
                                      ondragstart="window.onDragStart(event, ${t.id})" 
                                      ondragend="window.onDragEnd(event)">
                                     <div class="flex justify-between items-start mb-2">
@@ -86,7 +101,6 @@ export function renderKanban(container) {
                                         <span class="font-bold ${critColor(crit)}">${crit}</span>
                                     </div>
 
-                                    <!-- EQUIPO (RECURSOS) -->
                                     <div class="flex items-center justify-between pt-2 border-t border-slate-100">
                                         <div class="flex -space-x-1.5">
                                             ${equipo.map(r => {
@@ -134,6 +148,7 @@ export async function onDrop(e, nuevoEstado) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || t.estado === nuevoEstado) return;
 
+    // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
         toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
         window.editTask(id);
