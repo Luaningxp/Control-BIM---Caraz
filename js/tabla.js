@@ -75,8 +75,9 @@ function initResize(e, colKey) {
     startX = e.pageX;
     startWidth = tableState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
+    document.body.style.userSelect = 'none'; // Evita seleccionar texto mientras arrastras
+    document.addEventListener('pointermove', doResize);
+    document.addEventListener('pointerup', stopResize);
     e.preventDefault();
     e.stopPropagation();
 }
@@ -87,13 +88,14 @@ function doResize(e) {
     const newWidth = Math.max(50, startWidth + diff);
     tableState.colWidths[currentCol] = newWidth;
     
+    // Actualizar el th
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
     if (th) {
         th.style.width = `${newWidth}px`;
         th.style.minWidth = `${newWidth}px`;
         th.style.maxWidth = `${newWidth}px`;
     }
-    // Actualizamos los td de esa columna visualmente
+    // Actualizar todos los td de esa columna
     document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => {
         td.style.width = `${newWidth}px`;
         td.style.minWidth = `${newWidth}px`;
@@ -105,8 +107,9 @@ function stopResize() {
     isResizing = false;
     currentCol = null;
     document.body.style.cursor = '';
-    document.removeEventListener('mousemove', doResize);
-    document.removeEventListener('mouseup', stopResize);
+    document.body.style.userSelect = '';
+    document.removeEventListener('pointermove', doResize);
+    document.removeEventListener('pointerup', stopResize);
 }
 
 export function renderTabla(container) {
