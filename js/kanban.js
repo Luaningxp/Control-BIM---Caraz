@@ -1,15 +1,9 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, cdeBadge, nombreResponsable, critColor, toast, getCriticidad, fmtDate, daysToDeadline } from './utils.js';
+import { escapeHtml, cdeBadge, nombreResponsable, critColor, toast, getCriticidad, fmtDate, daysToDeadline, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
 
-// Estado local para los filtros del Kanban
-let kanbanState = {
-    search: '',
-    filterGrupo: '',
-    filterResp: ''
-};
+let kanbanState = { search: '', filterGrupo: '', filterResp: '' };
 
 export function renderKanban(container) {
-    // Definimos las columnas del Kanban operativo
     const ESTADOS = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
     
     const META = {
@@ -20,11 +14,9 @@ export function renderKanban(container) {
         'Cerrado': { t: 'Cerrado', sub: 'Completado', color: 'teal', icon: 'fa-check-circle' }
     };
 
-    // Generar opciones para los filtros
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
 
-    // Aplicar filtros a las tareas
     const filteredTasks = state.tasksCache.filter(t => {
         const matchSearch = !kanbanState.search || 
             (t.actividad || '').toLowerCase().includes(kanbanState.search.toLowerCase()) ||
@@ -50,16 +42,14 @@ export function renderKanban(container) {
                     ${respOpts.map(r => `<option value="${r.id}" ${kanbanState.filterResp === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
                 </select>
             </div>
-            <div class="flex items-center gap-2">
-                <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium px-2"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
-            </div>
+            <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium px-2"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-5 gap-3 overflow-x-auto pb-2">
             ${ESTADOS.map(estado => {
                 const items = filteredTasks.filter(t => t.estado === estado);
                 return `
-                    <div class="kb-col bg-slate-100 rounded-lg p-2 min-w-[250px]" data-estado="${estado}"
+                    <div class="kb-col bg-slate-100 rounded-lg p-2 min-w-[260px]" data-estado="${estado}"
                          ondragover="window.onDragOver(event)" ondragleave="window.onDragLeave(event)" ondrop="window.onDrop(event, '${estado}')">
                         <div class="flex items-center justify-between px-2 py-2 mb-1 border-b border-slate-200">
                             <div class="flex items-center gap-2">
@@ -75,8 +65,8 @@ export function renderKanban(container) {
                             ${items.map(t => {
                                 const crit = getCriticidad(t);
                                 const d = daysToDeadline(t);
+                                const equipo = state.actividadRecursosCache.filter(r => r.pendiente_id === t.id);
                                 
-                                // Lógica de permisos: Solo el responsable o admin/coordinador/supervisor pueden mover
                                 const isOwner = t.user_id === state.currentUser.id;
                                 const canDragThis = state.isAdmin || state.isCoordinador || state.isSupervisor || (state.isModelador && isOwner);
 
@@ -96,12 +86,17 @@ export function renderKanban(container) {
                                         <span class="font-bold ${critColor(crit)}">${crit}</span>
                                     </div>
 
+                                    <!-- EQUIPO (RECURSOS) -->
                                     <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                        <div class="flex -space-x-1.5">
+                                            ${equipo.map(r => {
+                                                const p = state.perfilesCache.find(x => x.id === r.usuario_id);
+                                                if (!p) return '';
+                                                return `<div class="w-5 h-5 rounded-full ${colorAvatar(p.id)} text-white text-[8px] font-bold flex items-center justify-center ring-2 ring-white" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`;
+                                            }).join('')}
+                                        </div>
                                         <div class="text-[10px] ${d !== null && d < 0 ? 'text-red-600 font-bold' : d !== null && d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
                                             <i class="fa-regular fa-calendar mr-1"></i>${t.fecha_fin ? fmtDate(t.fecha_fin) : 'Sin fecha'}
-                                        </div>
-                                        <div class="flex gap-1">
-                                            ${canEditTask(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="text-slate-400 hover:text-sky-600" title="Editar"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
                                         </div>
                                     </div>
                                 </div>
@@ -113,51 +108,21 @@ export function renderKanban(container) {
         </div>
     `;
 
-    // Event listeners para los filtros
-    document.getElementById('kb-search').addEventListener('input', (e) => {
-        kanbanState.search = e.target.value;
-        window.renderView();
-    });
-    document.getElementById('kb-fil-grupo').addEventListener('change', (e) => {
-        kanbanState.filterGrupo = e.target.value;
-        window.renderView();
-    });
-    document.getElementById('kb-fil-resp').addEventListener('change', (e) => {
-        kanbanState.filterResp = e.target.value;
-        window.renderView();
-    });
-}
-
-function canEditTask(t) {
-    if (state.isAdmin || state.isCoordinador || state.isSupervisor) return true;
-    if (state.isModelador && t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id) return true;
-    return false;
+    document.getElementById('kb-search').addEventListener('input', (e) => { kanbanState.search = e.target.value; window.renderView(); });
+    document.getElementById('kb-fil-grupo').addEventListener('change', (e) => { kanbanState.filterGrupo = e.target.value; window.renderView(); });
+    document.getElementById('kb-fil-resp').addEventListener('change', (e) => { kanbanState.filterResp = e.target.value; window.renderView(); });
 }
 
 export function onDragStart(e, id) {
-    if (e.currentTarget.getAttribute('draggable') !== 'true') {
-        e.preventDefault();
-        return;
-    }
+    if (e.currentTarget.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
     state.dragId = id;
     e.dataTransfer.effectAllowed = 'move';
     e.currentTarget.classList.add('opacity-50');
 }
 
-export function onDragEnd(e) { 
-    e.currentTarget.classList.remove('opacity-50'); 
-    state.dragId = null; 
-}
-
-export function onDragOver(e) { 
-    e.preventDefault(); 
-    e.dataTransfer.dropEffect = 'move'; 
-    e.currentTarget.classList.add('bg-sky-50', 'ring-2', 'ring-sky-300'); 
-}
-
-export function onDragLeave(e) { 
-    e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300'); 
-}
+export function onDragEnd(e) { e.currentTarget.classList.remove('opacity-50'); state.dragId = null; }
+export function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('bg-sky-50', 'ring-2', 'ring-sky-300'); }
+export function onDragLeave(e) { e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300'); }
 
 export async function onDrop(e, nuevoEstado) {
     e.preventDefault();
@@ -169,27 +134,18 @@ export async function onDrop(e, nuevoEstado) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || t.estado === nuevoEstado) return;
 
-    // REGLA: Si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
         toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
         window.editTask(id);
         return;
     }
     
-    // Si se saca de "Cerrado", borramos la fecha de cierre
     const updateData = { estado: nuevoEstado };
-    if (nuevoEstado !== 'Cerrado') {
-        updateData.fecha_cierre = null;
-    }
+    if (nuevoEstado !== 'Cerrado') updateData.fecha_cierre = null;
 
     const { error } = await supabaseClient.from('pendientes_bim').update(updateData).eq('id', id);
-    
-    if (error) { 
-        toast('Error al mover: ' + error.message); 
-        return; 
-    }
+    if (error) { toast('Error al mover: ' + error.message); return; }
     
     toast(`Movido a ${nuevoEstado}`);
-    await fetchAll(); 
-    window.renderView();
+    await fetchAll(); window.renderView();
 }
