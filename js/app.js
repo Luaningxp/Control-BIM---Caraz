@@ -7,6 +7,7 @@ import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
 import { renderRecursos } from './recursos.js';
+import { renderGantt } from './gantt.js';
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -84,7 +85,7 @@ if (state.isAdmin) {
 
 window.switchTab = function(tab) {
     state.currentTab = tab;
-    ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'manpower', 'recursos', 'config'].forEach(t => {
+    ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'gantt', 'manpower', 'recursos', 'config'].forEach(t => {
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if(btn) btn.classList.toggle('tab-active', t === tab);
     });
@@ -100,6 +101,7 @@ window.renderView = function() {
     else if (state.currentTab === 'tabla') renderTabla(container);
     else if (state.currentTab === 'kanban') renderKanban(container);
     else if (state.currentTab === 'eisenhower') renderEisenhower(container);
+        else if (state.currentTab === 'gantt') renderGantt(container);
     else if (state.currentTab === 'manpower') renderManpower(container);
         else if (state.currentTab === 'recursos') renderRecursos(container);
     else if (state.currentTab === 'config') renderConfig(container);
