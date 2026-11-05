@@ -133,78 +133,119 @@ window.handleFileUpload = (e) => {
         try {
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
             
-            if (json.length === 0) { toast('El archivo está vacío o no tiene datos.'); return; }
+            if (json.length < 2) { toast('El archivo está vacío.'); return; }
             
-            // ADVERTENCIA DE REEMPLAZO
-            const confirmMsg = `⚠️ ATENCIÓN: Se encontraron ${json.length} filas.\n\nAl continuar, se ELIMINARÁN todas las actividades actuales de la base de datos y se reemplazarán por las de este Excel.\n\n¿Estás seguro de continuar?`;
-            if (!confirm(confirmMsg)) return;
+            if (!confirm(`Se encontraron ${json.length - 1} filas.\n\n¿Deseas REEMPLAZAR la base de datos actual?`)) return;
 
-            // 1. BORRAR TODAS LAS ACTIVIDADES ACTUALES
-            // Nota: Solo el admin puede hacer esto por RLS, lo cual es correcto.
-            const { error: delError } = await supabaseClient
-                .from('pendientes_bim')
-                .delete()
-                .neq('id', 0); // Truco para borrar todo
-            
-            if (delError) throw new Error("No se pudieron borrar los datos antiguos: " + delError.message);
+            const headers = json[0].map(h => String(h).trim().toLowerCase());
+            const findCol = (names) => {
+                for (let n of names) { const i = headers.indexOf(n.toLowerCase()); if (i !== -1) return i; }
+                return -1;
+            };
+
+            const colActividad = findCol(['actividad']);
+            const colGrupo = findCol(['grupo']);
+            const colResp = findCol(['responsable', 'correo', 'email']);
+            const colImp = findCol(['importancia']);
+            const colUrg = findCol(['urgencia']);
+            const colEstado = findCol(['estado']);
+            const colIni = findCol(['inicio prog.', 'inicio']);
+            const colFin = findCol(['fin prog.', 'fin']);
+            const colCierre = findCol(['cierre real', 'cierre']);
+            const colNota = findCol(['nota', 'restricción']);
+
+            if (colActividad === -1) { toast('No se encontró la columna "Actividad".'); return; }
+
+            // Función para formatear el correo a "Nombre Apellido"
+            const formatNombre = (email) => {
+                if (!email) return '';
+                const base = email.split('@')[0];
+                return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
+                    .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
+            };
+
+            const parseNivel = (val) => {
+                if (val === true || String(val).toLowerCase() === 'true') return 'Alto';
+                if (val === false || String(val).toLowerCase() === 'false') return 'Bajo';
+                const s = String(val).trim().toLowerCase();
+                if (s === 'muy alto') return 'Muy alto';
+                if (s === 'alto') return 'Alto';
+                if (s === 'medio') return 'Medio';
+                if (s === 'bajo') return 'Bajo';
+                return 'Medio';
+            };
 
             const parseDate = (val) => {
-                if (!val) return null;
+                if (!val || val === 0 || val === '0' || String(val).trim() === '') return null;
+                if (val instanceof Date) return new Date(val.getTime() - val.getTimezoneOffset() * 60000).toISOString().split('T')[0];
                 if (typeof val === 'number') {
                     const date = new Date(Math.round((val - 25569) * 86400 * 1000));
                     return date.toISOString().split('T')[0];
                 }
-                const d = new Date(val);
+                const str = String(val).trim();
+                const d = new Date(str.includes('/') ? str.split('/').reverse().join('-') : str);
                 return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
             };
 
-            // 2. PREPARAR LOS NUEVOS INSERTS
-            const inserts = json.map(row => {
+            const inserts = [];
+            for (let i = 1; i < json.length; i++) {
+                const row = json[i];
+                if (!row || row.length === 0 || !row[colActividad]) continue;
+
+                const actTexto = String(row[colActividad]).trim();
+                if (!actTexto) continue;
+
+                // BÚSQUEDA DEL RESPONSABLE
                 let respId = null;
-                const respEmail = row['Responsable'] || row['responsable'] || '';
-                if (respEmail) {
-                    const perfil = state.perfilesCache.find(p => p.email.toLowerCase().trim() === String(respEmail).toLowerCase().trim());
-                    if (perfil) respId = perfil.id;
+                let respEmailReal = null;
+                const excelResp = colResp !== -1 ? String(row[colResp]).trim().toLowerCase() : '';
+                
+                if (excelResp) {
+                    // Buscar en los perfiles comparando el nombre formateado con el nombre del Excel
+                    const perfil = state.perfilesCache.find(p => {
+                        const nombrePerfil = formatNombre(p.email).toLowerCase(); // "luis romero"
+                        return nombrePerfil === excelResp || p.email.toLowerCase() === excelResp;
+                    });
+                    if (perfil) {
+                        respId = perfil.id;
+                        respEmailReal = perfil.email;
+                    }
                 }
 
-                let imp = row['Importancia'] || row['importancia'] || row['Criticidad'] || row['criticidad'] || 'Medio';
-                if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(imp)) imp = 'Medio';
-
-                let urg = row['Urgencia'] || row['urgencia'] || 'Medio';
-                if (!['Muy alto', 'Alto', 'Medio', 'Bajo'].includes(urg)) urg = 'Medio';
-
-                return {
-                    actividad: row['Actividad'] || row['actividad'] || 'Sin nombre',
-                    grupo: row['Grupo'] || row['grupo'] || null,
-                    responsable: respEmail || null,
+                inserts.push({
+                    actividad: actTexto,
+                    grupo: colGrupo !== -1 && row[colGrupo] ? String(row[colGrupo]).trim() : null,
+                    responsable: respEmailReal || null,
                     responsable_id: respId,
-                    importancia: imp,
-                    urgencia: urg,
-                    estado: row['Estado'] || row['estado'] || 'No iniciado',
-                    fecha_inicio_programado: parseDate(row['Inicio Prog.'] || row['fecha_inicio_programado']),
-                    fecha_fin: parseDate(row['Fin Prog.'] || row['fecha_fin']),
-                    fecha_cierre: parseDate(row['Cierre Real'] || row['fecha_cierre']),
-                    nota: row['Nota'] || row['nota'] || null,
+                    importancia: colImp !== -1 ? parseNivel(row[colImp]) : 'Medio',
+                    urgencia: colUrg !== -1 ? parseNivel(row[colUrg]) : 'Medio',
+                    estado: colEstado !== -1 && row[colEstado] ? String(row[colEstado]).trim() : 'No iniciado',
+                    fecha_inicio_programado: colIni !== -1 ? parseDate(row[colIni]) : null,
+                    fecha_fin: colFin !== -1 ? parseDate(row[colFin]) : null,
+                    fecha_cierre: colCierre !== -1 ? parseDate(row[colCierre]) : null,
+                    nota: colNota !== -1 && row[colNota] ? String(row[colNota]).trim() : null,
                     estado_cde: 'WIP',
                     codigo_aptitud: 'S0',
                     user_id: state.currentUser.id
-                };
-            });
+                });
+            }
 
-            // 3. INSERTAR EN LOTES
+            if (inserts.length === 0) { toast('No se encontraron datos válidos.'); return; }
+
+            const { error: delError } = await supabaseClient.from('pendientes_bim').delete().neq('id', 0);
+            if (delError) throw new Error("Error al borrar: " + delError.message);
+
             for (let i = 0; i < inserts.length; i += 50) {
-                const batch = inserts.slice(i, i + 50);
-                const { error } = await supabaseClient.from('pendientes_bim').insert(batch);
+                const { error } = await supabaseClient.from('pendientes_bim').insert(inserts.slice(i, i + 50));
                 if (error) throw error;
             }
 
             await fetchAll();
             window.renderView();
-            toast(`¡Base de datos reemplazada con ${inserts.length} actividades!`);
+            toast(`¡Importadas ${inserts.length} actividades con éxito!`);
 
         } catch (err) {
             console.error(err);
@@ -214,7 +255,6 @@ window.handleFileUpload = (e) => {
     reader.readAsArrayBuffer(file);
     e.target.value = ''; 
 };
-
 // --- RENDERIZADO DE MODALES ---
 function renderModales() {
     return `
