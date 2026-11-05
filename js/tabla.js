@@ -81,7 +81,7 @@ export function renderTabla(container) {
             <div class="flex flex-1 items-center gap-2 w-full">
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="tbl-search" placeholder="Buscar actividad o código..." value="${tableState.filters.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                    <input type="text" id="tbl-search" placeholder="Buscar actividad..." value="${tableState.filters.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
                 <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los grupos</option>${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}</select>
                 <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los responsables</option>${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select>
@@ -92,13 +92,17 @@ export function renderTabla(container) {
                     <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i></button>
                     <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('inicio')" ${tableState.visibleCols.inicio ? 'checked' : ''} class="rounded text-sky-600"> Inicio Prog.</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('actividad')" ${tableState.visibleCols.actividad ? 'checked' : ''} class="rounded text-sky-600"> Actividad</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('importancia')" ${tableState.visibleCols.importancia ? 'checked' : ''} class="rounded text-sky-600"> Importancia</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('urgencia')" ${tableState.visibleCols.urgencia ? 'checked' : ''} class="rounded text-sky-600"> Urgencia</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('inicio')" ${tableState.visibleCols.inicio ? 'checked' : ''} class="rounded text-sky-600"> Inicio Prog.</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('fin')" ${tableState.visibleCols.fin ? 'checked' : ''} class="rounded text-sky-600"> Fin Prog.</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cierre')" ${tableState.visibleCols.cierre ? 'checked' : ''} class="rounded text-sky-600"> Cierre Real</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('nota')" ${tableState.visibleCols.nota ? 'checked' : ''} class="rounded text-sky-600"> Nota</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad (Auto)</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado Op.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO</label>
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
                     </div>
@@ -113,13 +117,16 @@ export function renderTabla(container) {
                     <tr>
                         ${tableState.visibleCols.codigo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')">Código ${getSortIcon('codigo_contenedor')}</th>` : ''}
                         ${tableState.visibleCols.actividad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')">Actividad ${getSortIcon('actividad')}</th>` : ''}
-                        ${tableState.visibleCols.inicio ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')">Inicio Prog. ${getSortIcon('fecha_inicio_programado')}</th>` : ''}
                         ${tableState.visibleCols.grupo ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')">Grupo ${getSortIcon('grupo')}</th>` : ''}
                         ${tableState.visibleCols.responsable ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')">Responsable ${getSortIcon('responsable_id')}</th>` : ''}
                         ${tableState.visibleCols.importancia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')">Importancia ${getSortIcon('importancia')}</th>` : ''}
                         ${tableState.visibleCols.urgencia ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')">Urgencia ${getSortIcon('urgencia')}</th>` : ''}
-                        ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Criticidad ${getSortIcon('criticidad')}</th>` : ''}
                         ${tableState.visibleCols.estado ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')">Estado ${getSortIcon('estado')}</th>` : ''}
+                        ${tableState.visibleCols.inicio ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')">Inicio Prog. ${getSortIcon('fecha_inicio_programado')}</th>` : ''}
+                        ${tableState.visibleCols.fin ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_fin')">Fin Prog. ${getSortIcon('fecha_fin')}</th>` : ''}
+                        ${tableState.visibleCols.cierre ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')">Cierre Real ${getSortIcon('fecha_cierre')}</th>` : ''}
+                        ${tableState.visibleCols.nota ? `<th class="p-3">Nota</th>` : ''}
+                        ${tableState.visibleCols.criticidad ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')">Criticidad ${getSortIcon('criticidad')}</th>` : ''}
                         ${tableState.visibleCols.cde ? `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')">CDE ISO ${getSortIcon('estado_cde')}</th>` : ''}
                         ${visiblePropDefs.map(pd => `<th class="p-3 cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</th>`).join('')}
                         <th class="p-3 text-center">Acciones</th>
@@ -133,16 +140,21 @@ export function renderTabla(container) {
                         <tr class="hover:bg-slate-50 transition">
                             ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500">${t.codigo_contenedor || '–'}</td>` : ''}
                             ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 max-w-[250px] truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
-                            ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
                             ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px]">${escapeHtml(t.grupo || '-')}</td>` : ''}
                             ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px]">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
                             
                             ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px]">${t.importancia || 'Medio'}</td>` : ''}
                             ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px]">${t.urgencia || 'Medio'}</td>` : ''}
-                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)}">${crit}</td>` : ''}
-                            
                             ${tableState.visibleCols.estado ? `<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
+                            
+                            ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
+                            ${tableState.visibleCols.fin ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
+                            ${tableState.visibleCols.cierre ? `<td class="p-3 text-slate-500 text-[11px]">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
+                            ${tableState.visibleCols.nota ? `<td class="p-3 text-slate-500 text-[11px] max-w-[200px] truncate" title="${escapeHtml(t.nota || '')}">${escapeHtml(t.nota || '–')}</td>` : ''}
+
+                            ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)}">${crit}</td>` : ''}
                             ${tableState.visibleCols.cde ? `<td class="p-3">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
+                            
                             ${visiblePropDefs.map(pd => {
                                 const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
                                 let displayVal = '-';
@@ -154,6 +166,7 @@ export function renderTabla(container) {
                                 }
                                 return `<td class="p-3 text-slate-600 text-[11px]">${displayVal}</td>`;
                             }).join('')}
+                            
                             <td class="p-3 text-center whitespace-nowrap">
                                 ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
                                 ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
