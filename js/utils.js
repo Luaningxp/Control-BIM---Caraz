@@ -35,24 +35,23 @@ export const isCerrado = (t) => t.estado === 'Cerrado';
 
 export const daysToDeadline = (t) => !t.fecha_fin ? null : Math.round((new Date(t.fecha_fin + 'T00:00:00') - today()) / DAY);
 
-// --- LÓGICA DE EISENHOWER ---
 export const isUrgente = (t) => {
     if (isCerrado(t) || !t.fecha_fin) return false;
-    return daysToDeadline(t) <= 7; // Vence en 7 días o ya venció
+    return daysToDeadline(t) <= 7;
 };
 
 export const isImportante = (t) => {
+    if (isCerrado(t)) return false;
     return t.importancia === 'Muy alto' || t.importancia === 'Alto';
 };
 
-// Cálculo automático de criticidad para la tabla
 export const getCriticidad = (t) => {
     const urg = isUrgente(t);
     const imp = isImportante(t);
-    if (urg && imp) return 'Muy alto'; // Hacer ya
-    if (!urg && imp) return 'Alto';    // Programar
-    if (urg && !imp) return 'Medio';   // Delegar
-    return 'Bajo';                     // Eliminar / Posponer
+    if (urg && imp) return 'Muy alto';
+    if (!urg && imp) return 'Alto';
+    if (urg && !imp) return 'Medio';
+    return 'Bajo';
 };
 
 export const semaforo = (t) => {
@@ -66,16 +65,13 @@ export const semaforo = (t) => {
 
 export const nombreResponsable = (t, perfiles) => {
     let email = '';
-    
     if (t.responsable_id) {
         const p = perfiles.find(p => p.id === t.responsable_id);
         if (p) email = p.email;
     }
-    
     if (!email) email = t.responsable || '';
     if (!email) return 'Sin asignar';
 
-    // Convertir "manuel.llenque@..." a "Manuel Llenque"
     const nombreBase = email.split('@')[0];
     return nombreBase
         .replace(/[._-]/g, ' ')
@@ -86,8 +82,31 @@ export const nombreResponsable = (t, perfiles) => {
         .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
         .join(' ');
 };
+
 export const critColor = (c) => {
     return c === 'Muy alto' ? 'text-red-600' :
            c === 'Alto' ? 'text-orange-600' :
            c === 'Medio' ? 'text-amber-600' : 'text-slate-500';
 };
+
+// --- HELPERS PARA AVATARES Y NOMBRES ---
+export function nombreFormateado(p) {
+    if (!p || !p.email) return '';
+    const base = p.email.split('@')[0];
+    return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
+        .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
+}
+
+export function getIniciales(nombre) {
+    if (!nombre) return '?';
+    const partes = nombre.trim().split(' ');
+    return (partes[0]?.[0] || '') + (partes[1]?.[0] || '');
+}
+
+export function colorAvatar(seed) {
+    const colores = ['bg-sky-500', 'bg-teal-500', 'bg-amber-500', 'bg-rose-500', 'bg-violet-500', 'bg-emerald-500'];
+    let hash = 0;
+    const str = String(seed);
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return colores[Math.abs(hash) % colores.length];
+}
