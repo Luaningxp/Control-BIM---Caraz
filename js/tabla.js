@@ -244,7 +244,7 @@ export function openModal() {
     grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     
     const rsSel = document.getElementById('task-responsable'); 
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+   rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
     renderCustomProps(null);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
