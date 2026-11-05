@@ -53,7 +53,6 @@ function inicializarBuscadorRecursos() {
     const dropdown = document.getElementById('recursos-dropdown');
     if (!input || !dropdown) return;
 
-    // Clonar para eliminar listeners viejos
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
@@ -68,7 +67,6 @@ function inicializarBuscadorRecursos() {
 
     function mostrarDropdownRecursos(query) {
         const q = (query || '').toLowerCase();
-        // Solo modeladores
         const disponibles = state.perfilesCache.filter(p => {
             const esModelador = (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
             if (!esModelador) return false;
@@ -121,7 +119,8 @@ let tableState = {
         importancia: true, urgencia: true, criticidad: true, 
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
     },
-    visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
+    visibleProps: {}, 
+    filters: { search: '', grupo: '', responsable: '', recursos: '' }, // <-- Filtro de recursos
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
@@ -145,6 +144,14 @@ function getProcessedTasks() {
     }
     if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
     if (tableState.filters.responsable) result = result.filter(t => t.responsable_id === tableState.filters.responsable);
+    // Filtro de recursos
+    if (tableState.filters.recursos) {
+        result = result.filter(t => 
+            state.actividadRecursosCache.some(r => 
+                r.pendiente_id === t.id && r.usuario_id === tableState.filters.recursos
+            )
+        );
+    }
 
     result.sort((a, b) => {
         let valA = a[tableState.sortBy] || '';
@@ -219,6 +226,9 @@ export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
+    const recursosOpts = state.perfilesCache.filter(p => 
+        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
+    );
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
     const estadoColors = {
@@ -239,6 +249,7 @@ export function renderTabla(container) {
                 </div>
                 <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los grupos</option>${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}</select>
                 <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los responsables</option>${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select>
+                <select id="tbl-fil-recursos" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los recursos</option>${recursosOpts.map(p => `<option value="${p.id}" ${tableState.filters.recursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}</select>
             </div>
             <div class="flex items-center gap-2">
                 <div class="relative">
@@ -266,7 +277,7 @@ export function renderTabla(container) {
 
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
-                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1400px;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1500px;">
                     <thead class="sticky top-0 z-10 shadow-sm">
                         <tr class="bg-slate-50">
                             ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
@@ -351,6 +362,7 @@ export function renderTabla(container) {
     document.getElementById('tbl-search').addEventListener('input', (e) => { tableState.filters.search = e.target.value; setTimeout(() => window.renderView(), 300); });
     document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => { tableState.filters.grupo = e.target.value; window.renderView(); });
     document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
+    document.getElementById('tbl-fil-recursos').addEventListener('change', (e) => { tableState.filters.recursos = e.target.value; window.renderView(); });
 }
 
 window.toggleSort = toggleSort; 
