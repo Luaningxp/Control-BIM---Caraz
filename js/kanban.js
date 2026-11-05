@@ -10,6 +10,7 @@ let kanbanState = {
     filterGrupo: '', 
     filterResp: '', 
     filterRecursos: '',
+    filterEstado: '', 
     iniDesde: '', 
     iniHasta: '', 
     finDesde: '', 
@@ -48,6 +49,7 @@ export function renderKanban(container) {
         const matchRecursos = !kanbanState.filterRecursos || state.actividadRecursosCache.some(r => 
             r.pendiente_id === t.id && r.usuario_id === kanbanState.filterRecursos
         );
+        const matchEstado = !kanbanState.filterEstado || t.estado === kanbanState.filterEstado;
         const matchIniDesde = !kanbanState.iniDesde || (t.fecha_inicio_programado && t.fecha_inicio_programado >= kanbanState.iniDesde);
         const matchIniHasta = !kanbanState.iniHasta || (t.fecha_inicio_programado && t.fecha_inicio_programado <= kanbanState.iniHasta);
         const matchFinDesde = !kanbanState.finDesde || (t.fecha_fin && t.fecha_fin >= kanbanState.finDesde);
@@ -55,7 +57,7 @@ export function renderKanban(container) {
         const matchVencidas = !kanbanState.soloVencidas || semaforo(t) === 'Vencida';
         const matchPorVencer = !kanbanState.soloPorVencer || semaforo(t) === 'Por vencer';
         const matchSinFecha = !kanbanState.soloSinFecha || semaforo(t) === 'Sin fecha';
-        return matchSearch && matchGrupo && matchResp && matchRecursos &&
+        return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
                matchIniDesde && matchIniHasta && matchFinDesde && matchFinHasta &&
                matchVencidas && matchPorVencer && matchSinFecha;
     });
@@ -151,7 +153,7 @@ export function renderKanban(container) {
         </div>
     `;
 
-    // Drawer de filtros
+    // Drawer de filtros del Kanban
     if (!document.getElementById('kanban-filter-drawer')) {
         const drawerHtml = `
             <div id="kanban-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleKanbanFilterDrawer()"></div>
@@ -184,6 +186,15 @@ export function renderKanban(container) {
                             ${recursosOpts.map(p => `<option value="${p.id}" ${kanbanState.filterRecursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}
                         </select>
                     </div>
+                    <div>
+    <label class="block font-semibold text-slate-600 mb-1">Estado</label>
+    <select id="kb-drawer-estado" class="inp" onchange="window.applyKanbanFilter('filterEstado', this.value)">
+        <option value="">Todos los estados</option>
+        ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => 
+            `<option value="${e}" ${kanbanState.filterEstado === e ? 'selected' : ''}>${e}</option>`
+        ).join('')}
+    </select>
+</div>
 
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
@@ -264,7 +275,7 @@ window.applyKanbanFilter = function(key, value) {
 
 window.clearKanbanFilters = function() {
     kanbanState = { 
-        search: '', filterGrupo: '', filterResp: '', filterRecursos: '',
+        search: '', filterGrupo: '', filterResp: '', filterRecursos: '', filterEstado: '',
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false
     };
