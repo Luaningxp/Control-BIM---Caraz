@@ -1,8 +1,7 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
 import { 
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar,
-    confirmDelete // <-- Nuevo
+    confirmDelete
 } from './utils.js';
 
 function isUserInvolved(t) {
