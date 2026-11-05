@@ -10,10 +10,10 @@ let tableState = {
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
-    // GUARDAMOS LOS ANCHOS DE LAS COLUMNAS AQUÍ
     colWidths: {
         actividad: 250, grupo: 120, responsable: 150, importancia: 90, 
-        urgencia: 90, estado: 90, inicio: 90, fin: 90, cierre: 90, nota: 200
+        urgencia: 90, estado: 90, inicio: 90, fin: 90, cierre: 90, nota: 200,
+        codigo: 100, criticidad: 100, cde: 100
     }
 };
 
@@ -86,10 +86,9 @@ function initResize(e, colKey) {
 function doResize(e) {
     if (!isResizing) return;
     const diff = e.pageX - startX;
-    const newWidth = Math.max(50, startWidth + diff); // Ancho mínimo de 50px
+    const newWidth = Math.max(50, startWidth + diff);
     tableState.colWidths[currentCol] = newWidth;
     
-    // Actualizamos el ancho de la columna visualmente sin re-renderizar toda la tabla
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
     if (th) {
         th.style.width = `${newWidth}px`;
@@ -111,7 +110,6 @@ export function renderTabla(container) {
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: p.email.split('@')[0] }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
-    // Helper para inyectar el estilo de ancho y el divisor
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-10" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0";
@@ -151,7 +149,6 @@ export function renderTabla(container) {
             </div>
         </div>
 
-        <!-- CONTENEDOR CON SCROLL HORIZONTAL Y ENCABEZADO FIJO -->
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
             <div class="overflow-x-auto max-h-[70vh] overflow-y-auto custom-scrollbar relative">
                 <table class="w-full text-left text-xs table-fixed">
@@ -222,5 +219,166 @@ export function renderTabla(container) {
     document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
 }
 
-window.toggleSort = toggleSort; window.toggleCol = toggleCol; window.toggleProp = toggleProp; window.toggleColMenu = toggleColMenu;
+window.toggleSort = toggleSort; 
+window.toggleCol = toggleCol; 
+window.toggleProp = toggleProp; 
+window.toggleColMenu = toggleColMenu;
 window.initResize = initResize;
+
+// --- FUNCIONES DE LOS MODALES ---
+
+export function openModal() {
+    if (!state.isAdmin && !state.isCoordinador) return;
+    document.getElementById('modal-title').innerText = "Nuevo Contenedor";
+    
+    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    
+    document.getElementById('task-importancia').value = 'Medio';
+    document.getElementById('task-urgencia').value = 'Medio'; 
+    document.getElementById('task-estado').value = 'No iniciado';
+    
+    const grSel = document.getElementById('task-grupo'); 
+    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+    
+    const rsSel = document.getElementById('task-responsable'); 
+    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    
+    renderCustomProps(null);
+    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
+}
+
+export function editTask(id) {
+    const t = state.tasksCache.find(x => x.id === id);
+    if (!t || !canEdit(t)) return;
+    
+    document.getElementById('modal-title').innerText = "Editar Contenedor";
+    document.getElementById('task-id').value = t.id;
+    document.getElementById('task-actividad').value = t.actividad || '';
+    
+    const impEl = document.getElementById('task-importancia');
+    if (impEl) impEl.value = t.importancia || 'Medio';
+    
+    const urgEl = document.getElementById('task-urgencia');
+    if (urgEl) urgEl.value = t.urgencia || 'Medio';
+
+    const iniEl = document.getElementById('task-fecha-inicio');
+    if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
+
+    document.getElementById('task-estado').value = t.estado || 'No iniciado';
+    document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
+    document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
+    document.getElementById('task-nota').value = t.nota || '';
+    
+    const grSel = document.getElementById('task-grupo'); 
+    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
+    grSel.value = t.grupo || '';
+    
+    const rsSel = document.getElementById('task-responsable'); 
+    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); 
+    rsSel.value = t.responsable_id || '';
+    
+    renderCustomProps(t.id);
+    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
+}
+
+function renderCustomProps(pendienteId) {
+    const container = document.getElementById('custom-props-container');
+    const inputs = document.getElementById('custom-props-inputs');
+    if (state.propDefsCache.length === 0) { container.classList.add('hidden'); return; }
+    container.classList.remove('hidden');
+    inputs.innerHTML = state.propDefsCache.map(pd => {
+        let valor = '';
+        if (pendienteId) {
+            const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
+            if (pv) valor = pd.tipo === 'numero' ? (pv.valor_numero !== null ? pv.valor_numero : '') : pd.tipo === 'fecha' ? (pv.valor_fecha || '') : pd.tipo === 'booleano' ? pv.valor_booleano : (pv.valor_texto || '');
+        }
+        let inputHtml = '';
+        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${escapeHtml(valor)}">`;
+        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor}">`;
+        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor}">`;
+        else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
+        else if (pd.tipo === 'seleccion') {
+            const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
+            inputHtml = `<select class="inp custom-prop-input" data-pid="${pd.id}" data-type="seleccion"><option value="">— Seleccionar —</option>${opts}</select>`;
+        }
+        return `<div><label class="block font-semibold text-slate-600 mb-1">${escapeHtml(pd.nombre)} ${pd.requerido ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
+    }).join('');
+}
+
+export function closeModal() { 
+    document.getElementById('modal-task').classList.add('hidden'); 
+    document.getElementById('modal-task').classList.remove('flex'); 
+}
+
+export async function saveTask(e) {
+    e.preventDefault();
+    const id = document.getElementById('task-id').value;
+    const respId = document.getElementById('task-responsable').value || null;
+    const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
+    
+    const payload = {
+        actividad: document.getElementById('task-actividad').value,
+        grupo: document.getElementById('task-grupo').value || null,
+        responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
+        responsable_id: respId,
+        importancia: document.getElementById('task-importancia').value,
+        urgencia: document.getElementById('task-urgencia').value,
+        estado: document.getElementById('task-estado').value,
+        fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
+        fecha_fin: document.getElementById('task-fecha-fin').value || null,
+        fecha_cierre: document.getElementById('task-fecha-cierre').value || null,
+        nota: document.getElementById('task-nota').value
+    };
+    let taskId = id;
+    if (id) {
+        const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
+        if (error) { toast('Error: ' + error.message); return; }
+    } else {
+        payload.estado_cde = 'WIP'; payload.codigo_aptitud = 'S0'; payload.user_id = state.currentUser.id;
+        const { data, error } = await supabaseClient.from('pendientes_bim').insert([payload]).select();
+        if (error) { toast('Error: ' + error.message); return; }
+        taskId = data[0].id;
+    }
+    const propInputs = document.querySelectorAll('.custom-prop-input');
+    for (const input of propInputs) {
+        const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
+        let val = input.type === 'checkbox' ? input.checked : input.value;
+        if (val === '' || val === false) val = null;
+        const existente = state.propValsCache.find(v => v.pendiente_id === parseInt(taskId) && v.propiedad_id === pid);
+        const propPayload = { pendiente_id: parseInt(taskId), propiedad_id: pid, valor_texto: null, valor_numero: null, valor_fecha: null, valor_booleano: null };
+        if (val !== null) {
+            if (type === 'texto' || type === 'seleccion') propPayload.valor_texto = val;
+            else if (type === 'numero') propPayload.valor_numero = parseFloat(val);
+            else if (type === 'fecha') propPayload.valor_fecha = val;
+            else if (type === 'booleano') propPayload.valor_booleano = val;
+        }
+        if (existente) await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
+        else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
+    }
+    closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
+}
+
+export async function deleteTask(id) {
+    if (!canDelete()) return; if (!confirm("¿Eliminar este contenedor?")) return;
+    const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
+    if (error) { toast('Error: ' + error.message); return; }
+    await fetchAll(); window.renderView();
+}
+
+export function openModalCDE(id) {
+    if (!canTransition()) return;
+    state.cdeTargetId = id; document.getElementById('cde-current').innerText = `Contenedor #${id}`; document.getElementById('cde-estado').value = 'Shared'; document.getElementById('cde-aptitud').value = 'S1'; document.getElementById('cde-comentario').value = '';
+    document.getElementById('modal-cde').classList.remove('hidden'); document.getElementById('modal-cde').classList.add('flex');
+}
+export function closeModalCDE() { document.getElementById('modal-cde').classList.add('hidden'); document.getElementById('modal-cde').classList.remove('flex'); state.cdeTargetId = null; }
+export async function confirmarTransicion() {
+    if (!state.cdeTargetId) return;
+    const estado = document.getElementById('cde-estado').value; const aptitud = document.getElementById('cde-aptitud').value || null; const comentario = document.getElementById('cde-comentario').value || null;
+    const { data, error } = await supabaseClient.rpc('transicionar_cde', { p_pendiente_id: state.cdeTargetId, p_estado_nuevo: estado, p_aptitud_nueva: aptitud, p_comentario: comentario });
+    if (error) { toast('Error RPC: ' + error.message); return; }
+    if (!data?.ok) { toast('Rechazado: ' + (data?.error || 'desconocida')); return; }
+    closeModalCDE(); await fetchAll(); window.renderView(); toast('Transición aplicada');
+}
