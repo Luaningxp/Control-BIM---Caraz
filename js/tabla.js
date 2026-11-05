@@ -126,12 +126,12 @@ let tableState = {
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
     },
     visibleProps: {}, 
-    filters: { 
-        search: '', grupo: '', responsable: '', recursos: '',
-        iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
-        cierreDesde: '', cierreHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
-    },
+   filters: { 
+    search: '', grupo: '', responsable: '', recursos: '', estado: '',
+    iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
+    cierreDesde: '', cierreHasta: '',
+    soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+},
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
@@ -149,6 +149,7 @@ export function canTransition() { return state.isAdmin || state.isCoordinador ||
 
 function getProcessedTasks() {
     let result = [...state.tasksCache];
+    
     if (tableState.filters.search) {
         const q = tableState.filters.search.toLowerCase();
         result = result.filter(t => (t.actividad || '').toLowerCase().includes(q) || (t.codigo_contenedor || '').toLowerCase().includes(q));
@@ -162,6 +163,7 @@ function getProcessedTasks() {
             )
         );
     }
+    if (tableState.filters.estado) result = result.filter(t => t.estado === tableState.filters.estado);
 
     // Filtros de fecha
     if (tableState.filters.iniDesde) result = result.filter(t => t.fecha_inicio_programado && t.fecha_inicio_programado >= tableState.filters.iniDesde);
@@ -420,6 +422,15 @@ export function renderTabla(container) {
                             ${recursosOpts.map(p => `<option value="${p.id}" ${tableState.filters.recursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}
                         </select>
                     </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
+                        <select id="drawer-fil-estado" class="inp" onchange="window.applyFilter('estado', this.value)">
+                            <option value="">Todos los estados</option>
+                            ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => 
+                                `<option value="${e}" ${tableState.filters.estado === e ? 'selected' : ''}>${e}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
 
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
@@ -520,7 +531,7 @@ window.applyFilter = function(key, value) {
 
 window.clearFilters = function() {
     tableState.filters = { 
-        search: '', grupo: '', responsable: '', recursos: '',
+        search: '', grupo: '', responsable: '', recursos: '', estado: '',
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         cierreDesde: '', cierreHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false
