@@ -1,6 +1,13 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, cdeBadge, nombreResponsable, critColor, toast, getCriticidad, fmtDate, daysToDeadline } from './utils.js';
 
+// Estado local para los filtros del Kanban
+let kanbanState = {
+    search: '',
+    filterGrupo: '',
+    filterResp: ''
+};
+
 export function renderKanban(container) {
     // Definimos las columnas del Kanban operativo
     const ESTADOS = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
@@ -13,21 +20,44 @@ export function renderKanban(container) {
         'Cerrado': { t: 'Cerrado', sub: 'Completado', color: 'teal', icon: 'fa-check-circle' }
     };
 
-    // Los operadores no pueden cerrar tareas directamente desde el Kanban (requiere fecha de cierre)
-    // ni mover tareas que no sean suyas.
-    const canMove = () => state.isAdmin || state.isCoordinador || state.isSupervisor || state.isModelador;
+    // Generar opciones para los filtros
+    const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
+    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
+
+    // Aplicar filtros a las tareas
+    const filteredTasks = state.tasksCache.filter(t => {
+        const matchSearch = !kanbanState.search || 
+            (t.actividad || '').toLowerCase().includes(kanbanState.search.toLowerCase()) ||
+            (t.codigo_contenedor || '').toLowerCase().includes(kanbanState.search.toLowerCase());
+        const matchGrupo = !kanbanState.filterGrupo || t.grupo === kanbanState.filterGrupo;
+        const matchResp = !kanbanState.filterResp || t.responsable_id === kanbanState.filterResp;
+        return matchSearch && matchGrupo && matchResp;
+    });
 
     container.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-            <div>
-                <h3 class="font-bold text-sm text-slate-800">Tablero Kanban Operativo</h3>
-                <p class="text-[11px] text-slate-500">Arrastra las tarjetas para cambiar el estado de la tarea.</p>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+            <div class="flex flex-1 items-center gap-2 w-full">
+                <div class="relative w-full max-w-xs">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="kb-search" placeholder="Buscar actividad..." value="${kanbanState.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                </div>
+                <select id="kb-fil-grupo" class="inp max-w-[150px] text-xs py-1.5">
+                    <option value="">Todos los grupos</option>
+                    ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${kanbanState.filterGrupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+                </select>
+                <select id="kb-fil-resp" class="inp max-w-[150px] text-xs py-1.5">
+                    <option value="">Todos los responsables</option>
+                    ${respOpts.map(r => `<option value="${r.id}" ${kanbanState.filterResp === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                </select>
             </div>
-            <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
+            <div class="flex items-center gap-2">
+                <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium px-2"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
+            </div>
         </div>
+
         <div class="grid grid-cols-1 md:grid-cols-5 gap-3 overflow-x-auto pb-2">
             ${ESTADOS.map(estado => {
-                const items = state.tasksCache.filter(t => t.estado === estado);
+                const items = filteredTasks.filter(t => t.estado === estado);
                 return `
                     <div class="kb-col bg-slate-100 rounded-lg p-2 min-w-[250px]" data-estado="${estado}"
                          ondragover="window.onDragOver(event)" ondragleave="window.onDragLeave(event)" ondrop="window.onDrop(event, '${estado}')">
@@ -46,9 +76,9 @@ export function renderKanban(container) {
                                 const crit = getCriticidad(t);
                                 const d = daysToDeadline(t);
                                 
-                                // Lógica de permisos: Solo el responsable o admin/coordinador pueden mover
+                                // Lógica de permisos: Solo el responsable o admin/coordinador/supervisor pueden mover
                                 const isOwner = t.user_id === state.currentUser.id;
-                                const canDragThis = canMove() && (state.isAdmin || state.isCoordinador || state.isSupervisor || isOwner);
+                                const canDragThis = state.isAdmin || state.isCoordinador || state.isSupervisor || (state.isModelador && isOwner);
 
                                 return `
                                 <div class="kb-card bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${canDragThis ? '' : 'opacity-70 cursor-not-allowed'}" 
@@ -82,6 +112,20 @@ export function renderKanban(container) {
             }).join('')}
         </div>
     `;
+
+    // Event listeners para los filtros
+    document.getElementById('kb-search').addEventListener('input', (e) => {
+        kanbanState.search = e.target.value;
+        window.renderView();
+    });
+    document.getElementById('kb-fil-grupo').addEventListener('change', (e) => {
+        kanbanState.filterGrupo = e.target.value;
+        window.renderView();
+    });
+    document.getElementById('kb-fil-resp').addEventListener('change', (e) => {
+        kanbanState.filterResp = e.target.value;
+        window.renderView();
+    });
 }
 
 function canEditTask(t) {
@@ -125,9 +169,8 @@ export async function onDrop(e, nuevoEstado) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || t.estado === nuevoEstado) return;
 
-    // REGLA DE NEGOCIO: Si se mueve a "Cerrado", debe tener fecha de cierre
+    // REGLA: Si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
-        // Abrimos el modal para que coloque la fecha
         toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
         window.editTask(id);
         return;
@@ -139,7 +182,6 @@ export async function onDrop(e, nuevoEstado) {
         updateData.fecha_cierre = null;
     }
 
-    // Actualizamos directamente en Supabase (sin RPC de CDE)
     const { error } = await supabaseClient.from('pendientes_bim').update(updateData).eq('id', id);
     
     if (error) { 
