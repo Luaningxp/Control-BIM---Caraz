@@ -58,23 +58,28 @@ function inicializarBuscadorRecursos() {
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
-    // Mostrar dropdown al hacer focus
-    nuevoInput.addEventListener('focus', () => mostrarDropdownRecursos(nuevoInput.value));
-    
-    // Mostrar dropdown al hacer clic (soluciona el problema del segundo clic)
-    nuevoInput.addEventListener('click', () => mostrarDropdownRecursos(nuevoInput.value));
-    
-    // Filtrar al escribir
+    // Mostrar dropdown al hacer clic o focus
+    nuevoInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mostrarDropdownRecursos(nuevoInput.value);
+    });
     nuevoInput.addEventListener('input', (e) => mostrarDropdownRecursos(e.target.value));
-    
-    // Prevenir que clics dentro del dropdown se propaguen
+
+    // Prevenir que el input pierda el foco al interactuar con el dropdown
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
-    dropdown.addEventListener('click', (e) => e.stopPropagation());
 
     // Cerrar al hacer clic fuera
-    document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
+    const handlerClickFuera = (e) => {
+        if (e.target !== nuevoInput && !dropdown.contains(e.target)) {
             dropdown.classList.add('hidden');
+        }
+    };
+    document.addEventListener('click', handlerClickFuera);
+
+    // Abrir si ya está abierto y se hace clic en el input
+    nuevoInput.addEventListener('mousedown', () => {
+        if (dropdown.classList.contains('hidden')) {
+            mostrarDropdownRecursos(nuevoInput.value);
         }
     });
 
