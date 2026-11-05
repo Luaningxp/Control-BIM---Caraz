@@ -65,11 +65,34 @@ export const semaforo = (t) => {
 };
 
 export const nombreResponsable = (t, perfiles) => {
+    let email = '';
+    
+    // Si la tarea tiene un ID de responsable, buscamos su correo en la lista de perfiles
     if (t.responsable_id) {
         const p = perfiles.find(p => p.id === t.responsable_id);
-        if (p) return p.cargo ? `${p.email.split('@')[0]} · ${p.cargo}` : p.email;
+        if (p) email = p.email;
     }
-    return t.responsable || 'Sin asignar';
+    
+    // Si no encontró por ID, usamos el texto guardado en el campo 'responsable'
+    if (!email) {
+        email = t.responsable || '';
+    }
+
+    // Si no hay ningún correo, retornamos "Sin asignar"
+    if (!email) return 'Sin asignar';
+
+    // LÓGICA DE FORMATEO:
+    // 1. Tomamos solo la parte antes del '@'
+    // 2. Reemplazamos puntos y guiones bajos por espacios
+    // 3. Capitalizamos cada palabra
+    const nombreBase = email.split('@')[0];
+    const nombreFormateado = nombreBase
+        .replace(/[._-]/g, ' ')
+        .split(' ')
+        .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase())
+        .join(' ');
+
+    return nombreFormateado;
 };
 
 export const critColor = (c) => {
