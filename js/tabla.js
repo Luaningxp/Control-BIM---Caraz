@@ -88,13 +88,22 @@ function stopResize() { isResizing = false; currentCol = null; document.removeEv
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-    // FILTRO DE RESPONSABLE USANDO NOMBRE FORMATEADO
-    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
+    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
+
+    // Colores para el dot del estado
+    const estadoColors = {
+        'No iniciado': 'bg-slate-400',
+        'En proceso': 'bg-sky-500',
+        'En espera': 'bg-amber-500',
+        'Reprogramado': 'bg-purple-500',
+        'Cerrado': 'bg-teal-500',
+        'Terminado': 'bg-emerald-500'
+    };
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-10" onmousedown="window.initResize(event, '${key}')"></div>`;
-    const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0";
+    const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50";
     
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
@@ -121,7 +130,6 @@ export function renderTabla(container) {
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('inicio')" ${tableState.visibleCols.inicio ? 'checked' : ''} class="rounded text-sky-600"> Inicio Prog.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('fin')" ${tableState.visibleCols.fin ? 'checked' : ''} class="rounded text-sky-600"> Fin Prog.</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cierre')" ${tableState.visibleCols.cierre ? 'checked' : ''} class="rounded text-sky-600"> Cierre Real</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('nota')" ${tableState.visibleCols.nota ? 'checked' : ''} class="rounded text-sky-600"> Nota</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('criticidad')" ${tableState.visibleCols.criticidad ? 'checked' : ''} class="rounded text-sky-600"> Criticidad (Auto)</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('cde')" ${tableState.visibleCols.cde ? 'checked' : ''} class="rounded text-sky-600"> CDE ISO</label>
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
@@ -134,23 +142,31 @@ export function renderTabla(container) {
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
             <div class="overflow-x-auto max-h-[70vh] overflow-y-auto custom-scrollbar relative">
                 <table class="w-full text-left text-xs table-fixed">
-                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold select-none sticky top-0 z-10 shadow-sm">
-                        <tr>
+                    <thead class="sticky top-0 z-10 shadow-sm">
+                        <!-- CABECERA DE GRUPOS -->
+                        <tr class="bg-slate-100 border-b border-slate-200">
+                            <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Información de la Actividad</th>
+                            <th colspan="3" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Prioridad</th>
+                            <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
+                        </tr>
+                        <!-- CABECERA DE COLUMNAS -->
+                        <tr class="bg-slate-50">
                             ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
                             ${tableState.visibleCols.actividad ? `<th data-col="actividad" style="${colStyle('actividad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')"><div class="pr-2">Actividad ${getSortIcon('actividad')}</div>${resizer('actividad')}</th>` : ''}
                             ${tableState.visibleCols.grupo ? `<th data-col="grupo" style="${colStyle('grupo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')"><div class="pr-2">Grupo ${getSortIcon('grupo')}</div>${resizer('grupo')}</th>` : ''}
                             ${tableState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')"><div class="pr-2">Responsable ${getSortIcon('responsable_id')}</div>${resizer('responsable')}</th>` : ''}
+                            
                             ${tableState.visibleCols.importancia ? `<th data-col="importancia" style="${colStyle('importancia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')"><div class="pr-2">Importancia ${getSortIcon('importancia')}</div>${resizer('importancia')}</th>` : ''}
                             ${tableState.visibleCols.urgencia ? `<th data-col="urgencia" style="${colStyle('urgencia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')"><div class="pr-2">Urgencia ${getSortIcon('urgencia')}</div>${resizer('urgencia')}</th>` : ''}
+                            ${tableState.visibleCols.criticidad ? `<th data-col="criticidad" style="${colStyle('criticidad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')"><div class="pr-2">Criticidad ${getSortIcon('criticidad')}</div>${resizer('criticidad')}</th>` : ''}
+                            
                             ${tableState.visibleCols.estado ? `<th data-col="estado" style="${colStyle('estado')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado')"><div class="pr-2">Estado ${getSortIcon('estado')}</div>${resizer('estado')}</th>` : ''}
-                            ${tableState.visibleCols.inicio ? `<th data-col="inicio" style="${colStyle('inicio')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')"><div class="pr-2">Inicio ${getSortIcon('fecha_inicio_programado')}</div>${resizer('inicio')}</th>` : ''}
+                            ${tableState.visibleCols.inicio ? `<th data-col="inicio" style="${colStyle('inicio')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_inicio_programado')"><div class="pr-2">Inicio Prog. ${getSortIcon('fecha_inicio_programado')}</div>${resizer('inicio')}</th>` : ''}
                             ${tableState.visibleCols.fin ? `<th data-col="fin" style="${colStyle('fin')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_fin')"><div class="pr-2">Fin Prog. ${getSortIcon('fecha_fin')}</div>${resizer('fin')}</th>` : ''}
                             ${tableState.visibleCols.cierre ? `<th data-col="cierre" style="${colStyle('cierre')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')"><div class="pr-2">Cierre Real ${getSortIcon('fecha_cierre')}</div>${resizer('cierre')}</th>` : ''}
-                            ${tableState.visibleCols.nota ? `<th data-col="nota" style="${colStyle('nota')}" class="${thClass}"><div class="pr-2">Nota</div>${resizer('nota')}</th>` : ''}
-                            ${tableState.visibleCols.criticidad ? `<th data-col="criticidad" style="${colStyle('criticidad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('criticidad')"><div class="pr-2">Criticidad ${getSortIcon('criticidad')}</div>${resizer('criticidad')}</th>` : ''}
                             ${tableState.visibleCols.cde ? `<th data-col="cde" style="${colStyle('cde')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')"><div class="pr-2">CDE ISO ${getSortIcon('estado_cde')}</div>${resizer('cde')}</th>` : ''}
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th class="p-3 text-center sticky right-0 bg-slate-100 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">Acciones</th>
+                            <th class="p-3 text-center sticky right-0 bg-slate-50 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -158,19 +174,25 @@ export function renderTabla(container) {
                         ${tasks.map(t => {
                             const crit = getCriticidad(t); 
                             return `
-                            <tr class="hover:bg-slate-50 transition group">
-                                ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[11px] text-slate-500 truncate">${t.codigo_contenedor || '–'}</td>` : ''}
-                                ${tableState.visibleCols.actividad ? `<td class="p-3 font-medium text-slate-900 truncate" title="${escapeHtml(t.actividad)}">${escapeHtml(t.actividad)}</td>` : ''}
+                            <tr class="hover:bg-slate-50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
+                                ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[10px] text-slate-400 truncate">${t.codigo_contenedor || '–'}</td>` : ''}
+                                ${tableState.visibleCols.actividad ? `
+                                    <td class="p-3 truncate" title="${escapeHtml(t.actividad)}">
+                                        <div class="font-medium text-slate-900 text-[12px]">${escapeHtml(t.actividad)}</div>
+                                        ${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}
+                                    </td>
+                                ` : ''}
                                 ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px] truncate" title="${escapeHtml(t.grupo || '')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
                                 ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px] truncate" title="${escapeHtml(nombreResponsable(t, state.perfilesCache))}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+                                
                                 ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.importancia || 'Medio'}</td>` : ''}
                                 ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.urgencia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.estado ? `<td class="p-3 truncate"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${escapeHtml(t.estado)}</span></td>` : ''}
+                                ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)} truncate">${crit}</td>` : ''}
+                                
+                                ${tableState.visibleCols.estado ? `<td class="p-3 truncate"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
                                 ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
                                 ${tableState.visibleCols.fin ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
                                 ${tableState.visibleCols.cierre ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.nota ? `<td class="p-3 text-slate-500 text-[11px] truncate" title="${escapeHtml(t.nota || '')}">${escapeHtml(t.nota || '–')}</td>` : ''}
-                                ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)} truncate">${crit}</td>` : ''}
                                 ${tableState.visibleCols.cde ? `<td class="p-3 truncate">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
                                 ${visiblePropDefs.map(pd => {
                                     const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
@@ -184,9 +206,9 @@ export function renderTabla(container) {
                                     return `<td class="p-3 text-slate-600 text-[11px] truncate">${displayVal}</td>`;
                                 }).join('')}
                                 <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10">
-                                    ${canEdit(t) ? `<button onclick="window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
-                                    ${canTransition() ? `<button onclick="window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
-                                    ${canDelete() ? `<button onclick="window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
+                                    ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
+                                    ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
+                                    ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
                                 </td>
                             </tr>
                         `}).join('')}
@@ -200,6 +222,7 @@ export function renderTabla(container) {
     document.getElementById('tbl-fil-grupo').addEventListener('change', (e) => { tableState.filters.grupo = e.target.value; window.renderView(); });
     document.getElementById('tbl-fil-resp').addEventListener('change', (e) => { tableState.filters.responsable = e.target.value; window.renderView(); });
 }
+
 
 window.toggleSort = toggleSort; 
 window.toggleCol = toggleCol; 
