@@ -123,7 +123,7 @@ window.exportToExcel = () => {
     XLSX.writeFile(wb, `Control_BIM_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
 
-// --- LÓGICA DE IMPORTAR ---
+// --- LÓGICA DE IMPORTAR (REEMPLAZAR) ---
 window.handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -139,7 +139,18 @@ window.handleFileUpload = (e) => {
             
             if (json.length === 0) { toast('El archivo está vacío o no tiene datos.'); return; }
             
-            if (!confirm(`Se encontraron ${json.length} filas. ¿Deseas importarlas a la base de datos?`)) return;
+            // ADVERTENCIA DE REEMPLAZO
+            const confirmMsg = `⚠️ ATENCIÓN: Se encontraron ${json.length} filas.\n\nAl continuar, se ELIMINARÁN todas las actividades actuales de la base de datos y se reemplazarán por las de este Excel.\n\n¿Estás seguro de continuar?`;
+            if (!confirm(confirmMsg)) return;
+
+            // 1. BORRAR TODAS LAS ACTIVIDADES ACTUALES
+            // Nota: Solo el admin puede hacer esto por RLS, lo cual es correcto.
+            const { error: delError } = await supabaseClient
+                .from('pendientes_bim')
+                .delete()
+                .neq('id', 0); // Truco para borrar todo
+            
+            if (delError) throw new Error("No se pudieron borrar los datos antiguos: " + delError.message);
 
             const parseDate = (val) => {
                 if (!val) return null;
@@ -151,6 +162,7 @@ window.handleFileUpload = (e) => {
                 return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
             };
 
+            // 2. PREPARAR LOS NUEVOS INSERTS
             const inserts = json.map(row => {
                 let respId = null;
                 const respEmail = row['Responsable'] || row['responsable'] || '';
@@ -183,6 +195,7 @@ window.handleFileUpload = (e) => {
                 };
             });
 
+            // 3. INSERTAR EN LOTES
             for (let i = 0; i < inserts.length; i += 50) {
                 const batch = inserts.slice(i, i + 50);
                 const { error } = await supabaseClient.from('pendientes_bim').insert(batch);
@@ -191,7 +204,7 @@ window.handleFileUpload = (e) => {
 
             await fetchAll();
             window.renderView();
-            toast(`¡${inserts.length} actividades importadas con éxito!`);
+            toast(`¡Base de datos reemplazada con ${inserts.length} actividades!`);
 
         } catch (err) {
             console.error(err);
