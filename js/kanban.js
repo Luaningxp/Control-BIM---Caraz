@@ -10,7 +10,7 @@ let kanbanState = {
     filterGrupo: '', 
     filterResp: '', 
     filterRecursos: '',
-    filterEstado: '', 
+    estadosOcultos: [],
     iniDesde: '', 
     iniHasta: '', 
     finDesde: '', 
@@ -49,7 +49,7 @@ export function renderKanban(container) {
         const matchRecursos = !kanbanState.filterRecursos || state.actividadRecursosCache.some(r => 
             r.pendiente_id === t.id && r.usuario_id === kanbanState.filterRecursos
         );
-        const matchEstado = !kanbanState.filterEstado || t.estado === kanbanState.filterEstado;
+       const matchEstado = kanbanState.estadosOcultos.length === 0 || !kanbanState.estadosOcultos.includes(t.estado);
         const matchIniDesde = !kanbanState.iniDesde || (t.fecha_inicio_programado && t.fecha_inicio_programado >= kanbanState.iniDesde);
         const matchIniHasta = !kanbanState.iniHasta || (t.fecha_inicio_programado && t.fecha_inicio_programado <= kanbanState.iniHasta);
         const matchFinDesde = !kanbanState.finDesde || (t.fecha_fin && t.fecha_fin >= kanbanState.finDesde);
@@ -186,14 +186,18 @@ export function renderKanban(container) {
                             ${recursosOpts.map(p => `<option value="${p.id}" ${kanbanState.filterRecursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}
                         </select>
                     </div>
-                    <div>
-    <label class="block font-semibold text-slate-600 mb-1">Estado</label>
-    <select id="kb-drawer-estado" class="inp" onchange="window.applyKanbanFilter('filterEstado', this.value)">
-        <option value="">Todos los estados</option>
-        ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => 
-            `<option value="${e}" ${kanbanState.filterEstado === e ? 'selected' : ''}>${e}</option>`
-        ).join('')}
-    </select>
+                   <div>
+    <label class="block font-semibold text-slate-600 mb-2">Ocultar estados</label>
+    <div class="space-y-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
+        ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => `
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="rounded text-red-600" 
+                       ${kanbanState.estadosOcultos.includes(e) ? 'checked' : ''}
+                       onchange="window.toggleKanbanEstadoOculto('${e}', this.checked)">
+                <span class="text-slate-700">${e}</span>
+            </label>
+        `).join('')}
+    </div>
 </div>
 
                     <div class="border-t border-slate-200 pt-4">
@@ -275,7 +279,8 @@ window.applyKanbanFilter = function(key, value) {
 
 window.clearKanbanFilters = function() {
     kanbanState = { 
-        search: '', filterGrupo: '', filterResp: '', filterRecursos: '', filterEstado: '',
+        search: '', filterGrupo: '', filterResp: '', filterRecursos: '',
+        estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false
     };
@@ -319,3 +324,13 @@ export async function onDrop(e, nuevoEstado) {
     toast(`Movido a ${nuevoEstado}`);
     await fetchAll(); window.renderView();
 }
+window.toggleKanbanEstadoOculto = function(estado, checked) {
+    if (checked) {
+        if (!kanbanState.estadosOcultos.includes(estado)) {
+            kanbanState.estadosOcultos.push(estado);
+        }
+    } else {
+        kanbanState.estadosOcultos = kanbanState.estadosOcultos.filter(e => e !== estado);
+    }
+    window.renderView();
+};
