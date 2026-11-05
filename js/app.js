@@ -62,10 +62,12 @@ async function initApp(user) {
     // Muestra el cargo real en la barra
     document.getElementById('role-display').innerText = state.currentCargo || 'Sin Cargo';
 
-    if (state.isAdmin || state.isCoordinador) {
-        document.getElementById('btn-new-task').classList.remove('hidden');
-        document.getElementById('tab-config-btn').classList.remove('hidden');
-    }
+  if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
+    document.getElementById('btn-new-task').classList.remove('hidden');
+}
+if (state.isAdmin) {
+    document.getElementById('tab-config-btn').classList.remove('hidden');
+}
     
     // Supervisores y Modeladores van a "Mi Trabajo" por defecto
     if (!state.isAdmin && !state.isCoordinador) {
