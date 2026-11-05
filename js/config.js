@@ -1,5 +1,6 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, toast } from './utils.js';
+import { escapeHtml, toast, confirmDelete } from './utils.js';
 
 export function renderConfig(container) {
     container.innerHTML = `
@@ -332,10 +333,21 @@ export async function saveGrupo(e) {
     closeGrupoModal(); await fetchAll(); window.renderView(); toast('Grupo guardado');
 }
 export async function deleteGrupo(id) {
-    if (!confirm('¿Eliminar este grupo?')) return;
+    const g = state.gruposCache.find(x => x.id === id);
+    if (!g) return;
+    
+    const confirmado = await confirmDelete({
+        title: 'Eliminar grupo',
+        message: `Vas a eliminar el grupo "${g.nombre}". Las actividades que lo usaban quedarán sin grupo. Esta acción no se puede deshacer.`
+    });
+    
+    if (!confirmado) return;
+    
     const { error } = await supabaseClient.from('grupos_bim').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    await fetchAll(); window.renderView();
+    await fetchAll(); 
+    window.renderView();
+    toast('Grupo eliminado');
 }
 export function openPropModal(id) {
     const pd = id ? state.propDefsCache.find(x => x.id === id) : null;
@@ -361,10 +373,21 @@ export async function saveProp(e) {
     closePropModal(); await fetchAll(); window.renderView(); toast('Parámetro guardado');
 }
 export async function deleteProp(id) {
-    if (!confirm('¿Eliminar este parámetro? Se borrarán los valores de todas las actividades.')) return;
+    const pd = state.propDefsCache.find(x => x.id === id);
+    if (!pd) return;
+    
+    const confirmado = await confirmDelete({
+        title: 'Eliminar parámetro personalizado',
+        message: `Vas a eliminar el parámetro "${pd.nombre}". Se borrarán también los valores guardados en todas las actividades. Esta acción no se puede deshacer.`
+    });
+    
+    if (!confirmado) return;
+    
     const { error } = await supabaseClient.from('propiedades_def').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    await fetchAll(); window.renderView();
+    await fetchAll(); 
+    window.renderView();
+    toast('Parámetro eliminado');
 }
 export function openCargoModal(userId) {
     const p = state.perfilesCache.find(x => x.id === userId);
