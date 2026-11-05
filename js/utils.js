@@ -110,6 +110,7 @@ export function colorAvatar(seed) {
     for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
     return colores[Math.abs(hash) % colores.length];
 }
+
 // --- MODAL DE CONFIRMACIÓN CON TEXTO ---
 let confirmCallback = null;
 
@@ -132,7 +133,6 @@ export function confirmDelete(options) {
         
         confirmCallback = resolve;
         
-        // Activar el botón solo si escribe "Eliminar"
         const checkInput = () => {
             if (input.value.trim() === 'Eliminar') {
                 btn.disabled = false;
@@ -143,7 +143,6 @@ export function confirmDelete(options) {
         };
         input.addEventListener('input', checkInput);
         
-        // Focus al abrir
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         setTimeout(() => input.focus(), 100);
