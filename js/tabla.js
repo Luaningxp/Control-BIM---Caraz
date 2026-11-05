@@ -4,15 +4,26 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-        codigo: false, actividad: true, grupo: true, responsable: true, 
+        codigo: true, // <-- Cambiado a true para que aparezca
+        actividad: true, grupo: true, responsable: true, 
         importancia: true, urgencia: true, criticidad: false, 
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
     colWidths: {
-        actividad: 250, grupo: 120, responsable: 150, importancia: 90, 
-        urgencia: 90, estado: 90, inicio: 90, fin: 90, cierre: 90, nota: 200,
-        codigo: 100, criticidad: 100, cde: 100
+        codigo: 90, // <-- Ancho inicial para el código
+        actividad: 300, 
+        grupo: 120, 
+        responsable: 150, 
+        importancia: 90, 
+        urgencia: 90, 
+        estado: 110, 
+        inicio: 90, 
+        fin: 90, 
+        cierre: 90, 
+        nota: 200,
+        criticidad: 100, 
+        cde: 100
     }
 };
 
@@ -139,7 +150,7 @@ export function renderTabla(container) {
             </div>
         </div>
 
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
             <div class="overflow-x-auto max-h-[70vh] overflow-y-auto custom-scrollbar relative">
                 <table class="w-full text-left text-xs table-fixed">
                     <thead class="sticky top-0 z-10 shadow-sm">
