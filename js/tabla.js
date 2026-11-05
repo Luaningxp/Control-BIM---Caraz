@@ -3,8 +3,22 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    // Agregamos 'inicio' a las columnas visibles
-    visibleCols: { codigo: true, actividad: true, inicio: true, grupo: true, responsable: true, importancia: true, urgencia: true, criticidad: true, estado: true, cde: true },
+    // Configuración por defecto: Solo las columnas solicitadas
+    visibleCols: { 
+        codigo: false, 
+        actividad: true, 
+        grupo: true, 
+        responsable: true, 
+        importancia: true, 
+        urgencia: true, 
+        criticidad: false, // Oculta por defecto
+        estado: true, 
+        inicio: true, 
+        fin: true, 
+        cierre: true, 
+        nota: true, 
+        cde: false // Oculta por defecto
+    },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' }
 };
 
