@@ -4,26 +4,17 @@ import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad,
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-        codigo: true, // <-- Cambiado a true para que aparezca
+        codigo: true, // Visible por defecto
         actividad: true, grupo: true, responsable: true, 
         importancia: true, urgencia: true, criticidad: false, 
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: false 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
     colWidths: {
-        codigo: 90, // <-- Ancho inicial para el código
-        actividad: 300, 
-        grupo: 120, 
-        responsable: 150, 
-        importancia: 90, 
-        urgencia: 90, 
-        estado: 110, 
-        inicio: 90, 
-        fin: 90, 
-        cierre: 90, 
-        nota: 200,
-        criticidad: 100, 
-        cde: 100
+        codigo: 100,
+        actividad: 300, grupo: 120, responsable: 140, importancia: 90, 
+        urgencia: 90, estado: 100, inicio: 90, fin: 90, cierre: 90, nota: 200,
+        criticidad: 100, cde: 100
     }
 };
 
@@ -34,13 +25,6 @@ export function canEdit(t) {
 }
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
-
-// Helper para nombre formateado en selects
-const nombreFormateado = (p) => {
-    const base = p.email.split('@')[0];
-    return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
-        .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
-};
 
 function getProcessedTasks() {
     let result = [...state.tasksCache];
@@ -82,19 +66,48 @@ function toggleProp(pid) { tableState.visibleProps[pid] = tableState.visibleProp
 function toggleColMenu() { tableState.showColMenu = !tableState.showColMenu; window.renderView(); }
 function getSortIcon(col) { if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>'; return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>'; }
 
+// --- SISTEMA DE REDIMENSIONADO ---
 let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
+
 function initResize(e, colKey) {
-    isResizing = true; currentCol = colKey; startX = e.pageX; startWidth = tableState.colWidths[colKey] || 100;
-    document.addEventListener('mousemove', doResize); document.addEventListener('mouseup', stopResize); e.preventDefault(); e.stopPropagation();
+    isResizing = true;
+    currentCol = colKey;
+    startX = e.pageX;
+    startWidth = tableState.colWidths[colKey] || 100;
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+    e.preventDefault();
+    e.stopPropagation();
 }
+
 function doResize(e) {
     if (!isResizing) return;
-    const newWidth = Math.max(50, startWidth + (e.pageX - startX));
+    const diff = e.pageX - startX;
+    const newWidth = Math.max(50, startWidth + diff);
     tableState.colWidths[currentCol] = newWidth;
+    
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
-    if (th) { th.style.width = `${newWidth}px`; th.style.minWidth = `${newWidth}px`; th.style.maxWidth = `${newWidth}px`; }
+    if (th) {
+        th.style.width = `${newWidth}px`;
+        th.style.minWidth = `${newWidth}px`;
+        th.style.maxWidth = `${newWidth}px`;
+    }
+    // Actualizamos los td de esa columna visualmente
+    document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => {
+        td.style.width = `${newWidth}px`;
+        td.style.minWidth = `${newWidth}px`;
+        td.style.maxWidth = `${newWidth}px`;
+    });
 }
-function stopResize() { isResizing = false; currentCol = null; document.removeEventListener('mousemove', doResize); document.removeEventListener('mouseup', stopResize); }
+
+function stopResize() {
+    isResizing = false;
+    currentCol = null;
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+}
 
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
@@ -102,7 +115,6 @@ export function renderTabla(container) {
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
-    // Colores para el dot del estado
     const estadoColors = {
         'No iniciado': 'bg-slate-400',
         'En proceso': 'bg-sky-500',
@@ -113,7 +125,7 @@ export function renderTabla(container) {
     };
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
-    const resizer = (key) => `<div class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-10" onmousedown="window.initResize(event, '${key}')"></div>`;
+    const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize hover:bg-sky-400 opacity-0 hover:opacity-100 transition-opacity z-20" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50";
     
     container.innerHTML = `
@@ -130,7 +142,7 @@ export function renderTabla(container) {
             <div class="flex items-center gap-2">
                 <div class="relative">
                     <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i></button>
-                    <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+                    <div class="${tableState.showColMenu ? 'block' : 'hidden'} absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-30 py-1 max-h-64 overflow-y-auto">
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('codigo')" ${tableState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('actividad')" ${tableState.visibleCols.actividad ? 'checked' : ''} class="rounded text-sky-600"> Actividad</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
@@ -150,17 +162,20 @@ export function renderTabla(container) {
             </div>
         </div>
 
+        <!-- CONTENEDOR DE LA TABLA -->
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
-            <div class="overflow-x-auto max-h-[70vh] overflow-y-auto custom-scrollbar relative">
-                <table class="w-full text-left text-xs table-fixed">
+            <!-- overflow visible y x-auto permite ver el contenido y hacer scroll sin cortar el redimensionado -->
+            <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
+                <table class="w-full text-left text-xs" style="table-layout: fixed;">
                     <thead class="sticky top-0 z-10 shadow-sm">
-                        <!-- CABECERA DE GRUPOS -->
+                        <!-- AGRUPADOR DE COLUMNAS -->
                         <tr class="bg-slate-100 border-b border-slate-200">
-                            <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Información de la Actividad</th>
+                            <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Información</th>
                             <th colspan="3" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-200">Prioridad</th>
-                            <th colspan="4" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
+                            <th colspan="5" class="p-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ejecución</th>
+                            <th class="p-1 bg-slate-100"></th> <!-- Espacio para el botón de acción -->
                         </tr>
-                        <!-- CABECERA DE COLUMNAS -->
+                        <!-- CABECERAS -->
                         <tr class="bg-slate-50">
                             ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
                             ${tableState.visibleCols.actividad ? `<th data-col="actividad" style="${colStyle('actividad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')"><div class="pr-2">Actividad ${getSortIcon('actividad')}</div>${resizer('actividad')}</th>` : ''}
@@ -177,7 +192,7 @@ export function renderTabla(container) {
                             ${tableState.visibleCols.cierre ? `<th data-col="cierre" style="${colStyle('cierre')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('fecha_cierre')"><div class="pr-2">Cierre Real ${getSortIcon('fecha_cierre')}</div>${resizer('cierre')}</th>` : ''}
                             ${tableState.visibleCols.cde ? `<th data-col="cde" style="${colStyle('cde')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('estado_cde')"><div class="pr-2">CDE ISO ${getSortIcon('estado_cde')}</div>${resizer('cde')}</th>` : ''}
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th class="p-3 text-center sticky right-0 bg-slate-50 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">Acciones</th>
+                            <th class="p-3 text-center sticky right-0 bg-slate-50 z-20 border-l border-slate-200 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)] w-[100px]">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -186,25 +201,25 @@ export function renderTabla(container) {
                             const crit = getCriticidad(t); 
                             return `
                             <tr class="hover:bg-slate-50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
-                                ${tableState.visibleCols.codigo ? `<td class="p-3 font-mono text-[10px] text-slate-400 truncate">${t.codigo_contenedor || '–'}</td>` : ''}
+                                ${tableState.visibleCols.codigo ? `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate" style="${colStyle('codigo')}">${t.codigo_contenedor || '–'}</td>` : ''}
                                 ${tableState.visibleCols.actividad ? `
-                                    <td class="p-3 truncate" title="${escapeHtml(t.actividad)}">
+                                    <td data-col="actividad" class="p-3 truncate" style="${colStyle('actividad')}" title="${escapeHtml(t.actividad)}">
                                         <div class="font-medium text-slate-900 text-[12px]">${escapeHtml(t.actividad)}</div>
                                         ${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}
                                     </td>
                                 ` : ''}
-                                ${tableState.visibleCols.grupo ? `<td class="p-3 text-slate-500 text-[11px] truncate" title="${escapeHtml(t.grupo || '')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
-                                ${tableState.visibleCols.responsable ? `<td class="p-3 text-slate-600 text-[11px] truncate" title="${escapeHtml(nombreResponsable(t, state.perfilesCache))}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+                                ${tableState.visibleCols.grupo ? `<td data-col="grupo" class="p-3 text-slate-500 text-[11px] truncate" style="${colStyle('grupo')}" title="${escapeHtml(t.grupo || '')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
+                                ${tableState.visibleCols.responsable ? `<td data-col="responsable" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('responsable')}" title="${escapeHtml(nombreResponsable(t, state.perfilesCache))}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
                                 
-                                ${tableState.visibleCols.importancia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.importancia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.urgencia ? `<td class="p-3 text-slate-600 text-[11px] truncate">${t.urgencia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.criticidad ? `<td class="p-3 font-semibold ${critColor(crit)} truncate">${crit}</td>` : ''}
+                                ${tableState.visibleCols.importancia ? `<td data-col="importancia" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>` : ''}
+                                ${tableState.visibleCols.urgencia ? `<td data-col="urgencia" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>` : ''}
+                                ${tableState.visibleCols.criticidad ? `<td data-col="criticidad" class="p-3 font-semibold ${critColor(crit)} truncate" style="${colStyle('criticidad')}">${crit}</td>` : ''}
                                 
-                                ${tableState.visibleCols.estado ? `<td class="p-3 truncate"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
-                                ${tableState.visibleCols.inicio ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.fin ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cierre ? `<td class="p-3 text-slate-500 text-[11px] truncate">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cde ? `<td class="p-3 truncate">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
+                                ${tableState.visibleCols.estado ? `<td data-col="estado" class="p-3 truncate" style="${colStyle('estado')}"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
+                                ${tableState.visibleCols.inicio ? `<td data-col="inicio" class="p-3 text-slate-500 text-[11px] truncate" style="${colStyle('inicio')}">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.fin ? `<td data-col="fin" class="p-3 text-slate-500 text-[11px] truncate" style="${colStyle('fin')}">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.cierre ? `<td data-col="cierre" class="p-3 text-slate-500 text-[11px] truncate" style="${colStyle('cierre')}">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
+                                ${tableState.visibleCols.cde ? `<td data-col="cde" class="p-3 truncate" style="${colStyle('cde')}">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
                                 ${visiblePropDefs.map(pd => {
                                     const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
                                     let displayVal = '-';
@@ -214,9 +229,9 @@ export function renderTabla(container) {
                                         else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? '<i class="fa-solid fa-check text-teal-600"></i>' : '<i class="fa-solid fa-xmark text-slate-300"></i>';
                                         else displayVal = pv.valor_texto || '-';
                                     }
-                                    return `<td class="p-3 text-slate-600 text-[11px] truncate">${displayVal}</td>`;
+                                    return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
                                 }).join('')}
-                                <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10">
+                                <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10 w-[100px]">
                                     ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
                                     ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
                                     ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
