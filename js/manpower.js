@@ -95,7 +95,6 @@ export function renderManpower(container) {
         state.isAdmin || state.isCoordinador || m.usuario_id === state.currentUser.id
     );
     
-    const totalPct = registros.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
     const registrosCount = registros.length;
 
     container.innerHTML = `
@@ -121,6 +120,7 @@ export function renderManpower(container) {
                         <th class="p-3">Actividad</th>
                         <th class="p-3">% Día</th>
                         <th class="p-3">Nota</th>
+                        ${state.isAdmin ? '<th class="p-3 text-center">Acciones</th>' : ''}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -134,8 +134,15 @@ export function renderManpower(container) {
                             <td class="p-3 text-slate-700">${escapeHtml(t ? t.actividad : 'General')}</td>
                             <td class="p-3 font-bold text-sky-600">${parseFloat(r.porcentaje_dia || 0).toFixed(1)} %</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
+                            ${state.isAdmin ? `
+                                <td class="p-3 text-center whitespace-nowrap">
+                                    <button onclick="window.deleteManpower(${r.id})" class="text-red-500 hover:text-red-700" title="Eliminar registro">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            ` : ''}
                         </tr>`;
-                    }).join('') || '<tr><td colspan="5" class="text-center py-6 text-slate-400">No hay registros de % aún.</td></tr>'}
+                    }).join('') || `<tr><td colspan="${state.isAdmin ? 6 : 5}" class="text-center py-6 text-slate-400">No hay registros de % aún.</td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -251,3 +258,14 @@ export async function saveManpower(e) {
     await fetchAll(); window.renderView();
     toast('Registro guardado');
 }
+window.deleteManpower = async function(id) {
+    if (!state.isAdmin) { toast('Solo los administradores pueden eliminar registros.'); return; }
+    if (!confirm("¿Eliminar este registro de horas? Esta acción no se puede deshacer.")) return;
+    
+    const { error } = await supabaseClient.from('manpower_registros').delete().eq('id', id);
+    if (error) { toast('Error: ' + error.message); return; }
+    
+    toast('Registro eliminado');
+    await fetchAll();
+    window.renderView();
+};
