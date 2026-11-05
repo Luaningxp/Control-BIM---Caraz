@@ -40,11 +40,18 @@
                                placeholder="usuario@consorciosuyay.com">
                     </div>
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Contraseña</label>
-                        <input type="password" id="login-password" required 
-                               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" 
-                               placeholder="••••••••">
-                    </div>
+    <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">Contraseña</label>
+    <div class="relative">
+        <input type="password" id="login-password" required 
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100" 
+               placeholder="••••••••">
+        <!-- BOTÓN DEL OJITO -->
+        <button type="button" onclick="togglePassword()" 
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition p-1">
+            <i class="fa-solid fa-eye" id="eye-icon"></i>
+        </button>
+    </div>
+</div>
                     <button type="submit" id="btn-login" 
                             class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-lg shadow-sky-600/30 flex justify-center items-center gap-2 mt-2">
                         <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar al CDE
