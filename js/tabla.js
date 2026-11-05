@@ -1,24 +1,131 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad, critColor } from './utils.js';
+import { 
+    escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
+    getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar 
+} from './utils.js';
 
-const nombreFormateado = (p) => {
-    const base = p.email.split('@')[0];
-    return base.replace(/[._-]/g, ' ').replace(/\d+/g, '').trim()
-        .split(' ').filter(x => x).map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
+// --- HELPERS DE RECURSOS ---
+function getRecursosDeTarea(pendienteId) {
+    return state.actividadRecursosCache
+        .filter(r => r.pendiente_id === pendienteId)
+        .map(r => state.perfilesCache.find(p => p.id === r.usuario_id))
+        .filter(Boolean);
+}
+
+let recursosSeleccionados = new Set();
+
+function renderRecursosChips(pendienteId) {
+    recursosSeleccionados.clear();
+    if (pendienteId) {
+        const existentes = state.actividadRecursosCache
+            .filter(r => r.pendiente_id === pendienteId)
+            .map(r => r.usuario_id);
+        existentes.forEach(id => recursosSeleccionados.add(id));
+    }
+    actualizarChipsUI();
+}
+
+function actualizarChipsUI() {
+    const box = document.getElementById('recursos-chips');
+    if (!box) return;
+    if (recursosSeleccionados.size === 0) {
+        box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin recursos asignados</span>';
+        return;
+    }
+    box.innerHTML = Array.from(recursosSeleccionados).map(uid => {
+        const p = state.perfilesCache.find(x => x.id === uid);
+        if (!p) return '';
+        const nombre = nombreFormateado(p);
+        return `
+            <span class="inline-flex items-center gap-1 bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                <div class="w-4 h-4 rounded-full ${colorAvatar(p.id)} text-white text-[8px] font-bold flex items-center justify-center">
+                    ${getIniciales(nombre).toUpperCase()}
+                </div>
+                ${escapeHtml(nombre)}
+                <button type="button" onclick="window.quitarRecurso('${uid}')" class="text-sky-600 hover:text-sky-900 ml-0.5">×</button>
+            </span>
+        `;
+    }).join('');
+}
+
+function inicializarBuscadorRecursos() {
+    const input = document.getElementById('recursos-search');
+    const dropdown = document.getElementById('recursos-dropdown');
+    if (!input || !dropdown) return;
+
+    // Clonar para eliminar listeners viejos
+    const nuevoInput = input.cloneNode(true);
+    input.parentNode.replaceChild(nuevoInput, input);
+
+    nuevoInput.addEventListener('focus', () => mostrarDropdownRecursos(nuevoInput.value));
+    nuevoInput.addEventListener('input', (e) => mostrarDropdownRecursos(e.target.value));
+
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    function mostrarDropdownRecursos(query) {
+        const q = (query || '').toLowerCase();
+        // Solo modeladores
+        const disponibles = state.perfilesCache.filter(p => {
+            const esModelador = (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
+            if (!esModelador) return false;
+            if (recursosSeleccionados.has(p.id)) return false;
+            if (q && !nombreFormateado(p).toLowerCase().includes(q)) return false;
+            return true;
+        });
+        
+        if (disponibles.length === 0) {
+            dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
+        } else {
+            dropdown.innerHTML = disponibles.map(p => {
+                const nombre = nombreFormateado(p);
+                return `
+                    <div onclick="window.agregarRecurso('${p.id}')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                        <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[10px] font-bold flex items-center justify-center">
+                            ${getIniciales(nombre).toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-slate-800">${escapeHtml(nombre)}</p>
+                            <p class="text-[10px] text-slate-500">${escapeHtml(p.cargo || 'Operador')}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        dropdown.classList.remove('hidden');
+    }
+}
+
+window.agregarRecurso = function(uid) {
+    recursosSeleccionados.add(uid);
+    actualizarChipsUI();
+    const input = document.getElementById('recursos-search');
+    if (input) input.value = '';
+    const dd = document.getElementById('recursos-dropdown');
+    if (dd) dd.classList.add('hidden');
 };
 
+window.quitarRecurso = function(uid) {
+    recursosSeleccionados.delete(uid);
+    actualizarChipsUI();
+};
+
+// --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-        codigo: true, actividad: true, grupo: true, responsable: true, 
+        codigo: true, actividad: true, grupo: true, responsable: true, recursos: true,
         importancia: true, urgencia: true, criticidad: true, 
         estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
     },
     visibleProps: {}, filters: { search: '', grupo: '', responsable: '' },
     colWidths: {
-        codigo: 100, actividad: 300, grupo: 120, responsable: 140, 
+        codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
-        inicio: 90, fin: 90, cierre: 90, nota: 200, cde: 100
+        inicio: 90, fin: 90, cierre: 90, nota: 180, cde: 100
     }
 };
 
@@ -80,12 +187,7 @@ function initResize(e, colKey) {
     startWidth = tableState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    
-    // Desactivar clics en los encabezados mientras se redimensiona
-    document.querySelectorAll('th').forEach(th => {
-        th.style.pointerEvents = 'none';
-    });
-    
+    document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'none'; });
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
     e.preventDefault();
@@ -97,40 +199,20 @@ function doResize(e) {
     const diff = e.pageX - startX;
     const newWidth = Math.max(50, startWidth + diff);
     tableState.colWidths[currentCol] = newWidth;
-    
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
-    if (th) {
-        th.style.width = `${newWidth}px`;
-        th.style.minWidth = `${newWidth}px`;
-        th.style.maxWidth = `${newWidth}px`;
-    }
-    document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => {
-        td.style.width = `${newWidth}px`;
-        td.style.minWidth = `${newWidth}px`;
-        td.style.maxWidth = `${newWidth}px`;
-    });
+    if (th) { th.style.width = `${newWidth}px`; th.style.minWidth = `${newWidth}px`; th.style.maxWidth = `${newWidth}px`; }
+    document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => { td.style.width = `${newWidth}px`; td.style.minWidth = `${newWidth}px`; td.style.maxWidth = `${newWidth}px`; });
     e.preventDefault();
 }
 
 function stopResize(e) {
     if (!isResizing) return;
-    
-    // Reactivar los clics en los encabezados
-    setTimeout(() => {
-        document.querySelectorAll('th').forEach(th => {
-            th.style.pointerEvents = 'auto';
-        });
-    }, 50); // Pequeño delay para asegurar que el click fantasma no se dispare
-    
-    isResizing = false;
-    currentCol = null;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
+    setTimeout(() => { document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'auto'; }); }, 50);
+    isResizing = false; currentCol = null;
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
     document.removeEventListener('mousemove', doResize);
     document.removeEventListener('mouseup', stopResize);
-    
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
 }
 
 export function renderTabla(container) {
@@ -158,7 +240,6 @@ export function renderTabla(container) {
                 <select id="tbl-fil-grupo" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los grupos</option>${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}</select>
                 <select id="tbl-fil-resp" class="inp max-w-[150px] text-xs py-1.5"><option value="">Todos los responsables</option>${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}</select>
             </div>
-            
             <div class="flex items-center gap-2">
                 <div class="relative">
                     <button onclick="window.toggleColMenu()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i></button>
@@ -167,6 +248,7 @@ export function renderTabla(container) {
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('actividad')" ${tableState.visibleCols.actividad ? 'checked' : ''} class="rounded text-sky-600"> Actividad</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('grupo')" ${tableState.visibleCols.grupo ? 'checked' : ''} class="rounded text-sky-600"> Grupo</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('responsable')" ${tableState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
+                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('recursos')" ${tableState.visibleCols.recursos ? 'checked' : ''} class="rounded text-sky-600"> Recursos</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('importancia')" ${tableState.visibleCols.importancia ? 'checked' : ''} class="rounded text-sky-600"> Importancia</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('urgencia')" ${tableState.visibleCols.urgencia ? 'checked' : ''} class="rounded text-sky-600"> Urgencia</label>
                         <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleCol('estado')" ${tableState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado</label>
@@ -184,13 +266,14 @@ export function renderTabla(container) {
 
         <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
-                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1200px;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1400px;">
                     <thead class="sticky top-0 z-10 shadow-sm">
                         <tr class="bg-slate-50">
                             ${tableState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('codigo_contenedor')"><div class="pr-2">Código ${getSortIcon('codigo_contenedor')}</div>${resizer('codigo')}</th>` : ''}
                             ${tableState.visibleCols.actividad ? `<th data-col="actividad" style="${colStyle('actividad')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('actividad')"><div class="pr-2">Actividad ${getSortIcon('actividad')}</div>${resizer('actividad')}</th>` : ''}
                             ${tableState.visibleCols.grupo ? `<th data-col="grupo" style="${colStyle('grupo')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('grupo')"><div class="pr-2">Grupo ${getSortIcon('grupo')}</div>${resizer('grupo')}</th>` : ''}
                             ${tableState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('responsable_id')"><div class="pr-2">Responsable ${getSortIcon('responsable_id')}</div>${resizer('responsable')}</th>` : ''}
+                            ${tableState.visibleCols.recursos ? `<th data-col="recursos" style="${colStyle('recursos')}" class="${thClass}">Recursos${resizer('recursos')}</th>` : ''}
                             
                             ${tableState.visibleCols.importancia ? `<th data-col="importancia" style="${colStyle('importancia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('importancia')"><div class="pr-2">Importancia ${getSortIcon('importancia')}</div>${resizer('importancia')}</th>` : ''}
                             ${tableState.visibleCols.urgencia ? `<th data-col="urgencia" style="${colStyle('urgencia')}" class="${thClass} cursor-pointer hover:bg-slate-200" onclick="window.toggleSort('urgencia')"><div class="pr-2">Urgencia ${getSortIcon('urgencia')}</div>${resizer('urgencia')}</th>` : ''}
@@ -221,6 +304,16 @@ export function renderTabla(container) {
                                 ` : ''}
                                 ${tableState.visibleCols.grupo ? `<td data-col="grupo" class="p-3 text-slate-500 text-[11px] truncate" style="${colStyle('grupo')}" title="${escapeHtml(t.grupo || '')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
                                 ${tableState.visibleCols.responsable ? `<td data-col="responsable" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('responsable')}" title="${escapeHtml(nombreResponsable(t, state.perfilesCache))}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+                                
+                                ${tableState.visibleCols.recursos ? `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}">
+                                    <div class="flex -space-x-2">
+                                        ${getRecursosDeTarea(t.id).map(p => `
+                                            <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white" title="${escapeHtml(nombreFormateado(p))}">
+                                                ${getIniciales(nombreFormateado(p)).toUpperCase()}
+                                            </div>
+                                        `).join('') || '<span class="text-slate-300 text-[10px] italic">Sin recursos</span>'}
+                                    </div>
+                                </td>` : ''}
                                 
                                 ${tableState.visibleCols.importancia ? `<td data-col="importancia" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>` : ''}
                                 ${tableState.visibleCols.urgencia ? `<td data-col="urgencia" class="p-3 text-slate-600 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>` : ''}
@@ -288,6 +381,9 @@ export function openModal() {
     if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
     renderCustomProps(null);
+    renderRecursosChips(null);
+    inicializarBuscadorRecursos();
+    
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
 
@@ -315,6 +411,9 @@ export function editTask(id) {
     if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
     
     renderCustomProps(t.id);
+    renderRecursosChips(t.id);
+    inicializarBuscadorRecursos();
+    
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
 }
 
@@ -376,6 +475,8 @@ export async function saveTask(e) {
         if (error) { toast('Error: ' + error.message); return; }
         taskId = data[0].id;
     }
+
+    // Guardar propiedades personalizadas
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
@@ -392,6 +493,18 @@ export async function saveTask(e) {
         if (existente) await supabaseClient.from('propiedades_valores').update(propPayload).eq('id', existente.id);
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
+
+    // Guardar recursos
+    await supabaseClient.from('actividad_recursos').delete().eq('pendiente_id', parseInt(taskId));
+    if (recursosSeleccionados.size > 0) {
+        const recursosData = Array.from(recursosSeleccionados).map(uid => ({
+            pendiente_id: parseInt(taskId),
+            usuario_id: uid
+        }));
+        const { error: errRec } = await supabaseClient.from('actividad_recursos').insert(recursosData);
+        if (errRec) { toast('Error al guardar recursos: ' + errRec.message); }
+    }
+
     closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
 }
 
