@@ -67,22 +67,19 @@ export const semaforo = (t) => {
 export const nombreResponsable = (t, perfiles) => {
     let email = '';
     
-    // Buscar por ID
     if (t.responsable_id) {
         const p = perfiles.find(p => p.id === t.responsable_id);
         if (p) email = p.email;
     }
     
-    // Si no hay ID, usar el campo de texto directo
     if (!email) email = t.responsable || '';
-
     if (!email) return 'Sin asignar';
 
-    // Formateo: manuel.llenque@... -> Manuel Llenque
+    // Convertir "manuel.llenque@..." a "Manuel Llenque"
     const nombreBase = email.split('@')[0];
     return nombreBase
         .replace(/[._-]/g, ' ')
-        .replace(/\d+/g, '') // Elimina números por si acaso
+        .replace(/\d+/g, '')
         .trim()
         .split(' ')
         .filter(p => p.length > 0)
