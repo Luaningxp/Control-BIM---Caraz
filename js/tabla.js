@@ -1,7 +1,6 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, getCriticidad, critColor } from './utils.js';
 
-// Estado local de la tabla
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
@@ -65,49 +64,24 @@ function toggleProp(pid) { tableState.visibleProps[pid] = tableState.visibleProp
 function toggleColMenu() { tableState.showColMenu = !tableState.showColMenu; window.renderView(); }
 function getSortIcon(col) { if (tableState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 ml-1 text-[10px]"></i>'; return tableState.sortDir === 'asc' ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>'; }
 
-// --- LÓGICA PARA REDIMENSIONAR COLUMNAS ---
-let isResizing = false;
-let currentCol = null;
-let startX = 0;
-let startWidth = 0;
-
+let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
 function initResize(e, colKey) {
-    isResizing = true;
-    currentCol = colKey;
-    startX = e.pageX;
-    startWidth = tableState.colWidths[colKey] || 100;
-    
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
-    e.preventDefault();
-    e.stopPropagation();
+    isResizing = true; currentCol = colKey; startX = e.pageX; startWidth = tableState.colWidths[colKey] || 100;
+    document.addEventListener('mousemove', doResize); document.addEventListener('mouseup', stopResize); e.preventDefault(); e.stopPropagation();
 }
-
 function doResize(e) {
     if (!isResizing) return;
-    const diff = e.pageX - startX;
-    const newWidth = Math.max(50, startWidth + diff);
+    const newWidth = Math.max(50, startWidth + (e.pageX - startX));
     tableState.colWidths[currentCol] = newWidth;
-    
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
-    if (th) {
-        th.style.width = `${newWidth}px`;
-        th.style.minWidth = `${newWidth}px`;
-        th.style.maxWidth = `${newWidth}px`;
-    }
+    if (th) { th.style.width = `${newWidth}px`; th.style.minWidth = `${newWidth}px`; th.style.maxWidth = `${newWidth}px`; }
 }
-
-function stopResize() {
-    isResizing = false;
-    currentCol = null;
-    document.removeEventListener('mousemove', doResize);
-    document.removeEventListener('mouseup', stopResize);
-}
+function stopResize() { isResizing = false; currentCol = null; document.removeEventListener('mousemove', doResize); document.removeEventListener('mouseup', stopResize); }
 
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: p.email.split('@')[0] }));
+    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
@@ -229,22 +203,23 @@ window.initResize = initResize;
 
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador) return;
-    document.getElementById('modal-title').innerText = "Nuevo Contenedor";
+    document.getElementById('modal-title').innerText = "Nueva Actividad";
     
     ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
     
-    document.getElementById('task-importancia').value = 'Medio';
-    document.getElementById('task-urgencia').value = 'Medio'; 
-    document.getElementById('task-estado').value = 'No iniciado';
+    const impEl = document.getElementById('task-importancia'); if (impEl) impEl.value = 'Medio';
+    const urgEl = document.getElementById('task-urgencia'); if (urgEl) urgEl.value = 'Medio'; 
+    const estEl = document.getElementById('task-estado'); if (estEl) estEl.value = 'No iniciado';
     
     const grSel = document.getElementById('task-grupo'); 
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+    if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     
+    // CORRECCIÓN: Usar nombreResponsable en el select
     const rsSel = document.getElementById('task-responsable'); 
-   rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
     renderCustomProps(null);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
@@ -254,7 +229,7 @@ export function editTask(id) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || !canEdit(t)) return;
     
-    document.getElementById('modal-title').innerText = "Editar Contenedor";
+    document.getElementById('modal-title').innerText = "Editar Actividad";
     document.getElementById('task-id').value = t.id;
     document.getElementById('task-actividad').value = t.actividad || '';
     
@@ -273,12 +248,11 @@ export function editTask(id) {
     document.getElementById('task-nota').value = t.nota || '';
     
     const grSel = document.getElementById('task-grupo'); 
-    grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
-    grSel.value = t.grupo || '';
+    if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
     
+    // CORRECCIÓN: Usar nombreResponsable en el select
     const rsSel = document.getElementById('task-responsable'); 
-    rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(p.email.split('@')[0])}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); 
-    rsSel.value = t.responsable_id || '';
+    if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreResponsable({ responsable_id: p.id }, state.perfilesCache))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
     
     renderCustomProps(t.id);
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
