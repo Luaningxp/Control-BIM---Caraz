@@ -300,18 +300,22 @@ function inicializarGantt(tareas) {
 }
 
 function dibujarLineaHoy(tasksData) {
-    const ganttBody = document.querySelector('.grid-body');
-    if (!ganttBody || tasksData.length === 0) return;
+    // 1. El contenedor correcto para el scroll lateral
+    const scrollWrapper = document.querySelector('.gantt-container') || document.getElementById('gantt-container');
+    const ganttContainer = document.getElementById('gantt-container');
+    
+    if (!scrollWrapper || !ganttContainer || tasksData.length === 0) return;
 
+    // Eliminar líneas anteriores
     const oldLine = document.getElementById('today-red-line');
     if (oldLine) oldLine.remove();
 
+    // 2. Fecha mínima con el margen de 2 días de Frappe
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
         if (!minDate || d < minDate) minDate = d;
     });
-    
     if (!minDate) return;
     minDate.setDate(minDate.getDate() - 2); 
 
@@ -321,6 +325,7 @@ function dibujarLineaHoy(tasksData) {
     
     if (diffDays < 0) return;
 
+    // 3. Cálculo del ancho (con el padding interno de Frappe)
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -328,17 +333,29 @@ function dibujarLineaHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
+    // Padding interno que aplica Frappe Gantt
+    const paddingLeft = 40; 
+    
+    // Ancho de la columna de nombres
+    const sideHeader = ganttContainer.querySelector('.side-header');
+    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 150;
+
+    // Posición final: Ancho de nombres + Días transcurridos + Padding de Frappe
+    const finalLeft = sidebarWidth + offsetPx + paddingLeft;
+
+    // 4. Crear la línea
     const line = document.createElement('div');
     line.id = 'today-red-line';
     
+    // Usamos top: 50px (debajo de las fechas) y bottom: 0 para que abarque todo el alto
     line.style.cssText = `
         position: absolute;
-        top: 0;
+        top: 50px;
         bottom: 0;
-        left: ${offsetPx}px;
+        left: ${finalLeft}px;
         width: 2px;
-        background-color: #ff0000;
-        z-index: 9999;
+        background-color: #ef4444;
+        z-index: 50;
         pointer-events: none;
     `;
     
@@ -348,20 +365,20 @@ function dibujarLineaHoy(tasksData) {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #ff0000;
+            background-color: #ef4444;
             color: white;
             font-size: 10px;
             font-weight: bold;
             padding: 2px 6px;
             border-radius: 4px;
             white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
         ">HOY</div>
     `;
 
-    ganttBody.style.position = 'relative';
-    ganttBody.style.minHeight = '100%';
-    
-    ganttBody.appendChild(line);
+    // 5. Inyectar en el contenedor que maneja el scroll
+    scrollWrapper.style.position = 'relative';
+    scrollWrapper.appendChild(line);
 }
 
 window.setGanttView = function(mode) {
