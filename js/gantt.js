@@ -331,20 +331,19 @@ function pintarColoresYHoy(tasksData) {
         if (progress) progress.style.fill = color;
     });
 
-    // 2. Línea de HOY
+    // 2. Configurar Línea de HOY
     const ganttWrapper = document.getElementById('gantt-wrapper');
     const ganttContainer = document.getElementById('gantt-container');
     if (!ganttWrapper || !ganttContainer) return;
 
-    // Eliminar contenedor anterior si existe (para no duplicar)
-    const oldContainer = document.getElementById('today-line-container');
-    if (oldContainer) oldContainer.remove();
+    // Eliminar capas anteriores
+    const oldOverlay = document.getElementById('gantt-today-overlay');
+    if (oldOverlay) oldOverlay.remove();
 
-    // Obtener la fecha REAL de inicio leyendo el primer "tick" del calendario
+    // Obtener la fecha real de inicio del gráfico (leyendo el primer tick)
     const ticks = ganttContainer.querySelectorAll('.tick');
     if (ticks.length === 0) return;
     
-    // Frappe guarda la fecha en el atributo data-date (ej. "2026-11-01")
     const firstTickDate = ticks[0].getAttribute('data-date');
     if (!firstTickDate) return;
 
@@ -352,14 +351,11 @@ function pintarColoresYHoy(tasksData) {
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    // Calcular días exactos transcurridos
+    // Calcular diferencia de días
     const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
     
-    // Ancho de la columna izquierda (donde están los nombres)
-    const sideHeader = ganttContainer.querySelector('.side-header');
-    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
-    
-    // Ancho de la columna según la vista
+    // Anchos
+    const sidebarWidth = 150; // Ancho por defecto de Frappe
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     
     let offsetPx = 0;
@@ -369,26 +365,25 @@ function pintarColoresYHoy(tasksData) {
 
     const finalLeft = sidebarWidth + offsetPx;
 
-    // 3. Crear un contenedor "espejo" que oculte lo que sobra pero permita el scroll
-    const lineContainer = document.createElement('div');
-    lineContainer.id = 'today-line-container';
+    // 3. Crear el "cristal" overlay que contiene la línea
+    const overlay = document.createElement('div');
+    overlay.id = 'gantt-today-overlay';
     
-    // Calculamos la altura del header para que no pase por encima
+    // Obtener la altura del header para no taparlo
     const header = ganttContainer.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
-    lineContainer.style.cssText = `
+    overlay.style.cssText = `
         position: absolute;
-        top: ${headerHeight}px; /* Empieza justo debajo del encabezado del calendario */
+        top: ${headerHeight}px;
         left: 0;
         right: 0;
         bottom: 0;
-        overflow: hidden; /* Evita que la línea se escape a los lados */
+        overflow: hidden; /* Evita que la línea se salga del gráfico */
         pointer-events: none;
         z-index: 50;
     `;
 
-    // 4. Crear la línea
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
@@ -400,7 +395,6 @@ function pintarColoresYHoy(tasksData) {
         pointer-events: none;
     `;
     
-    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -418,28 +412,25 @@ function pintarColoresYHoy(tasksData) {
         ">HOY</div>
     `;
 
-    lineContainer.appendChild(line);
-    
-    // Hacemos que el contenedor sea pariente del contenedor del gantt para posicionarlo bien
-    ganttWrapper.style.position = 'relative';
-    ganttWrapper.appendChild(lineContainer);
+    overlay.appendChild(line);
+    ganttWrapper.appendChild(overlay);
 
-    // 5. Sincronizar el scroll
-    // Buscamos el contenedor que realmente scrollea en Frappe
+    // 4. Sincronizar el scroll
     const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
     
-    // Removemos el evento anterior si existía
     if (window.todayScrollListener) {
         scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
     }
     
-    // Agregamos el nuevo
     window.todayScrollListener = () => {
-        const scrollLeft = scrollWrapper.scrollLeft;
-        // Movemos la línea en sentido contrario para que parezca que está quieta en su fecha
-        line.style.transform = `translateX(-${scrollLeft}px)`;
+        // Movemos la línea en sentido contrario al scroll
+        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
     };
+    
     scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+    
+    // Forzar un primer movimiento por si ya estaba scrolleado
+    window.todayScrollListener();
 }
 
 window.toggleGanttFilterDrawer = function() {
