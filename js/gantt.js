@@ -128,7 +128,7 @@ export function renderGantt(container) {
                     <p class="text-[11px] text-slate-400">Mostrando ${tareas.length} de ${state.tasksCache.length}</p>
                 </div>
 
-                <div id="gantt-wrapper" class="relative w-full overflow-x-auto">
+                <div id="gantt-wrapper" class="relative w-full">
                     <div id="gantt-container" class="relative"></div>
                 </div>
             </div>
@@ -300,23 +300,19 @@ function inicializarGantt(tareas) {
 }
 
 function dibujarLineaHoy(tasksData) {
-    const scrollWrapper = document.querySelector('.gantt-container') || document.getElementById('gantt-wrapper');
-    const svgElement = document.querySelector('#gantt-container svg');
-    
-    if (!scrollWrapper || !svgElement || tasksData.length === 0) return;
+    const ganttBody = document.querySelector('.grid-body');
+    if (!ganttBody || tasksData.length === 0) return;
 
-    // Eliminar líneas anteriores
-    const oldOverlay = document.getElementById('gantt-today-overlay');
-    if (oldOverlay) oldOverlay.remove();
+    const oldLine = document.getElementById('today-red-line');
+    if (oldLine) oldLine.remove();
 
-    // 1. Encontrar la fecha mínima igual que hace internamente Frappe Gantt (con padding de 2 días)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
         if (!minDate || d < minDate) minDate = d;
     });
-    if (!minDate) return;
     
+    if (!minDate) return;
     minDate.setDate(minDate.getDate() - 2); 
 
     const today = new Date();
@@ -325,7 +321,6 @@ function dibujarLineaHoy(tasksData) {
     
     if (diffDays < 0) return;
 
-    // 2. Calcular los píxeles desde el inicio del SVG
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -333,62 +328,69 @@ function dibujarLineaHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // El SVG de Frappe Gantt ya incluye el espacio de la barra lateral de nombres a la izquierda
-    const svgWidth = svgElement.getBoundingClientRect().width;
-    const totalSvgWidth = parseFloat(svgElement.getAttribute('width')) || svgWidth;
-    
-    // Posición final exacta dentro del SVG
-    const finalLeft = offsetPx + 40; // Ajuste por el padding inicial del gráfico de Frappe
-
-    // 3. Crear el contenedor Overlay asegurando que ocupe todo el ancho real del SVG
-    const overlay = document.createElement('div');
-    overlay.id = 'gantt-today-overlay';
-    
-    scrollWrapper.style.position = 'relative'; 
-    
-    overlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: ${Math.max(totalSvgWidth, scrollWrapper.scrollWidth)}px;
-        height: 100%;
-        pointer-events: none;
-        z-index: 50;
-    `;
-
-    // 4. Crear la línea roja
     const line = document.createElement('div');
+    line.id = 'today-red-line';
+    
     line.style.cssText = `
         position: absolute;
-        top: 50px; /* Debajo de los encabezados de fecha */
+        top: 0;
         bottom: 0;
-        left: ${finalLeft}px;
+        left: ${offsetPx}px;
         width: 2px;
-        background-color: #ef4444;
-        z-index: 50;
+        background-color: #ff0000;
+        z-index: 9999;
+        pointer-events: none;
     `;
     
-    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #ef4444;
+            background-color: #ff0000;
             color: white;
             font-size: 10px;
             font-weight: bold;
             padding: 2px 6px;
             border-radius: 4px;
             white-space: nowrap;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         ">HOY</div>
     `;
 
-    overlay.appendChild(line);
-    scrollWrapper.appendChild(overlay);
+    ganttBody.style.position = 'relative';
+    ganttBody.style.minHeight = '100%';
+    
+    ganttBody.appendChild(line);
 }
+
+window.setGanttView = function(mode) {
+    ganttState.viewMode = mode;
+    if (ganttState.currentGantt) {
+        ganttState.currentGantt.change_view_mode(mode);
+        setTimeout(() => {
+            const tareasFiltradas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
+            dibujarLineaHoy(tareasFiltradas);
+        }, 300);
+        window.renderView();
+    } else {
+        window.renderView();
+    }
+};
+
+window.toggleGanttFilterDrawer = function() {
+    const drawer = document.getElementById('gantt-filter-drawer');
+    const overlay = document.getElementById('gantt-filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
 
 window.applyGanttFilter = function(key, value) {
     ganttState[key] = value;
