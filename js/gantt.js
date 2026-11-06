@@ -302,23 +302,24 @@ function inicializarGantt(tareas) {
 // DIBUJO ROBUSTO DE LA LÍNEA DE HOY
 // DIBUJO ROBUSTO DE LA LÍNEA DE HOY
 function dibujarLineaHoy(tasksData) {
-    const ganttWrapper = document.getElementById('gantt-wrapper');
+    // 1. Encontrar el contenedor que hace el scroll dentro de Frappe Gantt
+    const scrollWrapper = document.querySelector('.gantt-container');
     const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
+    
+    if (!scrollWrapper || !ganttContainer || tasksData.length === 0) return;
 
+    // Eliminar líneas anteriores
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Encontrar la fecha más antigua (inicio del gráfico)
+    // 2. Calcular la fecha de inicio (la primera tarea menos los 2 días de padding)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
         if (!minDate || d < minDate) minDate = d;
     });
-    
     if (!minDate) return;
     
-    // Restar 2 días de padding por defecto de Frappe
     minDate.setDate(minDate.getDate() - 2); 
 
     const today = new Date();
@@ -327,6 +328,7 @@ function dibujarLineaHoy(tasksData) {
     
     if (diffDays < 0) return;
 
+    // 3. Calcular el Left en píxeles
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -334,41 +336,39 @@ function dibujarLineaHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // Ancho de la barra lateral
+    // Ancho de la columna izquierda de tareas
     const sideHeader = ganttContainer.querySelector('.side-header');
     const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
     
     const finalLeft = sidebarWidth + offsetPx;
 
+    // 4. Crear el contenedor Overlay DENTRO del scrollWrapper
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Calcular altura del header
-    const header = ganttContainer.querySelector('.grid-header');
-    const headerHeight = header ? header.offsetHeight : 50;
-
+    // IMPORTANTE: Forzamos a que el contenedor de scroll tenga posición relativa
+    scrollWrapper.style.position = 'relative'; 
+    
     overlay.style.cssText = `
         position: absolute;
-        top: ${headerHeight}px;
+        top: 50px; /* Empezar debajo del encabezado */
         left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden;
+        width: 100%; /* Cubrir todo el ancho del gráfico */
+        height: 100%;
         pointer-events: none;
-        z-index: 9999;
+        z-index: 50;
     `;
 
+    // 5. Crear la línea con position: absolute
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
         top: 0;
         bottom: 0;
         left: ${finalLeft}px;
-        width: 3px; /* Más gruesa para que no se pierda */
-        background-color: #ff0000 !important; /* ROJO PURO */
-        pointer-events: none;
-        z-index: 9999;
-        transform: translateX(-1.5px); /* Centrar la línea en el día */
+        width: 2px;
+        background-color: #ff0000; /* Rojo puro */
+        z-index: 50;
     `;
     
     // Etiqueta HOY
@@ -379,50 +379,20 @@ function dibujarLineaHoy(tasksData) {
             left: 50%;
             transform: translateX(-50%);
             background-color: #ff0000;
-            color: #ffffff;
+            color: white;
             font-size: 10px;
-            font-weight: 900;
-            padding: 2px 8px;
+            font-weight: bold;
+            padding: 2px 6px;
             border-radius: 4px;
             white-space: nowrap;
-            letter-spacing: 0.5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
         ">HOY</div>
     `;
 
     overlay.appendChild(line);
-    ganttWrapper.style.position = 'relative';
-    ganttWrapper.appendChild(overlay);
-
-    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
     
-    if (window.todayScrollListener) {
-        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
-    }
-    
-    window.todayScrollListener = () => {
-        // Movemos la línea en base al scroll
-        line.style.transform = `translateX(calc(-${scrollWrapper.scrollLeft}px - 1.5px))`;
-    };
-    
-    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
-    window.todayScrollListener();
+    // 6. Inyectamos el overlay directamente en el contenedor que scrollea
+    scrollWrapper.appendChild(overlay);
 }
-// MANEJO DE VISTAS SIN ROMPER EL GRÁFICO
-window.setGanttView = function(mode) {
-    ganttState.viewMode = mode;
-    if (ganttState.currentGantt) {
-        ganttState.currentGantt.change_view_mode(mode);
-        setTimeout(() => {
-            const tareasFiltradas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
-            dibujarLineaHoy(tareasFiltradas);
-        }, 300);
-        window.renderView();
-    } else {
-        window.renderView();
-    }
-};
-
 window.toggleGanttFilterDrawer = function() {
     const drawer = document.getElementById('gantt-filter-drawer');
     const overlay = document.getElementById('gantt-filter-drawer-overlay');
