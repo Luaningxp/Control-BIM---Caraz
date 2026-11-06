@@ -142,11 +142,7 @@ function actualizarPlanosUI() {
             <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <button type="button" 
-                        onmousedown="event.preventDefault(); event.stopPropagation(); window.quitarPlano('${pid}')" 
-                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
-                    ×
-                </button>
+                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5">×</button>
             </span>
         `;
     }).join('');
@@ -157,7 +153,6 @@ function inicializarBuscadorPlanos() {
     const dropdown = document.getElementById('planos-dropdown');
     if (!input || !dropdown) return;
 
-    // Clonamos el input EXACTAMENTE como en recursos
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
@@ -167,13 +162,10 @@ function inicializarBuscadorPlanos() {
     });
     nuevoInput.addEventListener('input', (e) => mostrarDropdownPlanos(e.target.value));
     
-    // El mousedown es idéntico
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
 
     document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
-            dropdown.classList.add('hidden');
-        }
+        if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
     });
 
     function mostrarDropdownPlanos(query) {
@@ -187,7 +179,6 @@ function inicializarBuscadorPlanos() {
         if (disponibles.length === 0) {
             dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
         } else {
-            // El HTML de la lista es idéntico a recursos
             dropdown.innerHTML = disponibles.map(p => `
                 <div onclick="window.agregarPlano('${p.id}')" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0">
                     <div class="flex-shrink-0 w-6 h-6 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded flex items-center justify-center">
@@ -206,37 +197,16 @@ function inicializarBuscadorPlanos() {
 
 window.agregarPlano = function(pid) {
     planosSeleccionados.add(pid);
-    actualizarPlanosUI(); // <-- Esto redibuja los chips
+    actualizarPlanosUI();
     const input = document.getElementById('planos-search');
-    if (input) input.value = '';
+    if (input) input.value = ''; // Limpieza explícita del input
     const dd = document.getElementById('planos-dropdown');
-    if (dd) dd.classList.add('hidden');
+    if (dd) dd.classList.add('hidden'); // Cierre explícito del dropdown
 };
 
 window.quitarPlano = function(pid) {
-    // 1. Borramos el plano del Set
     planosSeleccionados.delete(pid);
-    
-    // 2. Forzamos la actualización visual del contenedor
-    const box = document.getElementById('planos-chips');
-    if (box) {
-        if (planosSeleccionados.size === 0) {
-            box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin planos vinculados</span>';
-        } else {
-            // Volvemos a dibujar los chips que quedan
-            box.innerHTML = Array.from(planosSeleccionados).map(id => {
-                const plano = (state.planosCache || []).find(p => p.id === id);
-                if (!plano) return '';
-                return `
-                    <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
-                        <i class="fa-solid fa-file-pdf text-[10px]"></i>
-                        ${escapeHtml(plano.codigo)}
-                        <button type="button" onclick="window.quitarPlano('${id}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5 font-bold text-sm leading-none">×</button>
-                    </span>
-                `;
-            }).join('');
-        }
-    }
+    actualizarPlanosUI();
 };
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
