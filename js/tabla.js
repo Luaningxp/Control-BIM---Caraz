@@ -143,8 +143,8 @@ function actualizarPlanosUI() {
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
                 <button type="button" 
-                        onpointerdown="event.preventDefault(); event.stopPropagation(); window.quitarPlano('${pid}')"
-                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5 font-bold text-sm leading-none cursor-pointer">
+                        onclick="setTimeout(() => window.quitarPlano('${pid}'), 10)"
+                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
                     ×
                 </button>
             </span>
