@@ -209,7 +209,6 @@ function inicializarGantt(tareas) {
     }
     container.innerHTML = '';
 
-    // 1. Mapear tareas
     const tasksData = tareas.map(t => {
         const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
         return {
@@ -226,15 +225,13 @@ function inicializarGantt(tareas) {
         };
     });
 
-    // 2. INYECTAR LA TAREA DE HOY
-    // Obtenemos la fecha de hoy en formato YYYY-MM-DD
+    // INYECTAR LA TAREA DE HOY (Para que la librería calcule la posición exacta)
     const todayStr = new Date().toISOString().split('T')[0];
-    
     tasksData.push({
         id: 'today-line',
         name: 'HOY',
         start: todayStr,
-        end: todayStr, // Dura 1 día
+        end: todayStr,
         progress: 0,
         dependencies: '',
         custom_class: 'gantt-today-marker',
@@ -268,69 +265,27 @@ function inicializarGantt(tareas) {
                         <div class="text-[11px] text-slate-500 space-y-0.5 pt-2 border-t border-slate-100">
                             <p><b class="text-slate-700">Inicio:</b> ${fmtDate(original.fecha_inicio_programado)}</p>
                             <p><b class="text-slate-700">Fin:</b> ${fmtDate(original.fecha_fin)}</p>
+                            <p><b class="text-slate-700">Estado:</b> <span style="color: ${color}; font-weight: 700;">${escapeHtml(original.estado)}</span></p>
                         </div>
                     </div>
                 `;
             }
         });
 
-        // 3. Pintar colores y convertir la tarea de hoy en una línea roja
+        // Pintar colores de las barras normales
         setTimeout(() => {
             const bars = document.querySelectorAll('.bar-wrapper .bar');
             bars.forEach((bar, idx) => {
                 const t = tasksData[idx];
-                if (!t) return;
-                
-                if (t._isToday) {
-                    // Ocultar la barra original
-                    bar.style.opacity = '0';
-                    const wrapper = bar.closest('.bar-wrapper');
-                    wrapper.style.pointerEvents = 'none';
-                    wrapper.style.zIndex = '50';
-                    
-                    // Obtener la altura total del gráfico
-                    const gridBody = document.querySelector('.grid-body');
-                    const gridHeight = gridBody ? gridBody.offsetHeight : 2000;
-
-                    // Dibujar la línea roja
-                    const line = document.createElement('div');
-                    line.style.cssText = `
-                        position: absolute;
-                        top: 0;
-                        height: ${gridHeight + 100}px;
-                        left: 50%;
-                        width: 2px;
-                        background: #ef4444;
-                        transform: translateX(-50%);
-                        z-index: 50;
-                    `;
-                    
-                    // Etiqueta "HOY"
-                    line.innerHTML = `
-                        <div style="
-                            position: absolute; 
-                            top: -24px; 
-                            left: 50%; 
-                            transform: translateX(-50%); 
-                            background: #ef4444; 
-                            color: white; 
-                            font-size: 10px; 
-                            font-weight: 700; 
-                            padding: 2px 8px; 
-                            border-radius: 4px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                        ">HOY</div>
-                    `;
-                    
-                    wrapper.style.overflow = 'visible';
-                    wrapper.appendChild(line);
-                } else {
-                    const color = COLORES_ESTADO[t._estado] || '#94a3b8';
-                    bar.style.fill = color;
-                    const progress = bar.querySelector('.bar-progress');
-                    if (progress) progress.style.fill = color;
-                }
+                if (!t || t._isToday) return; // Omitir la de HOY
+                const color = COLORES_ESTADO[t._estado] || '#94a3b8';
+                bar.style.fill = color;
+                const progress = bar.querySelector('.bar-progress');
+                if (progress) progress.style.fill = color;
             });
+
+            // DIBUJAR LA LÍNEA ROJA EN EL HEADER Y BODY
+            dibujarLineaHoyNativa();
         }, 200);
 
         ganttState.currentGantt.on_click = (task) => {
@@ -342,6 +297,71 @@ function inicializarGantt(tareas) {
         console.error('Error al crear Gantt:', err);
         container.innerHTML = `<div class="text-red-500 text-sm p-4">Error: ${err.message}</div>`;
     }
+}
+
+function dibujarLineaHoyNativa() {
+    const container = document.getElementById('gantt-container');
+    if (!container) return;
+
+    const oldLine = document.getElementById('today-red-line');
+    if (oldLine) oldLine.remove();
+
+    // Buscar el elemento de la tarea "HOY" que dibujó Frappe
+    const todayElements = container.querySelectorAll('.bar-wrapper');
+    let todayBar = null;
+
+    todayElements.forEach(el => {
+        if (el.querySelector('.bar-label') && el.querySelector('.bar-label').textContent === 'HOY') {
+            todayBar = el;
+        }
+    });
+
+    if (!todayBar) return;
+
+    // Obtener la posición exacta de esa barra
+    const rectBar = todayBar.getBoundingClientRect();
+    const rectContainer = container.getBoundingClientRect();
+    
+    // Calcular la distancia desde la izquierda del contenedor
+    const leftPos = rectBar.left - rectContainer.left;
+
+    // Crear la línea roja
+    const line = document.createElement('div');
+    line.id = 'today-red-line';
+    
+    line.style.cssText = `
+        position: absolute;
+        top: 50px; /* Debajo del encabezado */
+        bottom: 0;
+        left: ${leftPos}px;
+        width: 2px;
+        background-color: #ef4444;
+        z-index: 9999;
+        pointer-events: none;
+    `;
+    
+    line.innerHTML = `
+        <div style="
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        ">HOY</div>
+    `;
+
+    // Hacer que el contenedor principal sea el punto de referencia
+    container.style.position = 'relative';
+    
+    // Inyectar la línea directamente en el contenedor principal
+    container.appendChild(line);
 }
 
 window.setGanttView = function(mode) {
