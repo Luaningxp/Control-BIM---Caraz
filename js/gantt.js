@@ -340,7 +340,7 @@ function dibujarLineaHoy(tasksData) {
     
     const finalLeft = sidebarWidth + offsetPx;
 
-    const overlay = document.createElement('div');
+        const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
     // Calcular altura del header
@@ -355,7 +355,7 @@ function dibujarLineaHoy(tasksData) {
         bottom: 0;
         overflow: hidden;
         pointer-events: none;
-        z-index: 999;
+        z-index: 9999; /* Súper alto para que pase por encima de las barras */
     `;
 
     const line = document.createElement('div');
@@ -365,9 +365,10 @@ function dibujarLineaHoy(tasksData) {
         bottom: 0;
         left: ${finalLeft}px;
         width: 2px;
-        background: #dc2626; /* Rojo intenso */
+        background: #ef4444; /* Rojo brillante */
         pointer-events: none;
-        box-shadow: 0 0 4px rgba(220, 38, 38, 0.5); /* Brillo para que resalte */
+        z-index: 9999;
+        box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.8); /* Efecto de brillo (glow) para que resalte en el fondo blanco */
     `;
     
     line.innerHTML = `
@@ -376,15 +377,16 @@ function dibujarLineaHoy(tasksData) {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background: #dc2626;
+            background: #ef4444;
             color: white;
             font-size: 10px;
             font-weight: 800;
-            padding: 2px 8px;
+            padding: 3px 8px;
             border-radius: 4px;
             white-space: nowrap;
             letter-spacing: 0.5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 9999;
         ">HOY</div>
     `;
 
