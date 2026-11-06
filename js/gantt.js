@@ -300,9 +300,10 @@ function inicializarGantt(tareas) {
 }
 
 // DIBUJO ROBUSTO DE LA LÍNEA DE HOY
+// DIBUJO ROBUSTO DE LA LÍNEA DE HOY
 function dibujarLineaHoy(tasksData) {
     const ganttWrapper = document.getElementById('gantt-wrapper');
-    const ganttContainer = document.getElementById('gantt-container');
+    const ganttContainer = document.getElementById('gantt-container'); // <-- FALTABA ESTA LÍNEA
     if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
 
     const oldOverlay = document.getElementById('gantt-today-overlay');
