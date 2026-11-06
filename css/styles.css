@@ -266,21 +266,19 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     color: #c7d2fe; /* indigo-200 */
 }
 /* =========================================
-   FORZAR CLICS EN LOS CHIPS DE PLANOS
+   FIX PARA CHIPS DE PLANOS
    ========================================= */
 #planos-chips {
     position: relative;
-    z-index: 50 !important; /* Lo pone por encima del buscador */
-    pointer-events: auto !important;
+    z-index: 10; /* Capa normal, no flota sobre todo */
 }
 
 #planos-chips button {
     position: relative;
-    z-index: 51 !important;
-    pointer-events: auto !important;
+    z-index: 20; /* El botón está sobre el chip */
     cursor: pointer !important;
 }
 
 #planos-dropdown {
-    z-index: 10 !important; /* El dropdown se queda abajo para no tapar los chips */
+    z-index: 30; /* El dropdown de búsqueda está por encima de los chips */
 }
