@@ -249,3 +249,19 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 .dark .eis-q .bg-white .text-slate-500 {
     color: #94a3b8 !important; /* Subtítulos claros */
 }
+/* Chips de Planos */
+.plano-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background-color: #e0e7ff; /* indigo-100 */
+    color: #3730a3; /* indigo-800 */
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.dark .plano-chip {
+    background-color: rgba(49, 46, 129, 0.5); /* indigo-900/50 */
+    color: #c7d2fe; /* indigo-200 */
+}
