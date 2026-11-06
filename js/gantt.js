@@ -258,6 +258,7 @@ function inicializarGantt(tareas) {
     if (ganttState.currentGantt) ganttState.currentGantt = null;
     container.innerHTML = '';
 
+    // 1. Solo mapeamos las tareas reales
     const tasksData = tareas.map(t => {
         const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
         return {
@@ -270,22 +271,8 @@ function inicializarGantt(tareas) {
             custom_class: `gantt-bar-${estadoClase}`,
             _estado: t.estado,
             _grupo: t.grupo,
-            _responsable: t.responsable,
-            _is_today: false
+            _responsable: t.responsable
         };
-    });
-
-    // --- INYECTAR TAREA FANTASMA DE HOY ---
-    const todayStr = new Date().toISOString().split('T')[0];
-    tasksData.push({
-        id: 'today-marker',
-        name: 'HOY',
-        start: todayStr,
-        end: todayStr,
-        progress: 0,
-        dependencies: '',
-        custom_class: 'gantt-today-bar',
-        _is_today: true
     });
 
     try {
@@ -301,7 +288,6 @@ function inicializarGantt(tareas) {
             padding: 18,
             date_format: 'YYYY-MM-DD',
             custom_popup_html: (task) => {
-                if (task.id === 'today-marker') return '';
                 const original = tareas.find(t => String(t.id) === task.id);
                 if (!original) return '';
                 const color = COLORES_ESTADO[original.estado] || '#94a3b8';
@@ -322,67 +308,121 @@ function inicializarGantt(tareas) {
             }
         });
 
-        // Pintar colores y crear la línea de hoy
+        // 2. Pintar colores y crear la línea de hoy
         setTimeout(() => {
+            // Pintar colores de las barras
             const bars = document.querySelectorAll('.bar-wrapper .bar');
-            
-            // Obtener la altura del contenedor para hacer la línea larga
-            const gridBody = document.querySelector('.grid-body');
-            const gridHeight = gridBody ? gridBody.offsetHeight : 2000;
-
             bars.forEach((bar, idx) => {
                 const t = tasksData[idx];
                 if (!t) return;
-                
-                if (t._is_today) {
-                    // Es la tarea de HOY
-                    bar.style.opacity = '0'; 
-                    const wrapper = bar.closest('.bar-wrapper');
-                    wrapper.style.pointerEvents = 'none';
-                    wrapper.style.zIndex = '50';
-                    
-                    const line = document.createElement('div');
-                    line.style.cssText = `
-                        position: absolute;
-                        top: 0;
-                        height: ${gridHeight + 100}px;
-                        left: 50%;
-                        width: 2px;
-                        background: #ef4444;
-                        transform: translateX(-50%);
-                        z-index: 50;
-                    `;
-                    
-                    line.innerHTML = `
-                        <div style="
-                            position: absolute; 
-                            top: -24px; 
-                            left: 50%; 
-                            transform: translateX(-50%); 
-                            background: #ef4444; 
-                            color: white; 
-                            font-size: 10px; 
-                            font-weight: 700; 
-                            padding: 2px 8px; 
-                            border-radius: 4px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                        ">HOY</div>
-                    `;
-                    
-                    wrapper.style.overflow = 'visible';
-                    wrapper.appendChild(line);
-                } else {
-                    // Tareas normales
-                    const color = COLORES_ESTADO[t._estado] || '#94a3b8';
-                    bar.style.fill = color;
-                    const progress = bar.querySelector('.bar-progress');
-                    if (progress) progress.style.fill = color;
-                }
+                const color = COLORES_ESTADO[t._estado] || '#94a3b8';
+                bar.style.fill = color;
+                const progress = bar.querySelector('.bar-progress');
+                if (progress) progress.style.fill = color;
             });
-        }, 150);
+
+            // Crear Línea de HOY
+            const ganttWrapper = document.getElementById('gantt-wrapper');
+            if (!ganttWrapper || tasksData.length === 0) return;
+
+            const oldOverlay = document.getElementById('gantt-today-overlay');
+            if (oldOverlay) oldOverlay.remove();
+
+            // Calcular la fecha de inicio del gráfico
+            let minDate = null;
+            tasksData.forEach(t => {
+                const d = new Date(t.start + 'T00:00:00');
+                if (!minDate || d < minDate) minDate = d;
+            });
+            if (!minDate) return;
+            
+            // Restar 2 días por el padding por defecto de Frappe
+            minDate.setDate(minDate.getDate() - 2); 
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) return;
+
+            const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+            let offsetPx = 0;
+            
+            if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
+            else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
+            else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
+
+            const sidebarWidth = 150; 
+            const finalLeft = sidebarWidth + offsetPx;
+
+            // Crear contenedor
+            const overlay = document.createElement('div');
+            overlay.id = 'gantt-today-overlay';
+            
+            // Calcular la altura para que no pise el encabezado
+            const header = ganttWrapper.querySelector('.grid-header');
+            const headerHeight = header ? header.offsetHeight : 50;
+
+            overlay.style.cssText = `
+                position: absolute;
+                top: ${headerHeight}px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                overflow: hidden;
+                pointer-events: none;
+                z-index: 50;
+            `;
+
+            // Crear línea
+            const line = document.createElement('div');
+            line.style.cssText = `
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: ${finalLeft}px;
+                width: 2px;
+                background: #ef4444;
+                pointer-events: none;
+            `;
+            
+            line.innerHTML = `
+                <div style="
+                    position: absolute;
+                    top: 0;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #ef4444;
+                    color: white;
+                    font-size: 9px;
+                    font-weight: 700;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    white-space: nowrap;
+                    letter-spacing: 0.5px;
+                ">HOY</div>
+            `;
+
+            overlay.appendChild(line);
+            ganttWrapper.style.position = 'relative';
+            ganttWrapper.appendChild(overlay);
+
+            // Sincronizar con el scroll
+            const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
+            if (window.todayScrollListener) {
+                scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
+            }
+            
+            window.todayScrollListener = () => {
+                line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
+            };
+            
+            scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+            window.todayScrollListener();
+
+        }, 200);
 
         ganttState.currentGantt.on_click = (task) => {
-            if (task.id === 'today-marker') return;
             window.editTask(parseInt(task.id));
         };
 
