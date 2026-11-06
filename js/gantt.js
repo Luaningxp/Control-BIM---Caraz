@@ -299,20 +299,17 @@ function inicializarGantt(tareas) {
     }
 }
 
-// DIBUJO ROBUSTO DE LA LÍNEA DE HOY
-// DIBUJO ROBUSTO DE LA LÍNEA DE HOY
 function dibujarLineaHoy(tasksData) {
-    // 1. Encontrar el contenedor que hace el scroll dentro de Frappe Gantt
-    const scrollWrapper = document.querySelector('.gantt-container');
-    const ganttContainer = document.getElementById('gantt-container');
+    const scrollWrapper = document.querySelector('.gantt-container') || document.getElementById('gantt-wrapper');
+    const svgElement = document.querySelector('#gantt-container svg');
     
-    if (!scrollWrapper || !ganttContainer || tasksData.length === 0) return;
+    if (!scrollWrapper || !svgElement || tasksData.length === 0) return;
 
     // Eliminar líneas anteriores
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // 2. Calcular la fecha de inicio (la primera tarea menos los 2 días de padding)
+    // 1. Encontrar la fecha mínima igual que hace internamente Frappe Gantt (con padding de 2 días)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
@@ -328,7 +325,7 @@ function dibujarLineaHoy(tasksData) {
     
     if (diffDays < 0) return;
 
-    // 3. Calcular el Left en píxeles
+    // 2. Calcular los píxeles desde el inicio del SVG
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -336,38 +333,38 @@ function dibujarLineaHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // Ancho de la columna izquierda de tareas
-    const sideHeader = ganttContainer.querySelector('.side-header');
-    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
+    // El SVG de Frappe Gantt ya incluye el espacio de la barra lateral de nombres a la izquierda
+    const svgWidth = svgElement.getBoundingClientRect().width;
+    const totalSvgWidth = parseFloat(svgElement.getAttribute('width')) || svgWidth;
     
-    const finalLeft = sidebarWidth + offsetPx;
+    // Posición final exacta dentro del SVG
+    const finalLeft = offsetPx + 40; // Ajuste por el padding inicial del gráfico de Frappe
 
-    // 4. Crear el contenedor Overlay DENTRO del scrollWrapper
+    // 3. Crear el contenedor Overlay asegurando que ocupe todo el ancho real del SVG
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // IMPORTANTE: Forzamos a que el contenedor de scroll tenga posición relativa
     scrollWrapper.style.position = 'relative'; 
     
     overlay.style.cssText = `
         position: absolute;
-        top: 50px; /* Empezar debajo del encabezado */
+        top: 0;
         left: 0;
-        width: 100%; /* Cubrir todo el ancho del gráfico */
+        width: ${Math.max(totalSvgWidth, scrollWrapper.scrollWidth)}px;
         height: 100%;
         pointer-events: none;
         z-index: 50;
     `;
 
-    // 5. Crear la línea con position: absolute
+    // 4. Crear la línea roja
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
-        top: 0;
+        top: 50px; /* Debajo de los encabezados de fecha */
         bottom: 0;
         left: ${finalLeft}px;
         width: 2px;
-        background-color: #ff0000; /* Rojo puro */
+        background-color: #ef4444;
         z-index: 50;
     `;
     
@@ -378,34 +375,20 @@ function dibujarLineaHoy(tasksData) {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #ff0000;
+            background-color: #ef4444;
             color: white;
             font-size: 10px;
             font-weight: bold;
             padding: 2px 6px;
             border-radius: 4px;
             white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         ">HOY</div>
     `;
 
     overlay.appendChild(line);
-    
-    // 6. Inyectamos el overlay directamente en el contenedor que scrollea
     scrollWrapper.appendChild(overlay);
 }
-window.toggleGanttFilterDrawer = function() {
-    const drawer = document.getElementById('gantt-filter-drawer');
-    const overlay = document.getElementById('gantt-filter-drawer-overlay');
-    if (!drawer || !overlay) return;
-    const isOpen = !drawer.classList.contains('translate-x-full');
-    if (isOpen) {
-        drawer.classList.add('translate-x-full');
-        overlay.classList.add('hidden');
-    } else {
-        drawer.classList.remove('translate-x-full');
-        overlay.classList.remove('hidden');
-    }
-};
 
 window.applyGanttFilter = function(key, value) {
     ganttState[key] = value;
