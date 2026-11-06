@@ -174,3 +174,45 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     padding: 0.5rem; border-radius: 0.5rem; font-size: 0.75rem;
     text-align: center; margin-bottom: 1rem; display: none;
 }
+/* =========================================
+   MAGIA PARA EL MODO OSCURO
+   ========================================= */
+
+/* Cuando el modo oscuro está activo, forzamos a que los textos oscuros se vuelvan claros */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+.dark .text-slate-900, 
+.dark .text-slate-800,
+.dark .text-slate-700 {
+    color: #f8fafc !important; /* Texto casi blanco */
+}
+
+/* Los textos secundarios o sutiles se vuelven grises claros para que se lean */
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+    color: #cbd5e1 !important; /* Gris claro */
+}
+
+/* Fondos blancos de tablas o modales pasan a gris oscuro */
+.dark .bg-white {
+    background-color: #1e293b !important;
+}
+
+/* Fondos grises claros pasan a un gris un poco más oscuro */
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+    background-color: #0f172a !important;
+}
+
+/* Si las tarjetas tienen bordes blancos, los oscurecemos */
+.dark .border-slate-200,
+.dark .border-slate-100 {
+    border-color: #334155 !important;
+}
+
+/* Arreglar el dashboard donde algunos textos de los títulos están directamente en el HTML */
+.dark .card p, 
+.dark .card h4, 
+.dark .card h3 {
+    color: inherit; /* Toma el color del contenedor padre (que ya forzamos a claro) */
+}
