@@ -335,86 +335,106 @@ function pintarColoresYHoy(tasksData) {
     const ganttContainer = document.getElementById('gantt-container');
     if (!ganttContainer) return;
 
-    // Buscamos el contenedor que tiene el scroll interno de Frappe
-    const wrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
-    
     const oldLine = document.getElementById('gantt-today-line');
     if (oldLine) oldLine.remove();
 
-    // Calcular la fecha de inicio del gráfico (buscando el primer día)
-    let minDate = null;
-    tasksData.forEach(t => {
-        const d = new Date(t.start + 'T00:00:00');
-        if (!minDate || d < minDate) minDate = d;
-    });
-    if (!minDate) return;
+    // Buscar los "ticks" (las divisiones del calendario que dibuja Frappe)
+    const ticks = ganttContainer.querySelectorAll('.tick');
+    if (ticks.length === 0) return;
 
     const today = new Date();
     today.setHours(0,0,0,0);
-    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Calcular píxeles según la vista
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    let offsetPx = 0;
-    
-    if (ganttState.viewMode === 'Day') {
-        offsetPx = diffDays * colWidth;
-    } else if (ganttState.viewMode === 'Week') {
-        offsetPx = (diffDays / 7) * colWidth;
-    } else if (ganttState.viewMode === 'Month') {
-        offsetPx = (diffDays / 30) * colWidth;
+    // Recorrer los ticks para encontrar el que corresponde al día/semana/mes de hoy
+    let todayTick = null;
+    for (let tick of ticks) {
+        if (tick.dataset.date) {
+            // Frappe guarda la fecha en el atributo data-date (YYYY-MM-DD)
+            const tickDate = new Date(tick.dataset.date + 'T00:00:00');
+            
+            if (ganttState.viewMode === 'Day') {
+                // En vista Día, buscamos el tick exacto de hoy
+                if (tickDate.getTime() === today.getTime()) {
+                    todayTick = tick;
+                    break;
+                }
+            } else if (ganttState.viewMode === 'Week') {
+                // En vista Semana, buscamos si hoy cae dentro de esta semana (Lunes a Domingo)
+                const startOfWeek = new Date(tickDate);
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+                const monday = new Date(startOfWeek.setDate(diff));
+                monday.setHours(0,0,0,0);
+                
+                const endOfWeek = new Date(monday);
+                endOfWeek.setDate(monday.getDate() + 6);
+                endOfWeek.setHours(23,59,59,999);
+
+                if (today >= monday && today <= endOfWeek) {
+                    todayTick = tick;
+                    break;
+                }
+            } else if (ganttState.viewMode === 'Month') {
+                // En vista Mes, buscamos si hoy cae dentro de este mes
+                if (tickDate.getMonth() === today.getMonth() && tickDate.getFullYear() === today.getFullYear()) {
+                    todayTick = tick;
+                    break;
+                }
+            }
+        }
     }
 
-    // El ancho de la columna de texto de la izquierda en Frappe Gantt es de 150px por defecto
-    const sidebarWidth = 150; 
-    const finalLeft = sidebarWidth + offsetPx;
+    // Si encontramos el tick, pintamos la línea
+    if (todayTick) {
+        // Calcular el porcentaje de avance DENTRO de esa celda (para vista Semana/Mes)
+        let leftOffset = 0;
+        
+        if (ganttState.viewMode === 'Week') {
+            // Cuántos días de la semana han pasado
+            const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+            const cellWidth = todayTick.offsetWidth || 60;
+            leftOffset = ((dayOfWeek - 1) / 7) * cellWidth;
+        } else if (ganttState.viewMode === 'Month') {
+            // Cuántos días del mes han pasado
+            const dayOfMonth = today.getDate();
+            const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+            const cellWidth = todayTick.offsetWidth || 100;
+            leftOffset = ((dayOfMonth - 1) / daysInMonth) * cellWidth;
+        }
 
-    const line = document.createElement('div');
-    line.id = 'gantt-today-line';
-    line.style.cssText = `
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: ${finalLeft}px;
-        width: 2px;
-        background: #ef4444;
-        z-index: 5;
-        pointer-events: none;
-    `;
-    
-    line.innerHTML = `
-        <div style="
+        const line = document.createElement('div');
+        line.id = 'gantt-today-line';
+        line.style.cssText = `
             position: absolute;
             top: 0;
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 0;
+            left: ${leftOffset}px;
+            width: 2px;
             background: #ef4444;
-            color: white;
-            font-size: 9px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 3px;
-            white-space: nowrap;
-            letter-spacing: 0.5px;
-        ">HOY</div>
-    `;
+            z-index: 5;
+            pointer-events: none;
+        `;
+        
+        line.innerHTML = `
+            <div style="
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #ef4444;
+                color: white;
+                font-size: 9px;
+                font-weight: 700;
+                padding: 2px 6px;
+                border-radius: 3px;
+                white-space: nowrap;
+                letter-spacing: 0.5px;
+            ">HOY</div>
+        `;
 
-    // Inyectar la línea dentro del contenedor de Frappe para que scrollee junto con las barras
-    const ganttGrid = ganttContainer.querySelector('.grid-body') || wrapper;
-    ganttGrid.style.position = 'relative';
-    ganttGrid.appendChild(line);
-
-    // 3. Hacerla dinámica: Si el usuario mueve el scroll, ajustamos la línea
-    wrapper.removeEventListener('scroll', window.moverLineaHoy);
-    window.moverLineaHoy = () => {
-        const scrollLeft = wrapper.scrollLeft;
-        const lineEl = document.getElementById('gantt-today-line');
-        if (lineEl) {
-            // La nueva posición es la original menos el scroll
-            lineEl.style.transform = `translateX(-${scrollLeft}px)`;
-        }
-    };
-    wrapper.addEventListener('scroll', window.moverLineaHoy);
+        todayTick.style.position = 'relative';
+        todayTick.appendChild(line);
+    }
 }
 
 window.setGanttView = function(mode) {
