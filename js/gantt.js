@@ -335,11 +335,10 @@ function pintarColoresYHoy(tasksData) {
     const ganttWrapper = document.getElementById('gantt-wrapper');
     if (!ganttWrapper || tasksData.length === 0) return;
 
-    // Eliminar anterior
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Encontrar la fecha más antigua (inicio del gráfico)
+    // Encontrar la fecha más antigua
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
@@ -347,15 +346,12 @@ function pintarColoresYHoy(tasksData) {
     });
     
     if (!minDate) return;
-    // Frappe Gantt tiene un padding de 2 días por defecto antes de la primera tarea
-    minDate.setDate(minDate.getDate() - 2); 
 
     const today = new Date();
     today.setHours(0,0,0,0);
     const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 0) return;
-
+    // Calcular ancho según vista
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -363,14 +359,19 @@ function pintarColoresYHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    const sidebarWidth = 150; // Ancho de la columna de nombres de tareas
+    // Ancho REAL de la columna izquierda de Frappe Gantt
+    // Si el texto de las tareas es largo, Frappe hace la columna más ancha
+    const sideHeader = ganttWrapper.querySelector('.side-header');
+    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
+    
+    // Posición exacta
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear contenedor Overlay (con overflow hidden para que no se salga del gráfico)
+    // Crear Overlay
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Ajustar el top para que no pise el encabezado (usamos 50px que es el estándar de Frappe)
+    // Encontrar la altura del encabezado
     const header = ganttWrapper.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
@@ -385,7 +386,7 @@ function pintarColoresYHoy(tasksData) {
         z-index: 50;
     `;
 
-    // Crear la línea roja
+    // Crear Línea
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
@@ -397,7 +398,6 @@ function pintarColoresYHoy(tasksData) {
         pointer-events: none;
     `;
     
-    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -416,25 +416,19 @@ function pintarColoresYHoy(tasksData) {
     `;
 
     overlay.appendChild(line);
-    
-    // ¡LA CLAVE! Inyectamos el overlay directamente en el WRAPPER, no en el grid-body
     ganttWrapper.style.position = 'relative';
     ganttWrapper.appendChild(overlay);
 
-    // Sincronizar con el scroll
-    // Como el wrapper es el que tiene overflow-x-auto, escuchamos su scroll
+    // Scroll
     if (window.todayScrollListener) {
         ganttWrapper.removeEventListener('scroll', window.todayScrollListener);
     }
     
     window.todayScrollListener = () => {
-        // Movemos la línea hacia la izquierda según el scroll
         line.style.transform = `translateX(-${ganttWrapper.scrollLeft}px)`;
     };
     
     ganttWrapper.addEventListener('scroll', window.todayScrollListener);
-    
-    // Forzar actualización inicial
     window.todayScrollListener();
 }
 
