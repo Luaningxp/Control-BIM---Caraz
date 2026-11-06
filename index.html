@@ -72,7 +72,12 @@
         <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-lg bg-slate-900 text-white grid place-items-center text-base">🏥</div>
+                    <!-- AHORA -->
+<div class="flex items-center gap-2 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+    <img src="assets/suyay.png" alt="SUYAY" class="h-6 w-auto object-contain">
+    <div class="w-px h-5 bg-slate-300 dark:bg-slate-600"></div>
+    <img src="assets/anin.png" alt="ANIN" class="h-6 w-auto object-contain">
+</div>
                     <div>
                         <h1 class="font-bold text-slate-900 leading-tight">Control BIM</h1>
                         <p class="text-xs text-slate-500">
@@ -85,6 +90,10 @@
                     <button id="btn-new-task" onclick="window.openModal()" class="hidden px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
                         + Nueva Actividad
                     </button>
+
+                    <button onclick="window.toggleDarkMode()" id="btn-dark-mode" class="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg transition" title="Cambiar tema">
+    <i class="fa-solid fa-moon text-sm" id="dark-mode-icon"></i>
+</button>
                     
                     <button id="btn-logout" class="px-3 py-2 text-xs border border-slate-300 rounded-lg hover:bg-slate-100 transition text-slate-600">
                         Cerrar Sesión
