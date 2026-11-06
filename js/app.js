@@ -169,3 +169,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+// --- MODO OSCURO ---
+window.toggleDarkMode = function() {
+    const html = document.documentElement;
+    const icon = document.getElementById('dark-mode-icon');
+    
+    if (html.classList.contains('dark')) {
+        // Cambiar a claro
+        html.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+        icon.classList.remove('fa-sun');
+        icon.classList.add('fa-moon');
+    } else {
+        // Cambiar a oscuro
+        html.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        icon.classList.remove('fa-moon');
+        icon.classList.add('fa-sun');
+    }
+};
+
+// Al cargar la página, verificar si el usuario ya había elegido el modo oscuro
+window.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        const icon = document.getElementById('dark-mode-icon');
+        if (icon) {
+            icon.classList.remove('fa-moon');
+            icon.classList.add('fa-sun');
+        }
+    }
+});
