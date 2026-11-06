@@ -303,7 +303,7 @@ function inicializarGantt(tareas) {
 // DIBUJO ROBUSTO DE LA LÍNEA DE HOY
 function dibujarLineaHoy(tasksData) {
     const ganttWrapper = document.getElementById('gantt-wrapper');
-    const ganttContainer = document.getElementById('gantt-container'); // <-- FALTABA ESTA LÍNEA
+    const ganttContainer = document.getElementById('gantt-container');
     if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
 
     const oldOverlay = document.getElementById('gantt-today-overlay');
@@ -340,7 +340,7 @@ function dibujarLineaHoy(tasksData) {
     
     const finalLeft = sidebarWidth + offsetPx;
 
-        const overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
     // Calcular altura del header
@@ -355,7 +355,7 @@ function dibujarLineaHoy(tasksData) {
         bottom: 0;
         overflow: hidden;
         pointer-events: none;
-        z-index: 9999; /* Súper alto para que pase por encima de las barras */
+        z-index: 9999;
     `;
 
     const line = document.createElement('div');
@@ -364,29 +364,29 @@ function dibujarLineaHoy(tasksData) {
         top: 0;
         bottom: 0;
         left: ${finalLeft}px;
-        width: 2px;
-        background: #ef4444; /* Rojo brillante */
+        width: 3px; /* Más gruesa para que no se pierda */
+        background-color: #ff0000 !important; /* ROJO PURO */
         pointer-events: none;
         z-index: 9999;
-        box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.8); /* Efecto de brillo (glow) para que resalte en el fondo blanco */
+        transform: translateX(-1.5px); /* Centrar la línea en el día */
     `;
     
+    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background: #ef4444;
-            color: white;
+            background-color: #ff0000;
+            color: #ffffff;
             font-size: 10px;
-            font-weight: 800;
-            padding: 3px 8px;
+            font-weight: 900;
+            padding: 2px 8px;
             border-radius: 4px;
             white-space: nowrap;
             letter-spacing: 0.5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            z-index: 9999;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
         ">HOY</div>
     `;
 
@@ -401,13 +401,13 @@ function dibujarLineaHoy(tasksData) {
     }
     
     window.todayScrollListener = () => {
-        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
+        // Movemos la línea en base al scroll
+        line.style.transform = `translateX(calc(-${scrollWrapper.scrollLeft}px - 1.5px))`;
     };
     
     scrollWrapper.addEventListener('scroll', window.todayScrollListener);
     window.todayScrollListener();
 }
-
 // MANEJO DE VISTAS SIN ROMPER EL GRÁFICO
 window.setGanttView = function(mode) {
     ganttState.viewMode = mode;
