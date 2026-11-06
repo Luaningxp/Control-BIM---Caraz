@@ -308,62 +308,58 @@ function dibujarLineaHoy(tasksData) {
     const oldLine = document.getElementById('today-red-line');
     if (oldLine) oldLine.remove();
 
-    // ¡EL TRUCO! Buscamos la columna (tick) que corresponde a la fecha de hoy
-    const todayStr = new Date().toISOString().split('T')[0]; // "2023-10-24"
+    // 1. Obtener la fecha de hoy en los formatos que usa Frappe Gantt en el encabezado
+    const today = new Date();
+    const d = today.getDate();
+    const m = today.getMonth() + 1; // Enero es 0
+    const y = today.getFullYear();
     
-    // Frappe Gantt dibuja las columnas como rectángulos en el DOM
-    const ticks = ganttContainer.querySelectorAll('.tick');
-    let todayX = -1;
-    let tickWidth = 40; // Ancho por defecto
+    // Formatos posibles: "12 Oct", "12 Octubre", "12/10", "12"
+    // Frappe Gantt en español suele usar el número del día (ej. "12") o abreviaturas.
+    const buscarTexto = String(d); 
+    let todayElement = null;
 
-    ticks.forEach(tick => {
-        // En Frappe, los ticks suelen tener la clase .tick y un atributo con la fecha
-        if (tick.getAttribute('data-date') === todayStr) {
-            // Si encontramos el tick de hoy, obtenemos su posición X y su ancho
-            todayX = parseFloat(tick.getAttribute('x')) || tick.offsetLeft;
-            tickWidth = parseFloat(tick.getAttribute('width')) || tick.offsetWidth;
+    // 2. Buscar en los encabezados superiores (.grid-header .tick) el que tenga el número de hoy
+    const headerTicks = ganttContainer.querySelectorAll('.grid-header .tick');
+    
+    for (let tick of headerTicks) {
+        const text = tick.textContent.trim();
+        // Si el texto del encabezado contiene el número del día de hoy (ej. "12" o "12 oct")
+        if (text === buscarTexto || text.startsWith(buscarTexto + ' ') || text.includes(buscarTexto + '/')) {
+            todayElement = tick;
+            break;
         }
-    });
-
-    // Si la librería no expone data-date, usamos el cálculo matemático como respaldo
-    if (todayX === -1) {
-        // Cálculo de respaldo (con el padding exacto de 44px que usa Frappe internamente)
-        let minDate = null;
-        tasksData.forEach(t => {
-            const d = new Date(t.start + 'T00:00:00');
-            if (!minDate || d < minDate) minDate = d;
-        });
-        
-        if (!minDate) return;
-        // Frappe añade exactamente 2 columnas de 22px (44px en total) antes de la primera tarea
-        const paddingLeft = 44; 
-        const diffDays = Math.floor((new Date() - minDate) / (1000 * 60 * 60 * 24));
-        const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-        
-        let offsetPx = 0;
-        if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-        else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-        else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
-        
-        todayX = offsetPx + paddingLeft;
     }
 
-    // Ancho de la columna de nombres de tareas
+    let finalLeft = 0;
+
+    if (todayElement) {
+        // ¡ENCONTRADO! Usamos la posición exacta en la que la librería dibujó el día de hoy
+        finalLeft = todayElement.offsetLeft;
+    } else {
+        // SI NO LO ENCUENTRA (Fallback): Usamos la posición del scroll actual + un margen
+        // Esto al menos pondrá la línea cerca de lo que estás viendo
+        finalLeft = scrollWrapper.scrollLeft + 200;
+    }
+
+    // Ancho de la columna de nombres
     const sideHeader = ganttContainer.querySelector('.side-header');
     const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 150;
 
-    const finalLeft = sidebarWidth + todayX;
+    // Posición final ajustada
+    const adjustedLeft = sidebarWidth + finalLeft;
 
+    // 3. Crear la línea
     const line = document.createElement('div');
     line.id = 'today-red-line';
     
     line.style.cssText = `
         position: absolute;
-        top: 50px; /* Debajo del encabezado */
+        top: 50px; /* Debajo del encabezado de fechas */
         bottom: 0;
-        left: ${finalLeft}px;
+        left: ${adjustedLeft}px;
         width: 2px;
-        background-color: #ef4444;
+        background-color: #ff0000;
         z-index: 9999;
         pointer-events: none;
     `;
@@ -374,7 +370,7 @@ function dibujarLineaHoy(tasksData) {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #ef4444;
+            background-color: #ff0000;
             color: white;
             font-size: 10px;
             font-weight: bold;
