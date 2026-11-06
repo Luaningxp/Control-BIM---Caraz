@@ -4,28 +4,45 @@ export const supabaseClient = window.supabase.createClient(
 );
 
 export const state = {
-    currentUser: null, currentRol: 'operador', currentCargo: '',
-    isAdmin: false, isCoordinador: false, isSupervisor: false, isModelador: false,
-    tasksCache: [], gruposCache: [], perfilesCache: [], 
-    propDefsCache: [], propValsCache: [], manpowerCache: [],
-    actividadRecursosCache: [], // NUEVO
-    currentTab: 'dashboard', cdeTargetId: null, dragId: null, charts: {}
+    currentUser: null,
+    currentRol: 'operador',
+    currentCargo: '',
+    isAdmin: false,
+    isCoordinador: false,
+    isSupervisor: false,
+    isModelador: false,
+    tasksCache: [],
+    gruposCache: [],
+    perfilesCache: [],
+    propDefsCache: [],
+    propValsCache: [],
+    manpowerCache: [],
+    actividadRecursosCache: [],
+    planosCache: [],             // <-- ESTO
+    actividadPlanosCache: [],    // <-- ESTO
+    currentTab: 'dashboard',
+    cdeTargetId: null,
+    dragId: null,
+    charts: {}
 };
-
 export async function fetchAll() {
     try {
-        const [t, g, p, pd, pv, m, ar] = await Promise.all([
+        const [t, g, p, pd, pv, m, ar, pl, ap] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
             supabaseClient.from('propiedades_def').select('*').eq('activo', true).order('orden'),
             supabaseClient.from('propiedades_valores').select('*'),
             supabaseClient.from('manpower_registros').select('*').order('fecha', { ascending: false }),
-            supabaseClient.from('actividad_recursos').select('*') // NUEVO
+            supabaseClient.from('actividad_recursos').select('*'),
+            supabaseClient.from('planos').select('*').order('codigo'),           // <-- NUEVO
+            supabaseClient.from('actividad_planos').select('*')                  // <-- NUEVO
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
-        if (ar.error) console.error('Error recursos:', ar.error);
+        // ... (otros errores)
+        if (pl.error) console.error('Error planos:', pl.error);
+        if (ap.error) console.error('Error actividad_planos:', ap.error);
 
         state.tasksCache = t.data || [];
         state.gruposCache = g.data || [];
@@ -34,6 +51,9 @@ export async function fetchAll() {
         state.propValsCache = pv.data || [];
         state.manpowerCache = m.data || [];
         state.actividadRecursosCache = ar.data || [];
+        state.planosCache = pl.data || [];               // <-- ASIGNACIÓN
+        state.actividadPlanosCache = ap.data || [];      // <-- ASIGNACIÓN
+
     } catch (err) {
         console.error('Error general en fetchAll:', err);
     }
