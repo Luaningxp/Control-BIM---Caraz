@@ -334,48 +334,65 @@ function pintarColoresYHoy(tasksData) {
     // 2. Línea de HOY
     const ganttWrapper = document.getElementById('gantt-wrapper');
     const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttWrapper || !ganttContainer) return;
+    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
 
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Leer la fecha del primer "tick" del calendario (la columna más a la izquierda)
-    const ticks = ganttContainer.querySelectorAll('.tick');
-    if (ticks.length === 0) return;
+    // Calcular la fecha de inicio (la primera tarea de la lista)
+    let minDate = null;
+    tasksData.forEach(t => {
+        const d = new Date(t.start + 'T00:00:00');
+        if (!minDate || d < minDate) minDate = d;
+    });
+    
+    if (!minDate) return;
 
-    const firstTickDateStr = ticks[0].getAttribute('data-date');
-    if (!firstTickDateStr) return;
+    // Frappe Gantt añade por defecto 2 columnas de relleno (padding) antes de la primera tarea
+    minDate.setDate(minDate.getDate() - 2); 
 
-    const startDate = new Date(firstTickDateStr + 'T00:00:00');
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    // Distancia en días
+    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Si hoy es antes del inicio del gráfico, no dibujar
+    // Si el gráfico aún no llega a hoy, no dibujar
     if (diffDays < 0) return;
 
-    const sidebarWidth = 150; // Ancho estándar de la barra lateral
+    // Calcular el ancho según la vista (Día=40, Semana=60, Mes=100)
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    
     let offsetPx = 0;
-    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
+    
+    if (ganttState.viewMode === 'Day') {
+        offsetPx = diffDays * colWidth;
+    } else if (ganttState.viewMode === 'Week') {
+        offsetPx = (diffDays / 7) * colWidth;
+    } else if (ganttState.viewMode === 'Month') {
+        offsetPx = (diffDays / 30.44) * colWidth;
+    }
 
+    // Ancho de la columna izquierda de Frappe (por defecto 150px)
+    const sidebarWidth = 150; 
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear overlay
+    // Crear el contenedor "Overlay" pegado al Gantt
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
+    
+    // Buscamos la altura del encabezado para que la línea no lo pise
+    const header = ganttContainer.querySelector('.grid-header');
+    const headerHeight = header ? header.offsetHeight : 50;
+
     overlay.style.cssText = `
         position: absolute;
-        top: 0;
-        bottom: 0;
+        top: ${headerHeight}px;
         left: 0;
         right: 0;
+        bottom: 0;
+        overflow: hidden;
         pointer-events: none;
-        z-index: 100;
+        z-index: 50;
     `;
 
     const line = document.createElement('div');
@@ -387,7 +404,6 @@ function pintarColoresYHoy(tasksData) {
         width: 2px;
         background: #ef4444;
         pointer-events: none;
-        z-index: 100;
     `;
     
     line.innerHTML = `
@@ -404,20 +420,28 @@ function pintarColoresYHoy(tasksData) {
             border-radius: 3px;
             white-space: nowrap;
             letter-spacing: 0.5px;
-            z-index: 100;
         ">HOY</div>
     `;
 
     overlay.appendChild(line);
+    ganttWrapper.appendChild(overlay);
 
-    // Inyectar dentro del cuerpo del gráfico para que se mueva con el scroll
-    const gridBody = ganttContainer.querySelector('.grid-body');
-    if (gridBody) {
-        gridBody.style.position = 'relative';
-        gridBody.appendChild(overlay);
+    // Sincronizar con el scroll del gráfico
+    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
+    
+    if (window.todayScrollListener) {
+        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
     }
+    
+    window.todayScrollListener = () => {
+        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
+    };
+    
+    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+    
+    // Forzar actualización visual
+    window.todayScrollListener();
 }
-
 window.toggleGanttEstadoOculto = function(estado, checked) {
     if (checked) {
         if (!ganttState.estadosOcultos.includes(estado)) {
