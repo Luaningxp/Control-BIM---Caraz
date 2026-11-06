@@ -10,7 +10,8 @@ let planosState = {
 export function renderLogPlanos(container) {
     // Calcular cuántas actividades usan cada plano
     const conteoVinculados = {};
-    state.actividadPlanosCache.forEach(ap => {
+  const actividadPlanos = state.actividadPlanosCache || [];
+    actividadPlanos.forEach(ap => {
         conteoVinculados[ap.plano_id] = (conteoVinculados[ap.plano_id] || 0) + 1;
     });
 
