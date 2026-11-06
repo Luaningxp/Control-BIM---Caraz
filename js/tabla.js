@@ -546,6 +546,102 @@ window.clearFilters = function() {
     };
     window.renderView();
 };
+
+// --- LÓGICA DE PLANOS EN EL MODAL ---
+let planosSeleccionados = new Set();
+
+function renderPlanosChips(pendienteId) {
+    planosSeleccionados.clear();
+    if (pendienteId) {
+        const existentes = (state.actividadPlanosCache || [])
+            .filter(ap => ap.pendiente_id === pendienteId)
+            .map(ap => ap.plano_id);
+        existentes.forEach(id => planosSeleccionados.add(id));
+    }
+    actualizarPlanosUI();
+}
+
+function actualizarPlanosUI() {
+    const box = document.getElementById('planos-chips');
+    if (!box) return;
+    if (planosSeleccionados.size === 0) {
+        box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin planos vinculados</span>';
+        return;
+    }
+    box.innerHTML = Array.from(planosSeleccionados).map(pid => {
+        const plano = (state.planosCache || []).find(p => p.id === pid);
+        if (!plano) return '';
+        return `
+            <span class="plano-chip">
+                <i class="fa-solid fa-file-pdf text-[10px]"></i>
+                ${escapeHtml(plano.codigo)}
+                <button type="button" onclick="window.quitarPlano('${pid}')" class="hover:text-red-500 ml-1">×</button>
+            </span>
+        `;
+    }).join('');
+}
+
+function inicializarBuscadorPlanos() {
+    const input = document.getElementById('planos-search');
+    const dropdown = document.getElementById('planos-dropdown');
+    if (!input || !dropdown) return;
+
+    const nuevoInput = input.cloneNode(true);
+    input.parentNode.replaceChild(nuevoInput, input);
+
+    nuevoInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mostrarDropdownPlanos(nuevoInput.value);
+    });
+    nuevoInput.addEventListener('input', (e) => mostrarDropdownPlanos(e.target.value));
+
+    dropdown.addEventListener('mousedown', (e) => e.preventDefault());
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
+    });
+
+    function mostrarDropdownPlanos(query) {
+        const q = (query || '').toLowerCase();
+        const disponibles = (state.planosCache || []).filter(p => {
+            if (planosSeleccionados.has(p.id)) return false;
+            const text = `${p.codigo} ${p.titulo || ''}`.toLowerCase();
+            return text.includes(q);
+        }).slice(0, 30);
+        
+        if (disponibles.length === 0) {
+            dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
+        } else {
+            dropdown.innerHTML = disponibles.map(p => `
+                <div onclick="window.agregarPlano('${p.id}')" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0">
+                    <div class="flex-shrink-0 w-6 h-6 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded flex items-center justify-center">
+                        <i class="fa-solid fa-file-pdf text-[10px]"></i>
+                    </div>
+                    <div class="truncate">
+                        <p class="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${escapeHtml(p.codigo)}</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate">${escapeHtml(p.titulo || p.disciplina || '')}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+        dropdown.classList.remove('hidden');
+    }
+}
+
+window.agregarPlano = function(pid) {
+    planosSeleccionados.add(pid);
+    actualizarPlanosUI();
+    const input = document.getElementById('planos-search');
+    if (input) input.value = '';
+    const dd = document.getElementById('planos-dropdown');
+    if (dd) dd.classList.add('hidden');
+};
+
+window.quitarPlano = function(pid) {
+    planosSeleccionados.delete(pid);
+    actualizarPlanosUI();
+};
+
+
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
