@@ -10,6 +10,8 @@ let planosState = {
     filterEstado: '',
     filterAconex: '',
     showColMenu: false,
+    sortBy: 'codigo', // Ordenar por defecto por código
+    sortDir: 'asc',
     visibleCols: {
         codigo: true, titulo: true, disciplina: true, clasificacion: true, 
         revision: true, fecha: true, estado: true, aconex: true, 
@@ -22,7 +24,7 @@ let planosState = {
     }
 };
 
-// --- SISTEMA DE REDIMENSIONADO ---
+// --- SISTEMA DE REDIMENSIONADO (ANTI-CLIC FANTASMA) ---
 let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
 
 function initResize(e, colKey) {
@@ -32,6 +34,7 @@ function initResize(e, colKey) {
     startWidth = planosState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    // Desactivar clics en los th mientras se redimensiona
     document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'none'; });
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
@@ -60,6 +63,24 @@ function stopResize(e) {
     e.preventDefault(); e.stopPropagation();
 }
 
+// --- FUNCIÓN DE ORDENAMIENTO ---
+function toggleSort(col) {
+    if (planosState.sortBy === col) {
+        planosState.sortDir = planosState.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        planosState.sortBy = col;
+        planosState.sortDir = 'asc';
+    }
+    window.renderView();
+}
+
+function getSortIcon(col) {
+    if (planosState.sortBy !== col) return '<i class="fa-solid fa-sort text-slate-300 dark:text-slate-600 ml-1 text-[10px]"></i>';
+    return planosState.sortDir === 'asc' 
+        ? '<i class="fa-solid fa-sort-up text-sky-600 ml-1 text-[10px]"></i>' 
+        : '<i class="fa-solid fa-sort-down text-sky-600 ml-1 text-[10px]"></i>';
+}
+
 export function renderLogPlanos(container) {
     const conteoVinculados = {};
     const actividadPlanos = state.actividadPlanosCache || [];
@@ -69,13 +90,10 @@ export function renderLogPlanos(container) {
 
     const planos = state.planosCache || [];
 
-    // Extraer opciones únicas para los filtros
     const disciplinas = [...new Set(planos.map(p => p.disciplina).filter(Boolean))].sort();
     const revisiones = [...new Set(planos.map(p => p.revision).filter(Boolean))].sort();
     const estados = [...new Set(planos.map(p => p.estado).filter(Boolean))].sort();
-    const aconexOpts = [...new Set(planos.map(p => p.aconex).filter(Boolean))].sort();
 
-    // Aplicar todos los filtros
     let planosFiltrados = planos.filter(p => {
         const matchSearch = !planosState.search || 
             (p.codigo || '').toLowerCase().includes(planosState.search.toLowerCase()) ||
@@ -86,31 +104,54 @@ export function renderLogPlanos(container) {
         const matchRev = !planosState.filterRevision || p.revision === planosState.filterRevision;
         const matchEst = !planosState.filterEstado || p.estado === planosState.filterEstado;
         const matchAcx = !planosState.filterAconex || (p.aconex || '').toLowerCase().includes(planosState.filterAconex.toLowerCase());
-
-        
         return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx;
+    });
+
+    // LÓGICA DE ORDENAMIENTO
+    planosFiltrados.sort((a, b) => {
+        let valA = a[planosState.sortBy] || '';
+        let valB = b[planosState.sortBy] || '';
+        
+        // Manejo especial si es "actividades"
+        if (planosState.sortBy === 'actividades') {
+            valA = conteoVinculados[a.id] || 0;
+            valB = conteoVinculados[b.id] || 0;
+        }
+
+        // Si son números o fechas
+        if (planosState.sortBy === 'fecha') {
+            valA = valA ? new Date(valA).getTime() : 0;
+            valB = valB ? new Date(valB).getTime() : 0;
+        } else if (typeof valA === 'number') {
+            // Numérico directo
+        } else {
+            // Texto (A-Z)
+            valA = String(valA).toLowerCase();
+            valB = String(valB).toLowerCase();
+        }
+
+        if (valA < valB) return planosState.sortDir === 'asc' ? -1 : 1;
+        if (valA > valB) return planosState.sortDir === 'asc' ? 1 : -1;
+        return 0;
     });
 
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
     const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
-        if (['search', 'showColMenu', 'visibleCols', 'colWidths'].includes(k)) return false;
+        if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir'].includes(k)) return false;
         return v !== '';
     }).length;
 
     const colStyle = (key) => `width: ${planosState.colWidths[key]}px; min-width: ${planosState.colWidths[key]}px; max-width: ${planosState.colWidths[key]}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResizePlanos(event, '${key}')"></div>`;
-    const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 whitespace-nowrap overflow-hidden text-ellipsis";
+    const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700";
 
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full flex-wrap">
-                <!-- BÚSQUEDA RÁPIDA -->
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="pl-search" placeholder="Búsqueda rápida..." value="${planosState.search}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
                 </div>
-                
-                <!-- BOTÓN DE FILTROS PRO -->
                 <button onclick="window.togglePlanosFilterDrawer()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
@@ -122,7 +163,6 @@ export function renderLogPlanos(container) {
                     Mostrando <b>${planosFiltrados.length}</b> de ${planos.length} planos
                 </div>
                 
-                <!-- SELECTOR DE COLUMNAS -->
                 <div class="relative">
                     <button onclick="window.togglePlanosColMenu()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
                         <i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i>
@@ -142,7 +182,6 @@ export function renderLogPlanos(container) {
                     </div>
                 </div>
 
-                <!-- BOTÓN DE IMPORTAR -->
                 ${state.isAdmin || state.isCoordinador ? `
                 <label class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
                     <i class="fa-solid fa-file-import"></i> Importar
@@ -155,20 +194,20 @@ export function renderLogPlanos(container) {
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
             <div class="overflow-x-auto overflow-y-auto max-h-[75vh] custom-scrollbar">
                 <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1400px;">
-                    <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold sticky top-0 z-10 shadow-sm">
+                    <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold sticky top-0 z-10 shadow-sm select-none">
                         <tr>
-                            ${planosState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass}">Código ${resizer('codigo')}</th>` : ''}
-                            ${planosState.visibleCols.titulo ? `<th data-col="titulo" style="${colStyle('titulo')}" class="${thClass}">Título ${resizer('titulo')}</th>` : ''}
-                            ${planosState.visibleCols.disciplina ? `<th data-col="disciplina" style="${colStyle('disciplina')}" class="${thClass}">Disciplina ${resizer('disciplina')}</th>` : ''}
-                            ${planosState.visibleCols.clasificacion ? `<th data-col="clasificacion" style="${colStyle('clasificacion')}" class="${thClass}">Clasificación ${resizer('clasificacion')}</th>` : ''}
-                            ${planosState.visibleCols.revision ? `<th data-col="revision" style="${colStyle('revision')}" class="${thClass}">Rev. ${resizer('revision')}</th>` : ''}
-                            ${planosState.visibleCols.fecha ? `<th data-col="fecha" style="${colStyle('fecha')}" class="${thClass}">Fecha ${resizer('fecha')}</th>` : ''}
-                            ${planosState.visibleCols.estado ? `<th data-col="estado" style="${colStyle('estado')}" class="${thClass}">Estado ${resizer('estado')}</th>` : ''}
-                            ${planosState.visibleCols.aconex ? `<th data-col="aconex" style="${colStyle('aconex')}" class="${thClass}">Aconex ${resizer('aconex')}</th>` : ''}
-                            ${planosState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass}">Responsable ${resizer('responsable')}</th>` : ''}
-                            ${planosState.visibleCols.estatus_bim ? `<th data-col="estatus_bim" style="${colStyle('estatus_bim')}" class="${thClass}">Estatus BIM ${resizer('estatus_bim')}</th>` : ''}
-                            ${planosState.visibleCols.modelo_bim ? `<th data-col="modelo_bim" style="${colStyle('modelo_bim')}" class="${thClass}">Modelo BIM ${resizer('modelo_bim')}</th>` : ''}
-                            ${planosState.visibleCols.actividades ? `<th data-col="actividades" style="${colStyle('actividades')}" class="${thClass} text-center">Actividades ${resizer('actividades')}</th>` : ''}
+                            ${planosState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass}" onclick="window.togglePlanosSort('codigo')">Código ${getSortIcon('codigo')} ${resizer('codigo')}</th>` : ''}
+                            ${planosState.visibleCols.titulo ? `<th data-col="titulo" style="${colStyle('titulo')}" class="${thClass}" onclick="window.togglePlanosSort('titulo')">Título ${getSortIcon('titulo')} ${resizer('titulo')}</th>` : ''}
+                            ${planosState.visibleCols.disciplina ? `<th data-col="disciplina" style="${colStyle('disciplina')}" class="${thClass}" onclick="window.togglePlanosSort('disciplina')">Disciplina ${getSortIcon('disciplina')} ${resizer('disciplina')}</th>` : ''}
+                            ${planosState.visibleCols.clasificacion ? `<th data-col="clasificacion" style="${colStyle('clasificacion')}" class="${thClass}" onclick="window.togglePlanosSort('clasificacion')">Clasificación ${getSortIcon('clasificacion')} ${resizer('clasificacion')}</th>` : ''}
+                            ${planosState.visibleCols.revision ? `<th data-col="revision" style="${colStyle('revision')}" class="${thClass}" onclick="window.togglePlanosSort('revision')">Rev. ${getSortIcon('revision')} ${resizer('revision')}</th>` : ''}
+                            ${planosState.visibleCols.fecha ? `<th data-col="fecha" style="${colStyle('fecha')}" class="${thClass}" onclick="window.togglePlanosSort('fecha')">Fecha ${getSortIcon('fecha')} ${resizer('fecha')}</th>` : ''}
+                            ${planosState.visibleCols.estado ? `<th data-col="estado" style="${colStyle('estado')}" class="${thClass}" onclick="window.togglePlanosSort('estado')">Estado ${getSortIcon('estado')} ${resizer('estado')}</th>` : ''}
+                            ${planosState.visibleCols.aconex ? `<th data-col="aconex" style="${colStyle('aconex')}" class="${thClass}" onclick="window.togglePlanosSort('aconex')">Aconex ${getSortIcon('aconex')} ${resizer('aconex')}</th>` : ''}
+                            ${planosState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass}" onclick="window.togglePlanosSort('responsable')">Responsable ${getSortIcon('responsable')} ${resizer('responsable')}</th>` : ''}
+                            ${planosState.visibleCols.estatus_bim ? `<th data-col="estatus_bim" style="${colStyle('estatus_bim')}" class="${thClass}" onclick="window.togglePlanosSort('estatus_bim')">Estatus BIM ${getSortIcon('estatus_bim')} ${resizer('estatus_bim')}</th>` : ''}
+                            ${planosState.visibleCols.modelo_bim ? `<th data-col="modelo_bim" style="${colStyle('modelo_bim')}" class="${thClass}" onclick="window.togglePlanosSort('modelo_bim')">Modelo BIM ${getSortIcon('modelo_bim')} ${resizer('modelo_bim')}</th>` : ''}
+                            ${planosState.visibleCols.actividades ? `<th data-col="actividades" style="${colStyle('actividades')}" class="${thClass} text-center" onclick="window.togglePlanosSort('actividades')">Actividades ${getSortIcon('actividades')} ${resizer('actividades')}</th>` : ''}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
@@ -195,7 +234,6 @@ export function renderLogPlanos(container) {
         </div>
     `;
 
-    // --- DRAWER DE FILTROS ---
     if (!document.getElementById('planos-filter-drawer')) {
         const drawerHtml = `
             <div id="planos-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.togglePlanosFilterDrawer()"></div>
@@ -205,17 +243,18 @@ export function renderLogPlanos(container) {
                     <button onclick="window.togglePlanosFilterDrawer()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <div class="p-4 space-y-4 text-xs">
-                    
                     <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Código (Texto)</label>
-                        <input type="text" id="drw-pl-codigo" value="${planosState.filterCodigo}" oninput="window.applyPlanosFilter('filterCodigo', this.value)" class="inp" placeholder="Ej. 100003...">
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Código</label>
+                        <input type="text" id="drw-pl-codigo" value="${planosState.filterCodigo}" oninput="window.applyPlanosFilter('filterCodigo', this.value)" class="inp">
                     </div>
-                    
                     <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Título (Texto)</label>
-                        <input type="text" id="drw-pl-titulo" value="${planosState.filterTitulo}" oninput="window.applyPlanosFilter('filterTitulo', this.value)" class="inp" placeholder="Ej. Drenaje pluvial...">
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Título</label>
+                        <input type="text" id="drw-pl-titulo" value="${planosState.filterTitulo}" oninput="window.applyPlanosFilter('filterTitulo', this.value)" class="inp">
                     </div>
-
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex</label>
+                        <input type="text" id="drw-pl-aconex" value="${planosState.filterAconex}" oninput="window.applyPlanosFilter('filterAconex', this.value)" class="inp">
+                    </div>
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Disciplina</label>
                         <select id="drw-pl-disciplina" onchange="window.applyPlanosFilter('filterDisciplina', this.value)" class="inp">
@@ -223,7 +262,6 @@ export function renderLogPlanos(container) {
                             ${disciplinas.map(d => `<option value="${escapeHtml(d)}" ${planosState.filterDisciplina === d ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('')}
                         </select>
                     </div>
-
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Revisión</label>
                         <select id="drw-pl-revision" onchange="window.applyPlanosFilter('filterRevision', this.value)" class="inp">
@@ -231,7 +269,6 @@ export function renderLogPlanos(container) {
                             ${revisiones.map(r => `<option value="${escapeHtml(r)}" ${planosState.filterRevision === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
                         </select>
                     </div>
-
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Estado</label>
                         <select id="drw-pl-estado" onchange="window.applyPlanosFilter('filterEstado', this.value)" class="inp">
@@ -239,12 +276,6 @@ export function renderLogPlanos(container) {
                             ${estados.map(e => `<option value="${escapeHtml(e)}" ${planosState.filterEstado === e ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('')}
                         </select>
                     </div>
-
-                                        <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex (Texto)</label>
-                        <input type="text" id="drw-pl-aconex" value="${planosState.filterAconex}" oninput="window.applyPlanosFilter('filterAconex', this.value)" class="inp" placeholder="Buscar código Aconex...">
-                    </div>
-
                     <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
                         <button onclick="window.clearPlanosFilters()" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
                             <i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros
@@ -256,7 +287,6 @@ export function renderLogPlanos(container) {
         document.body.insertAdjacentHTML('beforeend', drawerHtml);
     }
 
-    // Listener para el buscador rápido (con debounce)
     const inputSearch = document.getElementById('pl-search');
     inputSearch.addEventListener('input', (e) => {
         planosState.search = e.target.value;
@@ -273,7 +303,8 @@ export function renderLogPlanos(container) {
     });
 }
 
-// --- FUNCIONES DE FILTROS Y COLUMNAS ---
+// Exportar funciones
+window.togglePlanosSort = toggleSort;
 window.togglePlanosFilterDrawer = function() {
     const drawer = document.getElementById('planos-filter-drawer');
     const overlay = document.getElementById('planos-filter-drawer-overlay');
@@ -287,12 +318,10 @@ window.togglePlanosFilterDrawer = function() {
         overlay.classList.remove('hidden');
     }
 };
-
 window.applyPlanosFilter = function(key, value) {
     planosState[key] = value;
     window.renderView();
 };
-
 window.clearPlanosFilters = function() {
     planosState.search = '';
     planosState.filterTitulo = '';
@@ -303,27 +332,22 @@ window.clearPlanosFilters = function() {
     planosState.filterAconex = '';
     window.renderView();
 };
-
 window.togglePlanosColMenu = function() {
     planosState.showColMenu = !planosState.showColMenu;
     window.renderView();
 };
-
 window.togglePlanosCol = function(col) {
     planosState.visibleCols[col] = !planosState.visibleCols[col];
     window.renderView();
 };
-
 window.toggleTodasPlanosCols = function(estado) {
     Object.keys(planosState.visibleCols).forEach(k => {
         planosState.visibleCols[k] = estado;
     });
     window.renderView();
 };
-
 window.initResizePlanos = initResize;
 
-// --- IMPORTAR EXCEL ---
 window.handlePlanosUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
