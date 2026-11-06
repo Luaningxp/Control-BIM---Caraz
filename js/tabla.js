@@ -829,6 +829,20 @@ export async function saveTask(e) {
         if (errRec) { toast('Error al guardar recursos: ' + errRec.message); }
     }
 
+        // Guardar Planos
+    await supabaseClient.from('actividad_planos').delete().eq('pendiente_id', parseInt(taskId));
+    if (planosSeleccionados.size > 0) {
+        const planosData = Array.from(planosSeleccionados).map(pid => ({
+            pendiente_id: parseInt(taskId),
+            plano_id: pid
+        }));
+        const { error: errPlanos } = await supabaseClient.from('actividad_planos').insert(planosData);
+        if (errPlanos) { 
+            toast('Error al guardar planos: ' + errPlanos.message); 
+            console.error(errPlanos);
+        }
+    }
+
     closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
 }
 
