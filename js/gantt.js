@@ -336,36 +336,28 @@ function pintarColoresYHoy(tasksData) {
     const ganttContainer = document.getElementById('gantt-container');
     if (!ganttWrapper || !ganttContainer) return;
 
-    // Eliminar anterior
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Obtener el cuerpo de la cuadrícula (donde están las barras)
-    const gridBody = ganttContainer.querySelector('.grid-body');
-    if (!gridBody) return;
+    // Leer la fecha del primer "tick" del calendario (la columna más a la izquierda)
+    const ticks = ganttContainer.querySelectorAll('.tick');
+    if (ticks.length === 0) return;
 
-    // CALCULAR POSICIÓN LEYENDO EL DOM
-    // El ancho de la barra lateral de tareas
-    const sideHeader = ganttContainer.querySelector('.side-header');
-    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
+    const firstTickDateStr = ticks[0].getAttribute('data-date');
+    if (!firstTickDateStr) return;
 
-    // Ancho de cada columna según la vista
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-
-    // Obtener la fecha de inicio del gráfico desde la propiedad interna
-    const startDate = ganttState.currentGantt.gantt_start;
-    if (!startDate) return;
-
+    const startDate = new Date(firstTickDateStr + 'T00:00:00');
     const today = new Date();
     today.setHours(0,0,0,0);
-
-    // Diferencia exacta en días
+    
     const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
     
-    // Si la diferencia es negativa (hoy es antes del inicio del gráfico), no dibujar
+    // Si hoy es antes del inicio del gráfico, no dibujar
     if (diffDays < 0) return;
 
-    // Cálculo de píxeles
+    const sidebarWidth = 150; // Ancho estándar de la barra lateral
+    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+    
     let offsetPx = 0;
     if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
@@ -373,7 +365,7 @@ function pintarColoresYHoy(tasksData) {
 
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear el overlay en la capa correcta para que el scroll lo mueva automáticamente
+    // Crear overlay
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     overlay.style.cssText = `
@@ -386,7 +378,6 @@ function pintarColoresYHoy(tasksData) {
         z-index: 100;
     `;
 
-    // Crear la línea
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
@@ -399,7 +390,6 @@ function pintarColoresYHoy(tasksData) {
         z-index: 100;
     `;
     
-    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -420,15 +410,13 @@ function pintarColoresYHoy(tasksData) {
 
     overlay.appendChild(line);
 
-    // LA CLAVE: Inyectar DENTRO de .grid-body, que es el contenedor que se mueve con el scroll
-    gridBody.style.position = 'relative';
-    gridBody.appendChild(overlay);
+    // Inyectar dentro del cuerpo del gráfico para que se mueva con el scroll
+    const gridBody = ganttContainer.querySelector('.grid-body');
+    if (gridBody) {
+        gridBody.style.position = 'relative';
+        gridBody.appendChild(overlay);
+    }
 }
-
-window.applyGanttFilter = function(key, value) {
-    ganttState[key] = value;
-    window.renderView();
-};
 
 window.toggleGanttEstadoOculto = function(estado, checked) {
     if (checked) {
