@@ -281,7 +281,7 @@ function inicializarGantt(tareas) {
         id: 'today-marker',
         name: 'HOY',
         start: todayStr,
-        end: todayStr, // Día de hoy
+        end: todayStr,
         progress: 0,
         dependencies: '',
         custom_class: 'gantt-today-bar',
@@ -301,7 +301,7 @@ function inicializarGantt(tareas) {
             padding: 18,
             date_format: 'YYYY-MM-DD',
             custom_popup_html: (task) => {
-                if (task.id === 'today-marker') return ''; // No mostrar popup en la línea de hoy
+                if (task.id === 'today-marker') return '';
                 const original = tareas.find(t => String(t.id) === task.id);
                 if (!original) return '';
                 const color = COLORES_ESTADO[original.estado] || '#94a3b8';
@@ -322,45 +322,64 @@ function inicializarGantt(tareas) {
             }
         });
 
-        // Pintar colores y ocultar la barra de hoy
+        // Pintar colores y crear la línea de hoy
         setTimeout(() => {
-            // Pintar colores
             const bars = document.querySelectorAll('.bar-wrapper .bar');
+            
+            // Obtener la altura del contenedor para hacer la línea larga
+            const gridBody = document.querySelector('.grid-body');
+            const gridHeight = gridBody ? gridBody.offsetHeight : 2000;
+
             bars.forEach((bar, idx) => {
                 const t = tasksData[idx];
                 if (!t) return;
                 
                 if (t._is_today) {
-                    // ESTILO DE LA LÍNEA DE HOY
-                    // La ocultamos de la barra normal y dibujamos una línea
+                    // Es la tarea de HOY
                     bar.style.opacity = '0'; 
                     const wrapper = bar.closest('.bar-wrapper');
                     wrapper.style.pointerEvents = 'none';
+                    wrapper.style.zIndex = '50';
                     
-                    // Creamos una línea roja que ocupe todo el alto
                     const line = document.createElement('div');
                     line.style.cssText = `
                         position: absolute;
-                        top: -100px;
-                        bottom: -1000px;
+                        top: 0;
+                        height: ${gridHeight + 100}px;
                         left: 50%;
                         width: 2px;
                         background: #ef4444;
                         transform: translateX(-50%);
                         z-index: 50;
                     `;
-                    line.innerHTML = `<div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;">HOY</div>`;
+                    
+                    line.innerHTML = `
+                        <div style="
+                            position: absolute; 
+                            top: -24px; 
+                            left: 50%; 
+                            transform: translateX(-50%); 
+                            background: #ef4444; 
+                            color: white; 
+                            font-size: 10px; 
+                            font-weight: 700; 
+                            padding: 2px 8px; 
+                            border-radius: 4px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        ">HOY</div>
+                    `;
                     
                     wrapper.style.overflow = 'visible';
                     wrapper.appendChild(line);
                 } else {
+                    // Tareas normales
                     const color = COLORES_ESTADO[t._estado] || '#94a3b8';
                     bar.style.fill = color;
                     const progress = bar.querySelector('.bar-progress');
                     if (progress) progress.style.fill = color;
                 }
             });
-        }, 200);
+        }, 150);
 
         ganttState.currentGantt.on_click = (task) => {
             if (task.id === 'today-marker') return;
