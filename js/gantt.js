@@ -270,8 +270,22 @@ function inicializarGantt(tareas) {
             custom_class: `gantt-bar-${estadoClase}`,
             _estado: t.estado,
             _grupo: t.grupo,
-            _responsable: t.responsable
+            _responsable: t.responsable,
+            _is_today: false
         };
+    });
+
+    // --- INYECTAR TAREA FANTASMA DE HOY ---
+    const todayStr = new Date().toISOString().split('T')[0];
+    tasksData.push({
+        id: 'today-marker',
+        name: 'HOY',
+        start: todayStr,
+        end: todayStr, // Día de hoy
+        progress: 0,
+        dependencies: '',
+        custom_class: 'gantt-today-bar',
+        _is_today: true
     });
 
     try {
@@ -287,6 +301,7 @@ function inicializarGantt(tareas) {
             padding: 18,
             date_format: 'YYYY-MM-DD',
             custom_popup_html: (task) => {
+                if (task.id === 'today-marker') return ''; // No mostrar popup en la línea de hoy
                 const original = tareas.find(t => String(t.id) === task.id);
                 if (!original) return '';
                 const color = COLORES_ESTADO[original.estado] || '#94a3b8';
@@ -301,18 +316,57 @@ function inicializarGantt(tareas) {
                             <p><b class="text-slate-700">Inicio:</b> ${fmtDate(original.fecha_inicio_programado)}</p>
                             <p><b class="text-slate-700">Fin:</b> ${fmtDate(original.fecha_fin)}</p>
                             <p><b class="text-slate-700">Estado:</b> <span style="color: ${color}; font-weight: 700;">${escapeHtml(original.estado)}</span></p>
-                            <p><b class="text-slate-700">Grupo:</b> ${escapeHtml(original.grupo || '-')}</p>
                         </div>
                     </div>
                 `;
             }
         });
 
-        setTimeout(() => pintarColoresYHoy(tasksData), 150);
+        // Pintar colores y ocultar la barra de hoy
+        setTimeout(() => {
+            // Pintar colores
+            const bars = document.querySelectorAll('.bar-wrapper .bar');
+            bars.forEach((bar, idx) => {
+                const t = tasksData[idx];
+                if (!t) return;
+                
+                if (t._is_today) {
+                    // ESTILO DE LA LÍNEA DE HOY
+                    // La ocultamos de la barra normal y dibujamos una línea
+                    bar.style.opacity = '0'; 
+                    const wrapper = bar.closest('.bar-wrapper');
+                    wrapper.style.pointerEvents = 'none';
+                    
+                    // Creamos una línea roja que ocupe todo el alto
+                    const line = document.createElement('div');
+                    line.style.cssText = `
+                        position: absolute;
+                        top: -100px;
+                        bottom: -1000px;
+                        left: 50%;
+                        width: 2px;
+                        background: #ef4444;
+                        transform: translateX(-50%);
+                        z-index: 50;
+                    `;
+                    line.innerHTML = `<div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;">HOY</div>`;
+                    
+                    wrapper.style.overflow = 'visible';
+                    wrapper.appendChild(line);
+                } else {
+                    const color = COLORES_ESTADO[t._estado] || '#94a3b8';
+                    bar.style.fill = color;
+                    const progress = bar.querySelector('.bar-progress');
+                    if (progress) progress.style.fill = color;
+                }
+            });
+        }, 200);
 
         ganttState.currentGantt.on_click = (task) => {
+            if (task.id === 'today-marker') return;
             window.editTask(parseInt(task.id));
         };
+
     } catch (err) {
         console.error('Error al crear Gantt:', err);
         container.innerHTML = `<div class="text-red-500 text-sm p-4">Error al renderizar el Gantt: ${err.message}</div>`;
