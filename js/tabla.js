@@ -138,15 +138,12 @@ function actualizarPlanosUI() {
     box.innerHTML = Array.from(planosSeleccionados).map(pid => {
         const plano = (state.planosCache || []).find(p => p.id === pid);
         if (!plano) return '';
+        // EXACTAMENTE la misma estructura que recursos
         return `
             <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <button type="button" 
-                        onclick="document.activeElement.blur(); window.quitarPlano('${pid}')" 
-                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5 cursor-pointer">
-                    ×
-                </button>
+                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5">×</button>
             </span>
         `;
     }).join('');
@@ -157,6 +154,7 @@ function inicializarBuscadorPlanos() {
     const dropdown = document.getElementById('planos-dropdown');
     if (!input || !dropdown) return;
 
+    // Clonamos el input EXACTAMENTE como en recursos
     const nuevoInput = input.cloneNode(true);
     input.parentNode.replaceChild(nuevoInput, input);
 
@@ -165,10 +163,14 @@ function inicializarBuscadorPlanos() {
         mostrarDropdownPlanos(nuevoInput.value);
     });
     nuevoInput.addEventListener('input', (e) => mostrarDropdownPlanos(e.target.value));
+    
+    // El mousedown es idéntico
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
 
     document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
+        if (!dropdown.contains(e.target) && e.target !== nuevoInput) {
+            dropdown.classList.add('hidden');
+        }
     });
 
     function mostrarDropdownPlanos(query) {
@@ -182,6 +184,7 @@ function inicializarBuscadorPlanos() {
         if (disponibles.length === 0) {
             dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
         } else {
+            // El HTML de la lista es idéntico a recursos
             dropdown.innerHTML = disponibles.map(p => `
                 <div onclick="window.agregarPlano('${p.id}')" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0">
                     <div class="flex-shrink-0 w-6 h-6 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded flex items-center justify-center">
