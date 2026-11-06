@@ -85,7 +85,8 @@ export function renderLogPlanos(container) {
         const matchDisc = !planosState.filterDisciplina || p.disciplina === planosState.filterDisciplina;
         const matchRev = !planosState.filterRevision || p.revision === planosState.filterRevision;
         const matchEst = !planosState.filterEstado || p.estado === planosState.filterEstado;
-        const matchAcx = !planosState.filterAconex || p.aconex === planosState.filterAconex;
+        const matchAcx = !planosState.filterAconex || (p.aconex || '').toLowerCase().includes(planosState.filterAconex.toLowerCase());
+
         
         return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx;
     });
@@ -239,12 +240,9 @@ export function renderLogPlanos(container) {
                         </select>
                     </div>
 
-                    <div>
-                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex</label>
-                        <select id="drw-pl-aconex" onchange="window.applyPlanosFilter('filterAconex', this.value)" class="inp">
-                            <option value="">Todos</option>
-                            ${aconexOpts.map(a => `<option value="${escapeHtml(a)}" ${planosState.filterAconex === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
-                        </select>
+                                        <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex (Texto)</label>
+                        <input type="text" id="drw-pl-aconex" value="${planosState.filterAconex}" oninput="window.applyPlanosFilter('filterAconex', this.value)" class="inp" placeholder="Buscar código Aconex...">
                     </div>
 
                     <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
