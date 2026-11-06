@@ -3,6 +3,13 @@ import {
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar,
     confirmDelete
 } from './utils.js';
+let manpowerState = {
+    search: '',
+    filterResp: '',
+    filterGrupo: '',
+    iniDesde: '',
+    iniHasta: ''
+};
 
 function isUserInvolved(t) {
     const esResponsable = t.responsable_id === state.currentUser.id;
@@ -94,26 +101,57 @@ export function renderMiTrabajo(container) {
 }
 
 export function renderManpower(container) {
-    const registros = state.manpowerCache.filter(m => 
-        state.isAdmin || state.isCoordinador || m.usuario_id === state.currentUser.id
+    // Base: registros visibles según rol
+    let registros = state.manpowerCache.filter(m => 
+        state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
     );
-    
-    const registrosCount = registros.length;
+
+    // Aplicar filtros
+    registros = registros.filter(r => {
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const p = state.perfilesCache.find(x => x.id === r.usuario_id);
+        const nombre = p ? nombreFormateado(p) : 'Desconocido';
+        const grupo = t ? (t.grupo || '') : '';
+        const actividad = t ? t.actividad : 'General';
+
+        const matchSearch = !manpowerState.search || 
+            nombre.toLowerCase().includes(manpowerState.search.toLowerCase()) ||
+            actividad.toLowerCase().includes(manpowerState.search.toLowerCase());
+        const matchResp = !manpowerState.filterResp || r.usuario_id === manpowerState.filterResp;
+        const matchGrupo = !manpowerState.filterGrupo || grupo === manpowerState.filterGrupo;
+        const matchIni = !manpowerState.iniDesde || (r.fecha && r.fecha >= manpowerState.iniDesde);
+        const matchFin = !manpowerState.iniHasta || (r.fecha && r.fecha <= manpowerState.iniHasta);
+
+        return matchSearch && matchResp && matchGrupo && matchIni && matchFin;
+    });
+
+    const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
+    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
+
+    const filtrosActivos = Object.values(manpowerState).filter(v => v !== '').length;
+    const totalPct = registros.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
 
     container.innerHTML = `
-        <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
-            <div>
-                <h3 class="font-bold text-sm text-slate-800">Registro MANPOWER</h3>
-                <p class="text-[11px] text-slate-500">Registra el % del día que dedicaste a cada actividad.</p>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+            <div class="flex flex-1 items-center gap-2 w-full">
+                <div class="relative w-full max-w-xs">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="mp-search" placeholder="Buscar usuario o actividad..." value="${manpowerState.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                </div>
+                <button onclick="window.toggleManpowerFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
+                    <i class="fa-solid fa-filter"></i> Filtros
+                    ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
             </div>
             <div class="flex items-center gap-3">
                 <div class="text-right hidden md:block">
-                    <p class="text-[10px] text-slate-500 uppercase font-bold">Total Registros</p>
-                    <p class="text-lg font-bold text-sky-700">${registrosCount}</p>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold">Total %</p>
+                    <p class="text-lg font-bold text-sky-700">${totalPct.toFixed(0)}%</p>
                 </div>
                 <button onclick="window.openManpowerModal()" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700">+ Registrar %</button>
             </div>
         </div>
+
         <div class="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -145,13 +183,93 @@ export function renderManpower(container) {
                                 </td>
                             ` : ''}
                         </tr>`;
-                    }).join('') || `<tr><td colspan="${state.isAdmin ? 6 : 5}" class="text-center py-6 text-slate-400">No hay registros de % aún.</td></tr>`}
+                    }).join('') || `<tr><td colspan="${state.isAdmin ? 6 : 5}" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
                 </tbody>
             </table>
         </div>
     `;
+
+    // Drawer de filtros
+    if (!document.getElementById('manpower-filter-drawer')) {
+        const drawerHtml = `
+            <div id="manpower-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleManpowerFilterDrawer()"></div>
+            <div id="manpower-filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+                <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-sm text-slate-800">Filtros MANPOWER</h3>
+                    <button onclick="window.toggleManpowerFilterDrawer()" class="text-slate-400 hover:text-slate-700">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-4 space-y-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Usuario</label>
+                        <select id="mp-drawer-resp" class="inp" onchange="window.applyManpowerFilter('filterResp', this.value)">
+                            <option value="">Todos</option>
+                            ${respOpts.map(r => `<option value="${r.id}" ${manpowerState.filterResp === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Grupo</label>
+                        <select id="mp-drawer-grupo" class="inp" onchange="window.applyManpowerFilter('filterGrupo', this.value)">
+                            <option value="">Todos</option>
+                            ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${manpowerState.filterGrupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <h4 class="font-bold text-slate-700 mb-2">Rango de fechas</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
+                                <input type="date" id="mp-drawer-ini" class="inp" value="${manpowerState.iniDesde || ''}" onchange="window.applyManpowerFilter('iniDesde', this.value)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
+                                <input type="date" id="mp-drawer-fin" class="inp" value="${manpowerState.iniHasta || ''}" onchange="window.applyManpowerFilter('iniHasta', this.value)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <button onclick="window.clearManpowerFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', drawerHtml);
+    }
+
+    document.getElementById('mp-search').addEventListener('input', (e) => {
+        manpowerState.search = e.target.value;
+        setTimeout(() => window.renderView(), 300);
+    });
 }
 
+window.toggleManpowerFilterDrawer = function() {
+    const drawer = document.getElementById('manpower-filter-drawer');
+    const overlay = document.getElementById('manpower-filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyManpowerFilter = function(key, value) {
+    manpowerState[key] = value;
+    window.renderView();
+};
+
+window.clearManpowerFilters = function() {
+    manpowerState = { search: '', filterResp: '', filterGrupo: '', iniDesde: '', iniHasta: '' };
+    window.renderView();
+};
 export function openManpowerModal(pendienteId, fechaPredefinida) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
