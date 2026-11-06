@@ -320,7 +320,7 @@ function inicializarGantt(tareas) {
 }
 
 function pintarColoresYHoy(tasksData) {
-    // 1. Pintar las barras
+    // 1. Pintar las barras con sus colores
     const bars = document.querySelectorAll('.bar-wrapper .bar');
     bars.forEach((bar, idx) => {
         const t = tasksData[idx];
@@ -331,55 +331,65 @@ function pintarColoresYHoy(tasksData) {
         if (progress) progress.style.fill = color;
     });
 
-    // 2. Configurar Línea de HOY
+    // 2. Dibujar Línea de HOY
     const ganttWrapper = document.getElementById('gantt-wrapper');
     const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttWrapper || !ganttContainer) return;
+    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
 
-    // Eliminar capas anteriores
+    // Eliminar capa anterior si existe
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Obtener la fecha real de inicio del gráfico (leyendo el primer tick)
-    const ticks = ganttContainer.querySelectorAll('.tick');
-    if (ticks.length === 0) return;
+    // Calcular fecha de inicio (primera tarea - 2 días de padding)
+    let minDate = null;
+    tasksData.forEach(t => {
+        const d = new Date(t.start + 'T00:00:00');
+        if (!minDate || d < minDate) minDate = d;
+    });
+    if (!minDate) return;
     
-    const firstTickDate = ticks[0].getAttribute('data-date');
-    if (!firstTickDate) return;
+    // Frappe añade 2 días de padding antes de la primera tarea
+    minDate.setDate(minDate.getDate() - 2); 
 
-    const startDate = new Date(firstTickDate + 'T00:00:00');
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    // Calcular diferencia de días
-    const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    // Días de diferencia entre el inicio del gráfico y hoy
+    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Anchos
-    const sidebarWidth = 150; // Ancho por defecto de Frappe
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    
-    let offsetPx = 0;
-    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
+    // Si hoy es antes de que empiece el gráfico, no mostramos la línea
+    if (diffDays < 0) return;
 
+    // Calcular ancho de píxeles según la vista
+    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+    let offsetPx = 0;
+    
+    if (ganttState.viewMode === 'Day') {
+        offsetPx = diffDays * colWidth;
+    } else if (ganttState.viewMode === 'Week') {
+        offsetPx = (diffDays / 7) * colWidth;
+    } else if (ganttState.viewMode === 'Month') {
+        offsetPx = (diffDays / 30.44) * colWidth;
+    }
+
+    const sidebarWidth = 150; // Ancho de la columna de nombres
     const finalLeft = sidebarWidth + offsetPx;
 
-    // 3. Crear el "cristal" overlay que contiene la línea
+    // Crear contenedor "Overlay" para evitar que la línea se salga o pise los encabezados
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Obtener la altura del header para no taparlo
+    // Buscar la altura del encabezado
     const header = ganttContainer.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
     overlay.style.cssText = `
         position: absolute;
-        top: ${headerHeight}px;
+        top: ${headerHeight}px; /* Evita pisar el encabezado */
         left: 0;
         right: 0;
         bottom: 0;
-        overflow: hidden; /* Evita que la línea se salga del gráfico */
+        overflow: hidden; /* Recorta la línea cuando sale del área */
         pointer-events: none;
         z-index: 50;
     `;
@@ -415,7 +425,7 @@ function pintarColoresYHoy(tasksData) {
     overlay.appendChild(line);
     ganttWrapper.appendChild(overlay);
 
-    // 4. Sincronizar el scroll
+    // Sincronizar con el scroll horizontal del gráfico
     const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
     
     if (window.todayScrollListener) {
@@ -423,13 +433,12 @@ function pintarColoresYHoy(tasksData) {
     }
     
     window.todayScrollListener = () => {
-        // Movemos la línea en sentido contrario al scroll
         line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
     };
     
     scrollWrapper.addEventListener('scroll', window.todayScrollListener);
     
-    // Forzar un primer movimiento por si ya estaba scrolleado
+    // Forzar una actualización inicial por si ya estaba scrolleado
     window.todayScrollListener();
 }
 
