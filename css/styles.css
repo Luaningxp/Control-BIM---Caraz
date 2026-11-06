@@ -216,3 +216,36 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 .dark .card h3 {
     color: inherit; /* Toma el color del contenedor padre (que ya forzamos a claro) */
 }
+/* =========================================
+   ARREGLO DE LA MATRIZ EISENHOWER EN OSCURO
+   ========================================= */
+
+/* Forzar a que los títulos de los cuadrantes sean claros y brillantes */
+.dark .eis-q h4 {
+    color: #ffffff !important;
+}
+
+/* Cambiar el fondo de los cuadrantes a un tono oscuro (semitransparente para que se vea pro) */
+.dark .eis-q.bg-red-50 { background-color: rgba(220, 38, 38, 0.15) !important; border-color: rgba(220, 38, 38, 0.4) !important; }
+.dark .eis-q.bg-sky-50 { background-color: rgba(2, 132, 199, 0.15) !important; border-color: rgba(2, 132, 199, 0.4) !important; }
+.dark .eis-q.bg-amber-50 { background-color: rgba(245, 158, 11, 0.15) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
+.dark .eis-q.bg-slate-50 { background-color: rgba(100, 116, 139, 0.15) !important; border-color: rgba(100, 116, 139, 0.4) !important; }
+
+/* Ajustar el color del contador (el circulito blanco) y su texto */
+.dark .eis-q span.bg-white {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+/* Arreglar las tarjetas blancas dentro de los cuadrantes */
+.dark .eis-q .bg-white {
+    background-color: #1e293b !important; /* Fondo de tarjeta oscuro */
+    border-color: #334155 !important;
+}
+.dark .eis-q .bg-white p {
+    color: #e2e8f0 !important; /* Texto claro */
+}
+.dark .eis-q .bg-white .text-slate-500 {
+    color: #94a3b8 !important; /* Subtítulos claros */
+}
