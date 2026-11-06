@@ -503,30 +503,7 @@ function renderCustomProps(pendienteId) {
     const container = document.getElementById('custom-props-container');
     const inputs = document.getElementById('custom-props-inputs');
     
-    // 1. Inyectar el buscador de planos SIEMPRE, justo antes del contenedor de propiedades
-    const planosWrapper = document.getElementById('planos-wrapper-dynamic');
-    if (planosWrapper) {
-        planosWrapper.innerHTML = `
-            <div class="relative">
-                <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Planos Asociados</label>
-                <div id="planos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
-                <div class="relative">
-                    <input type="text" id="planos-search" placeholder="Escribe código o título de plano..." 
-                           class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
-                    <div id="planos-dropdown" class="hidden absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
-                </div>
-            </div>
-        `;
-        renderPlanosChips(pendienteId);
-        inicializarBuscadorPlanos();
-    }
-
-    // 2. Renderizar las propiedades personalizadas normales (sin 'planos')
-    if (state.propDefsCache.length === 0) { 
-        container.classList.add('hidden'); 
-        return; 
-    }
-    
+    // Solo renderizamos las propiedades personalizadas que NO son de tipo 'planos'
     const otrosProps = state.propDefsCache.filter(pd => pd.tipo !== 'planos');
     
     if (otrosProps.length === 0) {
