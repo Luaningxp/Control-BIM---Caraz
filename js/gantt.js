@@ -26,10 +26,8 @@ const COLORES_ESTADO = {
 };
 
 export function renderGantt(container) {
-    // Base: tareas con fechas asignadas
     const tareasConFechas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
 
-    // Aplicar filtros
     let tareas = tareasConFechas.filter(t => {
         const matchGrupo = !ganttState.filterGrupo || t.grupo === ganttState.filterGrupo;
         const matchResp = !ganttState.filterResp || t.responsable_id === ganttState.filterResp;
@@ -94,7 +92,6 @@ export function renderGantt(container) {
                 <i class="fa-solid fa-calendar-days text-3xl text-slate-300 mb-3"></i>
                 <p class="text-sm font-semibold mb-1">No hay actividades para mostrar</p>
                 <p class="text-xs">Las tareas necesitan tener Fecha Inicio y Fin Prog.</p>
-                ${sinFechas > 0 ? `<p class="text-xs text-amber-600 mt-2">Hay ${sinFechas} tarea(s) sin fechas.</p>` : ''}
             </div>
         ` : `
             <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
@@ -131,7 +128,7 @@ export function renderGantt(container) {
                     <p class="text-[11px] text-slate-400">Mostrando ${tareas.length} de ${state.tasksCache.length}</p>
                 </div>
 
-                <div id="gantt-wrapper" class="relative overflow-x-auto">
+                <div id="gantt-wrapper" class="relative w-full overflow-x-auto">
                     <div id="gantt-container" class="relative"></div>
                 </div>
             </div>
@@ -151,9 +148,7 @@ export function renderGantt(container) {
             <div id="gantt-filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
                 <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 class="font-bold text-sm text-slate-800">Filtros del Gantt</h3>
-                    <button onclick="window.toggleGanttFilterDrawer()" class="text-slate-400 hover:text-slate-700">
-                        <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
+                    <button onclick="window.toggleGanttFilterDrawer()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 <div class="p-4 space-y-4 text-xs">
                     <div>
@@ -182,63 +177,33 @@ export function renderGantt(container) {
                         <div class="space-y-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
                             ${estadosOpts.map(e => `
                                 <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" class="rounded text-red-600" 
-                                           ${ganttState.estadosOcultos.includes(e) ? 'checked' : ''}
-                                           onchange="window.toggleGanttEstadoOculto('${e}', this.checked)">
+                                    <input type="checkbox" class="rounded text-red-600" ${ganttState.estadosOcultos.includes(e) ? 'checked' : ''} onchange="window.toggleGanttEstadoOculto('${e}', this.checked)">
                                     <span class="text-slate-700">${e}</span>
                                 </label>
                             `).join('')}
                         </div>
                     </div>
-
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
                         <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
-                                <input type="date" id="gantt-drawer-ini-desde" class="inp" value="${ganttState.iniDesde || ''}" onchange="window.applyGanttFilter('iniDesde', this.value)">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
-                                <input type="date" id="gantt-drawer-ini-hasta" class="inp" value="${ganttState.iniHasta || ''}" onchange="window.applyGanttFilter('iniHasta', this.value)">
-                            </div>
+                            <div><label class="block text-[10px] text-slate-500 mb-1">Desde</label><input type="date" id="gantt-drawer-ini-desde" class="inp" value="${ganttState.iniDesde || ''}" onchange="window.applyGanttFilter('iniDesde', this.value)"></div>
+                            <div><label class="block text-[10px] text-slate-500 mb-1">Hasta</label><input type="date" id="gantt-drawer-ini-hasta" class="inp" value="${ganttState.iniHasta || ''}" onchange="window.applyGanttFilter('iniHasta', this.value)"></div>
                         </div>
                     </div>
-
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="font-bold text-slate-700 mb-2">Fecha Fin Prog.</h4>
                         <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
-                                <input type="date" id="gantt-drawer-fin-desde" class="inp" value="${ganttState.finDesde || ''}" onchange="window.applyGanttFilter('finDesde', this.value)">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
-                                <input type="date" id="gantt-drawer-fin-hasta" class="inp" value="${ganttState.finHasta || ''}" onchange="window.applyGanttFilter('finHasta', this.value)">
-                            </div>
+                            <div><label class="block text-[10px] text-slate-500 mb-1">Desde</label><input type="date" id="gantt-drawer-fin-desde" class="inp" value="${ganttState.finDesde || ''}" onchange="window.applyGanttFilter('finDesde', this.value)"></div>
+                            <div><label class="block text-[10px] text-slate-500 mb-1">Hasta</label><input type="date" id="gantt-drawer-fin-hasta" class="inp" value="${ganttState.finHasta || ''}" onchange="window.applyGanttFilter('finHasta', this.value)"></div>
                         </div>
                     </div>
-
                     <div class="border-t border-slate-200 pt-4 space-y-2">
                         <h4 class="font-bold text-slate-700 mb-2">Semáforo</h4>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" class="rounded text-sky-600" ${ganttState.soloVencidas ? 'checked' : ''} onchange="window.applyGanttFilter('soloVencidas', this.checked)">
-                            Solo vencidas
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" class="rounded text-sky-600" ${ganttState.soloPorVencer ? 'checked' : ''} onchange="window.applyGanttFilter('soloPorVencer', this.checked)">
-                            Solo por vencer (≤ 7 días)
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" class="rounded text-sky-600" ${ganttState.soloSinFecha ? 'checked' : ''} onchange="window.applyGanttFilter('soloSinFecha', this.checked)">
-                            Solo sin fecha
-                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${ganttState.soloVencidas ? 'checked' : ''} onchange="window.applyGanttFilter('soloVencidas', this.checked)"> Solo vencidas</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${ganttState.soloPorVencer ? 'checked' : ''} onchange="window.applyGanttFilter('soloPorVencer', this.checked)"> Solo por vencer (≤ 7 días)</label>
                     </div>
-
                     <div class="border-t border-slate-200 pt-4">
-                        <button onclick="window.clearGanttFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
-                            <i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros
-                        </button>
+                        <button onclick="window.clearGanttFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"><i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros</button>
                     </div>
                 </div>
             </div>
@@ -247,7 +212,7 @@ export function renderGantt(container) {
     }
 
     if (tareas.length > 0) {
-        setTimeout(() => inicializarGantt(tareas), 100);
+        setTimeout(() => inicializarGantt(tareas), 150);
     }
 }
 
@@ -255,10 +220,11 @@ function inicializarGantt(tareas) {
     const container = document.getElementById('gantt-container');
     if (!container) return;
 
-    if (ganttState.currentGantt) ganttState.currentGantt = null;
+    if (ganttState.currentGantt) {
+        ganttState.currentGantt = null;
+    }
     container.innerHTML = '';
 
-    // 1. Solo mapeamos las tareas reales
     const tasksData = tareas.map(t => {
         const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
         return {
@@ -308,9 +274,8 @@ function inicializarGantt(tareas) {
             }
         });
 
-        // 2. Pintar colores y crear la línea de hoy
+        // Pintar colores y línea de hoy
         setTimeout(() => {
-            // Pintar colores de las barras
             const bars = document.querySelectorAll('.bar-wrapper .bar');
             bars.forEach((bar, idx) => {
                 const t = tasksData[idx];
@@ -321,105 +286,7 @@ function inicializarGantt(tareas) {
                 if (progress) progress.style.fill = color;
             });
 
-            // Crear Línea de HOY
-            const ganttWrapper = document.getElementById('gantt-wrapper');
-            if (!ganttWrapper || tasksData.length === 0) return;
-
-            const oldOverlay = document.getElementById('gantt-today-overlay');
-            if (oldOverlay) oldOverlay.remove();
-
-            // Calcular la fecha de inicio del gráfico
-            let minDate = null;
-            tasksData.forEach(t => {
-                const d = new Date(t.start + 'T00:00:00');
-                if (!minDate || d < minDate) minDate = d;
-            });
-            if (!minDate) return;
-            
-            // Restar 2 días por el padding por defecto de Frappe
-            minDate.setDate(minDate.getDate() - 2); 
-
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
-            
-            if (diffDays < 0) return;
-
-            const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-            let offsetPx = 0;
-            
-            if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-            else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-            else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
-
-            const sidebarWidth = 150; 
-            const finalLeft = sidebarWidth + offsetPx;
-
-            // Crear contenedor
-            const overlay = document.createElement('div');
-            overlay.id = 'gantt-today-overlay';
-            
-            // Calcular la altura para que no pise el encabezado
-            const header = ganttWrapper.querySelector('.grid-header');
-            const headerHeight = header ? header.offsetHeight : 50;
-
-            overlay.style.cssText = `
-                position: absolute;
-                top: ${headerHeight}px;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                overflow: hidden;
-                pointer-events: none;
-                z-index: 50;
-            `;
-
-            // Crear línea
-            const line = document.createElement('div');
-            line.style.cssText = `
-                position: absolute;
-                top: 0;
-                bottom: 0;
-                left: ${finalLeft}px;
-                width: 2px;
-                background: #ef4444;
-                pointer-events: none;
-            `;
-            
-            line.innerHTML = `
-                <div style="
-                    position: absolute;
-                    top: 0;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: #ef4444;
-                    color: white;
-                    font-size: 9px;
-                    font-weight: 700;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    white-space: nowrap;
-                    letter-spacing: 0.5px;
-                ">HOY</div>
-            `;
-
-            overlay.appendChild(line);
-            ganttWrapper.style.position = 'relative';
-            ganttWrapper.appendChild(overlay);
-
-            // Sincronizar con el scroll
-            const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
-            if (window.todayScrollListener) {
-                scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
-            }
-            
-            window.todayScrollListener = () => {
-                line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
-            };
-            
-            scrollWrapper.addEventListener('scroll', window.todayScrollListener);
-            window.todayScrollListener();
-
+            dibujarLineaHoy(tasksData);
         }, 200);
 
         ganttState.currentGantt.on_click = (task) => {
@@ -428,30 +295,20 @@ function inicializarGantt(tareas) {
 
     } catch (err) {
         console.error('Error al crear Gantt:', err);
-        container.innerHTML = `<div class="text-red-500 text-sm p-4">Error al renderizar el Gantt: ${err.message}</div>`;
+        container.innerHTML = `<div class="text-red-500 text-sm p-4">Error: ${err.message}</div>`;
     }
 }
 
-function pintarColoresYHoy(tasksData) {
-    // 1. Pintar las barras
-    const bars = document.querySelectorAll('.bar-wrapper .bar');
-    bars.forEach((bar, idx) => {
-        const t = tasksData[idx];
-        if (!t) return;
-        const color = COLORES_ESTADO[t._estado] || '#94a3b8';
-        bar.style.fill = color;
-        const progress = bar.querySelector('.bar-progress');
-        if (progress) progress.style.fill = color;
-    });
-
-    // 2. Línea de HOY
+// DIBUJO ROBUSTO DE LA LÍNEA DE HOY
+function dibujarLineaHoy(tasksData) {
     const ganttWrapper = document.getElementById('gantt-wrapper');
-    if (!ganttWrapper || tasksData.length === 0) return;
+    const ganttContainer = document.getElementById('gantt-container');
+    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
 
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Encontrar la fecha más antigua
+    // Encontrar la fecha más antigua (inicio del gráfico)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
@@ -459,12 +316,16 @@ function pintarColoresYHoy(tasksData) {
     });
     
     if (!minDate) return;
+    
+    // Restar 2 días de padding por defecto de Frappe
+    minDate.setDate(minDate.getDate() - 2); 
 
     const today = new Date();
     today.setHours(0,0,0,0);
     const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Calcular ancho según vista
+    if (diffDays < 0) return;
+
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
@@ -472,20 +333,17 @@ function pintarColoresYHoy(tasksData) {
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // Ancho REAL de la columna izquierda de Frappe Gantt
-    // Si el texto de las tareas es largo, Frappe hace la columna más ancha
-    const sideHeader = ganttWrapper.querySelector('.side-header');
+    // Ancho de la barra lateral
+    const sideHeader = ganttContainer.querySelector('.side-header');
     const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
     
-    // Posición exacta
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear Overlay
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Encontrar la altura del encabezado
-    const header = ganttWrapper.querySelector('.grid-header');
+    // Calcular altura del header
+    const header = ganttContainer.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
     overlay.style.cssText = `
@@ -496,10 +354,9 @@ function pintarColoresYHoy(tasksData) {
         bottom: 0;
         overflow: hidden;
         pointer-events: none;
-        z-index: 50;
+        z-index: 999;
     `;
 
-    // Crear Línea
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
@@ -507,8 +364,9 @@ function pintarColoresYHoy(tasksData) {
         bottom: 0;
         left: ${finalLeft}px;
         width: 2px;
-        background: #ef4444;
+        background: #dc2626; /* Rojo intenso */
         pointer-events: none;
+        box-shadow: 0 0 4px rgba(220, 38, 38, 0.5); /* Brillo para que resalte */
     `;
     
     line.innerHTML = `
@@ -517,14 +375,15 @@ function pintarColoresYHoy(tasksData) {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background: #ef4444;
+            background: #dc2626;
             color: white;
-            font-size: 9px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
             white-space: nowrap;
             letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         ">HOY</div>
     `;
 
@@ -532,26 +391,69 @@ function pintarColoresYHoy(tasksData) {
     ganttWrapper.style.position = 'relative';
     ganttWrapper.appendChild(overlay);
 
-    // Scroll
+    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
+    
     if (window.todayScrollListener) {
-        ganttWrapper.removeEventListener('scroll', window.todayScrollListener);
+        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
     }
     
     window.todayScrollListener = () => {
-        line.style.transform = `translateX(-${ganttWrapper.scrollLeft}px)`;
+        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
     };
     
-    ganttWrapper.addEventListener('scroll', window.todayScrollListener);
+    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
     window.todayScrollListener();
 }
+
+// MANEJO DE VISTAS SIN ROMPER EL GRÁFICO
+window.setGanttView = function(mode) {
+    ganttState.viewMode = mode;
+    if (ganttState.currentGantt) {
+        ganttState.currentGantt.change_view_mode(mode);
+        setTimeout(() => {
+            const tareasFiltradas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
+            dibujarLineaHoy(tareasFiltradas);
+        }, 300);
+        window.renderView();
+    } else {
+        window.renderView();
+    }
+};
+
+window.toggleGanttFilterDrawer = function() {
+    const drawer = document.getElementById('gantt-filter-drawer');
+    const overlay = document.getElementById('gantt-filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyGanttFilter = function(key, value) {
+    ganttState[key] = value;
+    window.renderView();
+};
+
+window.toggleGanttEstadoOculto = function(estado, checked) {
+    if (checked) {
+        if (!ganttState.estadosOcultos.includes(estado)) ganttState.estadosOcultos.push(estado);
+    } else {
+        ganttState.estadosOcultos = ganttState.estadosOcultos.filter(e => e !== estado);
+    }
+    window.renderView();
+};
 
 window.clearGanttFilters = function() {
     ganttState = {
         filterGrupo: '', filterResp: '', filterRecursos: '', estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
-        viewMode: ganttState.viewMode,
-        currentGantt: ganttState.currentGantt
+        viewMode: ganttState.viewMode, currentGantt: ganttState.currentGantt
     };
     window.renderView();
 };
