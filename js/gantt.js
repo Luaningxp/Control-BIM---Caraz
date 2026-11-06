@@ -136,12 +136,10 @@ export function renderGantt(container) {
             <p class="text-[11px] text-slate-400 mt-2">
                 <i class="fa-solid fa-circle-info mr-1"></i>
                 Las tareas que no tienen fecha de inicio o fin no se muestran en el Gantt.
-                ${sinFechas > 0 ? ` <span class="text-amber-600">(${sinFechas} sin fechas)</span>` : ''}
             </p>
         `}
     `;
 
-    // Drawer de filtros
     if (!document.getElementById('gantt-filter-drawer')) {
         const drawerHtml = `
             <div id="gantt-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleGanttFilterDrawer()"></div>
@@ -183,24 +181,10 @@ export function renderGantt(container) {
                             `).join('')}
                         </div>
                     </div>
-                    <div class="border-t border-slate-200 pt-4">
-                        <h4 class="font-bold text-slate-700 mb-2">Fecha Inicio Prog.</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] text-slate-500 mb-1">Desde</label><input type="date" id="gantt-drawer-ini-desde" class="inp" value="${ganttState.iniDesde || ''}" onchange="window.applyGanttFilter('iniDesde', this.value)"></div>
-                            <div><label class="block text-[10px] text-slate-500 mb-1">Hasta</label><input type="date" id="gantt-drawer-ini-hasta" class="inp" value="${ganttState.iniHasta || ''}" onchange="window.applyGanttFilter('iniHasta', this.value)"></div>
-                        </div>
-                    </div>
-                    <div class="border-t border-slate-200 pt-4">
-                        <h4 class="font-bold text-slate-700 mb-2">Fecha Fin Prog.</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[10px] text-slate-500 mb-1">Desde</label><input type="date" id="gantt-drawer-fin-desde" class="inp" value="${ganttState.finDesde || ''}" onchange="window.applyGanttFilter('finDesde', this.value)"></div>
-                            <div><label class="block text-[10px] text-slate-500 mb-1">Hasta</label><input type="date" id="gantt-drawer-fin-hasta" class="inp" value="${ganttState.finHasta || ''}" onchange="window.applyGanttFilter('finHasta', this.value)"></div>
-                        </div>
-                    </div>
                     <div class="border-t border-slate-200 pt-4 space-y-2">
                         <h4 class="font-bold text-slate-700 mb-2">Semáforo</h4>
                         <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${ganttState.soloVencidas ? 'checked' : ''} onchange="window.applyGanttFilter('soloVencidas', this.checked)"> Solo vencidas</label>
-                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${ganttState.soloPorVencer ? 'checked' : ''} onchange="window.applyGanttFilter('soloPorVencer', this.checked)"> Solo por vencer (≤ 7 días)</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${ganttState.soloPorVencer ? 'checked' : ''} onchange="window.applyGanttFilter('soloPorVencer', this.checked)"> Solo por vencer</label>
                     </div>
                     <div class="border-t border-slate-200 pt-4">
                         <button onclick="window.clearGanttFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50"><i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros</button>
@@ -225,6 +209,7 @@ function inicializarGantt(tareas) {
     }
     container.innerHTML = '';
 
+    // 1. Mapear tareas
     const tasksData = tareas.map(t => {
         const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
         return {
@@ -241,6 +226,21 @@ function inicializarGantt(tareas) {
         };
     });
 
+    // 2. INYECTAR LA TAREA DE HOY
+    // Obtenemos la fecha de hoy en formato YYYY-MM-DD
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    tasksData.push({
+        id: 'today-line',
+        name: 'HOY',
+        start: todayStr,
+        end: todayStr, // Dura 1 día
+        progress: 0,
+        dependencies: '',
+        custom_class: 'gantt-today-marker',
+        _isToday: true
+    });
+
     try {
         ganttState.currentGantt = new Gantt('#gantt-container', tasksData, {
             view_mode: ganttState.viewMode,
@@ -254,6 +254,7 @@ function inicializarGantt(tareas) {
             padding: 18,
             date_format: 'YYYY-MM-DD',
             custom_popup_html: (task) => {
+                if (task.id === 'today-line') return '';
                 const original = tareas.find(t => String(t.id) === task.id);
                 if (!original) return '';
                 const color = COLORES_ESTADO[original.estado] || '#94a3b8';
@@ -267,29 +268,73 @@ function inicializarGantt(tareas) {
                         <div class="text-[11px] text-slate-500 space-y-0.5 pt-2 border-t border-slate-100">
                             <p><b class="text-slate-700">Inicio:</b> ${fmtDate(original.fecha_inicio_programado)}</p>
                             <p><b class="text-slate-700">Fin:</b> ${fmtDate(original.fecha_fin)}</p>
-                            <p><b class="text-slate-700">Estado:</b> <span style="color: ${color}; font-weight: 700;">${escapeHtml(original.estado)}</span></p>
                         </div>
                     </div>
                 `;
             }
         });
 
-        // Pintar colores y línea de hoy
+        // 3. Pintar colores y convertir la tarea de hoy en una línea roja
         setTimeout(() => {
             const bars = document.querySelectorAll('.bar-wrapper .bar');
             bars.forEach((bar, idx) => {
                 const t = tasksData[idx];
                 if (!t) return;
-                const color = COLORES_ESTADO[t._estado] || '#94a3b8';
-                bar.style.fill = color;
-                const progress = bar.querySelector('.bar-progress');
-                if (progress) progress.style.fill = color;
-            });
+                
+                if (t._isToday) {
+                    // Ocultar la barra original
+                    bar.style.opacity = '0';
+                    const wrapper = bar.closest('.bar-wrapper');
+                    wrapper.style.pointerEvents = 'none';
+                    wrapper.style.zIndex = '50';
+                    
+                    // Obtener la altura total del gráfico
+                    const gridBody = document.querySelector('.grid-body');
+                    const gridHeight = gridBody ? gridBody.offsetHeight : 2000;
 
-            dibujarLineaHoy(tasksData);
+                    // Dibujar la línea roja
+                    const line = document.createElement('div');
+                    line.style.cssText = `
+                        position: absolute;
+                        top: 0;
+                        height: ${gridHeight + 100}px;
+                        left: 50%;
+                        width: 2px;
+                        background: #ef4444;
+                        transform: translateX(-50%);
+                        z-index: 50;
+                    `;
+                    
+                    // Etiqueta "HOY"
+                    line.innerHTML = `
+                        <div style="
+                            position: absolute; 
+                            top: -24px; 
+                            left: 50%; 
+                            transform: translateX(-50%); 
+                            background: #ef4444; 
+                            color: white; 
+                            font-size: 10px; 
+                            font-weight: 700; 
+                            padding: 2px 8px; 
+                            border-radius: 4px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        ">HOY</div>
+                    `;
+                    
+                    wrapper.style.overflow = 'visible';
+                    wrapper.appendChild(line);
+                } else {
+                    const color = COLORES_ESTADO[t._estado] || '#94a3b8';
+                    bar.style.fill = color;
+                    const progress = bar.querySelector('.bar-progress');
+                    if (progress) progress.style.fill = color;
+                }
+            });
         }, 200);
 
         ganttState.currentGantt.on_click = (task) => {
+            if (task.id === 'today-line') return;
             window.editTask(parseInt(task.id));
         };
 
@@ -299,99 +344,14 @@ function inicializarGantt(tareas) {
     }
 }
 
-function dibujarLineaHoy(tasksData) {
-    const ganttContainer = document.getElementById('gantt-container');
-    const scrollWrapper = document.querySelector('.gantt-container') || ganttContainer;
-    
-    if (!ganttContainer || !scrollWrapper || tasksData.length === 0) return;
-
-    const oldLine = document.getElementById('today-red-line');
-    if (oldLine) oldLine.remove();
-
-    // 1. Obtener la fecha de hoy en los formatos que usa Frappe Gantt en el encabezado
-    const today = new Date();
-    const d = today.getDate();
-    const m = today.getMonth() + 1; // Enero es 0
-    const y = today.getFullYear();
-    
-    // Formatos posibles: "12 Oct", "12 Octubre", "12/10", "12"
-    // Frappe Gantt en español suele usar el número del día (ej. "12") o abreviaturas.
-    const buscarTexto = String(d); 
-    let todayElement = null;
-
-    // 2. Buscar en los encabezados superiores (.grid-header .tick) el que tenga el número de hoy
-    const headerTicks = ganttContainer.querySelectorAll('.grid-header .tick');
-    
-    for (let tick of headerTicks) {
-        const text = tick.textContent.trim();
-        // Si el texto del encabezado contiene el número del día de hoy (ej. "12" o "12 oct")
-        if (text === buscarTexto || text.startsWith(buscarTexto + ' ') || text.includes(buscarTexto + '/')) {
-            todayElement = tick;
-            break;
-        }
-    }
-
-    let finalLeft = 0;
-
-    if (todayElement) {
-        // ¡ENCONTRADO! Usamos la posición exacta en la que la librería dibujó el día de hoy
-        finalLeft = todayElement.offsetLeft;
-    } else {
-        // SI NO LO ENCUENTRA (Fallback): Usamos la posición del scroll actual + un margen
-        // Esto al menos pondrá la línea cerca de lo que estás viendo
-        finalLeft = scrollWrapper.scrollLeft + 200;
-    }
-
-    // Ancho de la columna de nombres
-    const sideHeader = ganttContainer.querySelector('.side-header');
-    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 150;
-
-    // Posición final ajustada
-    const adjustedLeft = sidebarWidth + finalLeft;
-
-    // 3. Crear la línea
-    const line = document.createElement('div');
-    line.id = 'today-red-line';
-    
-    line.style.cssText = `
-        position: absolute;
-        top: 50px; /* Debajo del encabezado de fechas */
-        bottom: 0;
-        left: ${adjustedLeft}px;
-        width: 2px;
-        background-color: #ff0000;
-        z-index: 9999;
-        pointer-events: none;
-    `;
-    
-    line.innerHTML = `
-        <div style="
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #ff0000;
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-            padding: 2px 6px;
-            border-radius: 4px;
-            white-space: nowrap;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-        ">HOY</div>
-    `;
-
-    scrollWrapper.style.position = 'relative';
-    scrollWrapper.appendChild(line);
-}
-
 window.setGanttView = function(mode) {
     ganttState.viewMode = mode;
     if (ganttState.currentGantt) {
         ganttState.currentGantt.change_view_mode(mode);
+        // Al cambiar de vista, se vuelve a renderizar todo para colocar la línea de hoy en el lugar correcto
         setTimeout(() => {
             const tareasFiltradas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
-            dibujarLineaHoy(tareasFiltradas);
+            inicializarGantt(tareasFiltradas);
         }, 300);
         window.renderView();
     } else {
