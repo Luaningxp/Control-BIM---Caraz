@@ -206,7 +206,7 @@ function inicializarBuscadorPlanos() {
 
 window.agregarPlano = function(pid) {
     planosSeleccionados.add(pid);
-    actualizarPlanosUI();
+    actualizarPlanosUI(); // <-- Esto redibuja los chips
     const input = document.getElementById('planos-search');
     if (input) input.value = '';
     const dd = document.getElementById('planos-dropdown');
@@ -215,9 +215,8 @@ window.agregarPlano = function(pid) {
 
 window.quitarPlano = function(pid) {
     planosSeleccionados.delete(pid);
-    actualizarPlanosUI();
+    actualizarPlanosUI(); // <-- ESTO ES LO QUE FALTA O ESTÁ FALLANDO
 };
-
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
