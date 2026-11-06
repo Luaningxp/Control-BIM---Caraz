@@ -300,62 +300,71 @@ function inicializarGantt(tareas) {
 }
 
 function dibujarLineaHoy(tasksData) {
-    // 1. El contenedor correcto para el scroll lateral
-    const scrollWrapper = document.querySelector('.gantt-container') || document.getElementById('gantt-container');
     const ganttContainer = document.getElementById('gantt-container');
+    const scrollWrapper = document.querySelector('.gantt-container') || ganttContainer;
     
-    if (!scrollWrapper || !ganttContainer || tasksData.length === 0) return;
+    if (!ganttContainer || !scrollWrapper || tasksData.length === 0) return;
 
-    // Eliminar líneas anteriores
     const oldLine = document.getElementById('today-red-line');
     if (oldLine) oldLine.remove();
 
-    // 2. Fecha mínima con el margen de 2 días de Frappe
-    let minDate = null;
-    tasksData.forEach(t => {
-        const d = new Date(t.start + 'T00:00:00');
-        if (!minDate || d < minDate) minDate = d;
+    // ¡EL TRUCO! Buscamos la columna (tick) que corresponde a la fecha de hoy
+    const todayStr = new Date().toISOString().split('T')[0]; // "2023-10-24"
+    
+    // Frappe Gantt dibuja las columnas como rectángulos en el DOM
+    const ticks = ganttContainer.querySelectorAll('.tick');
+    let todayX = -1;
+    let tickWidth = 40; // Ancho por defecto
+
+    ticks.forEach(tick => {
+        // En Frappe, los ticks suelen tener la clase .tick y un atributo con la fecha
+        if (tick.getAttribute('data-date') === todayStr) {
+            // Si encontramos el tick de hoy, obtenemos su posición X y su ancho
+            todayX = parseFloat(tick.getAttribute('x')) || tick.offsetLeft;
+            tickWidth = parseFloat(tick.getAttribute('width')) || tick.offsetWidth;
+        }
     });
-    if (!minDate) return;
-    minDate.setDate(minDate.getDate() - 2); 
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return;
+    // Si la librería no expone data-date, usamos el cálculo matemático como respaldo
+    if (todayX === -1) {
+        // Cálculo de respaldo (con el padding exacto de 44px que usa Frappe internamente)
+        let minDate = null;
+        tasksData.forEach(t => {
+            const d = new Date(t.start + 'T00:00:00');
+            if (!minDate || d < minDate) minDate = d;
+        });
+        
+        if (!minDate) return;
+        // Frappe añade exactamente 2 columnas de 22px (44px en total) antes de la primera tarea
+        const paddingLeft = 44; 
+        const diffDays = Math.floor((new Date() - minDate) / (1000 * 60 * 60 * 24));
+        const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+        
+        let offsetPx = 0;
+        if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
+        else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
+        else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
+        
+        todayX = offsetPx + paddingLeft;
+    }
 
-    // 3. Cálculo del ancho (con el padding interno de Frappe)
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    let offsetPx = 0;
-    
-    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
-
-    // Padding interno que aplica Frappe Gantt
-    const paddingLeft = 40; 
-    
-    // Ancho de la columna de nombres
+    // Ancho de la columna de nombres de tareas
     const sideHeader = ganttContainer.querySelector('.side-header');
     const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 150;
 
-    // Posición final: Ancho de nombres + Días transcurridos + Padding de Frappe
-    const finalLeft = sidebarWidth + offsetPx + paddingLeft;
+    const finalLeft = sidebarWidth + todayX;
 
-    // 4. Crear la línea
     const line = document.createElement('div');
     line.id = 'today-red-line';
     
-    // Usamos top: 50px (debajo de las fechas) y bottom: 0 para que abarque todo el alto
     line.style.cssText = `
         position: absolute;
-        top: 50px;
+        top: 50px; /* Debajo del encabezado */
         bottom: 0;
         left: ${finalLeft}px;
         width: 2px;
         background-color: #ef4444;
-        z-index: 50;
+        z-index: 9999;
         pointer-events: none;
     `;
     
@@ -376,7 +385,6 @@ function dibujarLineaHoy(tasksData) {
         ">HOY</div>
     `;
 
-    // 5. Inyectar en el contenedor que maneja el scroll
     scrollWrapper.style.position = 'relative';
     scrollWrapper.appendChild(line);
 }
