@@ -3,8 +3,12 @@ import { escapeHtml, fmtDate, toast } from './utils.js';
 
 let planosState = {
     search: '',
+    filterTitulo: '',
+    filterCodigo: '',
     filterDisciplina: '',
-    filterEstatus: '',
+    filterRevision: '',
+    filterEstado: '',
+    filterAconex: '',
     showColMenu: false,
     visibleCols: {
         codigo: true, titulo: true, disciplina: true, clasificacion: true, 
@@ -29,7 +33,6 @@ function initResize(e, colKey) {
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'none'; });
-    
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
     e.preventDefault();
@@ -41,18 +44,9 @@ function doResize(e) {
     const diff = e.pageX - startX;
     const newWidth = Math.max(50, startWidth + diff);
     planosState.colWidths[currentCol] = newWidth;
-    
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
-    if (th) {
-        th.style.width = `${newWidth}px`;
-        th.style.minWidth = `${newWidth}px`;
-        th.style.maxWidth = `${newWidth}px`;
-    }
-    document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => {
-        td.style.width = `${newWidth}px`;
-        td.style.minWidth = `${newWidth}px`;
-        td.style.maxWidth = `${newWidth}px`;
-    });
+    if (th) { th.style.width = `${newWidth}px`; th.style.minWidth = `${newWidth}px`; th.style.maxWidth = `${newWidth}px`; }
+    document.querySelectorAll(`td[data-col="${currentCol}"]`).forEach(td => { td.style.width = `${newWidth}px`; td.style.minWidth = `${newWidth}px`; td.style.maxWidth = `${newWidth}px`; });
     e.preventDefault();
 }
 
@@ -60,12 +54,10 @@ function stopResize(e) {
     if (!isResizing) return;
     setTimeout(() => { document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'auto'; }); }, 50);
     isResizing = false; currentCol = null;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
     document.removeEventListener('mousemove', doResize);
     document.removeEventListener('mouseup', stopResize);
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
 }
 
 export function renderLogPlanos(container) {
@@ -77,19 +69,32 @@ export function renderLogPlanos(container) {
 
     const planos = state.planosCache || [];
 
+    // Extraer opciones únicas para los filtros
     const disciplinas = [...new Set(planos.map(p => p.disciplina).filter(Boolean))].sort();
-    const estatusOpts = [...new Set(planos.map(p => p.estatus_bim).filter(Boolean))].sort();
+    const revisiones = [...new Set(planos.map(p => p.revision).filter(Boolean))].sort();
+    const estados = [...new Set(planos.map(p => p.estado).filter(Boolean))].sort();
+    const aconexOpts = [...new Set(planos.map(p => p.aconex).filter(Boolean))].sort();
 
+    // Aplicar todos los filtros
     let planosFiltrados = planos.filter(p => {
         const matchSearch = !planosState.search || 
             (p.codigo || '').toLowerCase().includes(planosState.search.toLowerCase()) ||
             (p.titulo || '').toLowerCase().includes(planosState.search.toLowerCase());
-        const matchDisciplina = !planosState.filterDisciplina || p.disciplina === planosState.filterDisciplina;
-        const matchEstatus = !planosState.filterEstatus || p.estatus_bim === planosState.filterEstatus;
-        return matchSearch && matchDisciplina && matchEstatus;
+        const matchTitulo = !planosState.filterTitulo || (p.titulo || '').toLowerCase().includes(planosState.filterTitulo.toLowerCase());
+        const matchCodigo = !planosState.filterCodigo || (p.codigo || '').toLowerCase().includes(planosState.filterCodigo.toLowerCase());
+        const matchDisc = !planosState.filterDisciplina || p.disciplina === planosState.filterDisciplina;
+        const matchRev = !planosState.filterRevision || p.revision === planosState.filterRevision;
+        const matchEst = !planosState.filterEstado || p.estado === planosState.filterEstado;
+        const matchAcx = !planosState.filterAconex || p.aconex === planosState.filterAconex;
+        
+        return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx;
     });
 
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
+    const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
+        if (['search', 'showColMenu', 'visibleCols', 'colWidths'].includes(k)) return false;
+        return v !== '';
+    }).length;
 
     const colStyle = (key) => `width: ${planosState.colWidths[key]}px; min-width: ${planosState.colWidths[key]}px; max-width: ${planosState.colWidths[key]}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResizePlanos(event, '${key}')"></div>`;
@@ -98,18 +103,17 @@ export function renderLogPlanos(container) {
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full flex-wrap">
+                <!-- BÚSQUEDA RÁPIDA -->
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="pl-search" placeholder="Buscar código o título..." value="${planosState.search}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                    <input type="text" id="pl-search" placeholder="Búsqueda rápida..." value="${planosState.search}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
                 </div>
-                <select id="pl-fil-disciplina" class="inp max-w-[150px] text-xs py-1.5">
-                    <option value="">Todas las disciplinas</option>
-                    ${disciplinas.map(d => `<option value="${escapeHtml(d)}" ${planosState.filterDisciplina === d ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('')}
-                </select>
-                <select id="pl-fil-estatus" class="inp max-w-[150px] text-xs py-1.5">
-                    <option value="">Todos los estatus</option>
-                    ${estatusOpts.map(e => `<option value="${escapeHtml(e)}" ${planosState.filterEstatus === e ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('')}
-                </select>
+                
+                <!-- BOTÓN DE FILTROS PRO -->
+                <button onclick="window.togglePlanosFilterDrawer()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
+                    <i class="fa-solid fa-filter"></i> Filtros
+                    ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
             </div>
             
             <div class="flex items-center gap-3">
@@ -117,6 +121,7 @@ export function renderLogPlanos(container) {
                     Mostrando <b>${planosFiltrados.length}</b> de ${planos.length} planos
                 </div>
                 
+                <!-- SELECTOR DE COLUMNAS -->
                 <div class="relative">
                     <button onclick="window.togglePlanosColMenu()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
                         <i class="fa-solid fa-table-columns"></i> Columnas <i class="fa-solid fa-chevron-down text-[10px]"></i>
@@ -127,21 +132,16 @@ export function renderLogPlanos(container) {
                                 ${todasActivas ? 'Ocultar todas' : 'Mostrar todas'}
                             </button>
                         </div>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('codigo')" ${planosState.visibleCols.codigo ? 'checked' : ''} class="rounded text-sky-600"> Código</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('titulo')" ${planosState.visibleCols.titulo ? 'checked' : ''} class="rounded text-sky-600"> Título</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('disciplina')" ${planosState.visibleCols.disciplina ? 'checked' : ''} class="rounded text-sky-600"> Disciplina</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('clasificacion')" ${planosState.visibleCols.clasificacion ? 'checked' : ''} class="rounded text-sky-600"> Clasificación</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('revision')" ${planosState.visibleCols.revision ? 'checked' : ''} class="rounded text-sky-600"> Revisión</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('fecha')" ${planosState.visibleCols.fecha ? 'checked' : ''} class="rounded text-sky-600"> Fecha</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('estado')" ${planosState.visibleCols.estado ? 'checked' : ''} class="rounded text-sky-600"> Estado</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('aconex')" ${planosState.visibleCols.aconex ? 'checked' : ''} class="rounded text-sky-600"> Aconex</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('responsable')" ${planosState.visibleCols.responsable ? 'checked' : ''} class="rounded text-sky-600"> Responsable</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('estatus_bim')" ${planosState.visibleCols.estatus_bim ? 'checked' : ''} class="rounded text-sky-600"> Estatus BIM</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('modelo_bim')" ${planosState.visibleCols.modelo_bim ? 'checked' : ''} class="rounded text-sky-600"> Modelo BIM</label>
-                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.togglePlanosCol('actividades')" ${planosState.visibleCols.actividades ? 'checked' : ''} class="rounded text-sky-600"> Actividades</label>
+                        ${Object.keys(planosState.visibleCols).map(col => `
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs capitalize">
+                                <input type="checkbox" onchange="window.togglePlanosCol('${col}')" ${planosState.visibleCols[col] ? 'checked' : ''} class="rounded text-sky-600"> 
+                                ${col.replace('_', ' ')}
+                            </label>
+                        `).join('')}
                     </div>
                 </div>
 
+                <!-- BOTÓN DE IMPORTAR -->
                 ${state.isAdmin || state.isCoordinador ? `
                 <label class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
                     <i class="fa-solid fa-file-import"></i> Importar
@@ -194,37 +194,118 @@ export function renderLogPlanos(container) {
         </div>
     `;
 
-    // --- LISTENERS DE FILTROS (EVITA QUE SE PIERDA EL FOCO) ---
+    // --- DRAWER DE FILTROS ---
+    if (!document.getElementById('planos-filter-drawer')) {
+        const drawerHtml = `
+            <div id="planos-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.togglePlanosFilterDrawer()"></div>
+            <div id="planos-filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+                <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white">Filtros de Planos</h3>
+                    <button onclick="window.togglePlanosFilterDrawer()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-4 space-y-4 text-xs">
+                    
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Código (Texto)</label>
+                        <input type="text" id="drw-pl-codigo" value="${planosState.filterCodigo}" oninput="window.applyPlanosFilter('filterCodigo', this.value)" class="inp" placeholder="Ej. 100003...">
+                    </div>
+                    
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Título (Texto)</label>
+                        <input type="text" id="drw-pl-titulo" value="${planosState.filterTitulo}" oninput="window.applyPlanosFilter('filterTitulo', this.value)" class="inp" placeholder="Ej. Drenaje pluvial...">
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Disciplina</label>
+                        <select id="drw-pl-disciplina" onchange="window.applyPlanosFilter('filterDisciplina', this.value)" class="inp">
+                            <option value="">Todas</option>
+                            ${disciplinas.map(d => `<option value="${escapeHtml(d)}" ${planosState.filterDisciplina === d ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Revisión</label>
+                        <select id="drw-pl-revision" onchange="window.applyPlanosFilter('filterRevision', this.value)" class="inp">
+                            <option value="">Todas</option>
+                            ${revisiones.map(r => `<option value="${escapeHtml(r)}" ${planosState.filterRevision === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Estado</label>
+                        <select id="drw-pl-estado" onchange="window.applyPlanosFilter('filterEstado', this.value)" class="inp">
+                            <option value="">Todos</option>
+                            ${estados.map(e => `<option value="${escapeHtml(e)}" ${planosState.filterEstado === e ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex</label>
+                        <select id="drw-pl-aconex" onchange="window.applyPlanosFilter('filterAconex', this.value)" class="inp">
+                            <option value="">Todos</option>
+                            ${aconexOpts.map(a => `<option value="${escapeHtml(a)}" ${planosState.filterAconex === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <button onclick="window.clearPlanosFilters()" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
+                            <i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', drawerHtml);
+    }
+
+    // Listener para el buscador rápido (con debounce)
     const inputSearch = document.getElementById('pl-search');
     inputSearch.addEventListener('input', (e) => {
         planosState.search = e.target.value;
-        
         clearTimeout(window.planosSearchTimeout);
         window.planosSearchTimeout = setTimeout(() => {
             window.renderView();
-            // Mantener el foco en el buscador después de redibujar
             const newInput = document.getElementById('pl-search');
             if (newInput) {
                 newInput.focus();
                 const val = newInput.value;
-                newInput.value = '';
-                newInput.value = val;
+                newInput.value = ''; newInput.value = val;
             }
-        }, 500);
-    });
-
-    document.getElementById('pl-fil-disciplina').addEventListener('change', (e) => {
-        planosState.filterDisciplina = e.target.value;
-        window.renderView();
-    });
-    
-    document.getElementById('pl-fil-estatus').addEventListener('change', (e) => {
-        planosState.filterEstatus = e.target.value;
-        window.renderView();
+        }, 400);
     });
 }
 
-// --- FUNCIONES EXPUESTAS AL HTML ---
+// --- FUNCIONES DE FILTROS Y COLUMNAS ---
+window.togglePlanosFilterDrawer = function() {
+    const drawer = document.getElementById('planos-filter-drawer');
+    const overlay = document.getElementById('planos-filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyPlanosFilter = function(key, value) {
+    planosState[key] = value;
+    window.renderView();
+};
+
+window.clearPlanosFilters = function() {
+    planosState.search = '';
+    planosState.filterTitulo = '';
+    planosState.filterCodigo = '';
+    planosState.filterDisciplina = '';
+    planosState.filterRevision = '';
+    planosState.filterEstado = '';
+    planosState.filterAconex = '';
+    window.renderView();
+};
+
 window.togglePlanosColMenu = function() {
     planosState.showColMenu = !planosState.showColMenu;
     window.renderView();
@@ -244,6 +325,7 @@ window.toggleTodasPlanosCols = function(estado) {
 
 window.initResizePlanos = initResize;
 
+// --- IMPORTAR EXCEL ---
 window.handlePlanosUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
