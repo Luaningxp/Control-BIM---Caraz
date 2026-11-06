@@ -333,13 +333,13 @@ function pintarColoresYHoy(tasksData) {
 
     // 2. Línea de HOY
     const ganttWrapper = document.getElementById('gantt-wrapper');
-    const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
+    if (!ganttWrapper || tasksData.length === 0) return;
 
+    // Eliminar anterior
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Calcular la fecha de inicio (la primera tarea de la lista)
+    // Encontrar la fecha más antigua (inicio del gráfico)
     let minDate = null;
     tasksData.forEach(t => {
         const d = new Date(t.start + 'T00:00:00');
@@ -347,41 +347,31 @@ function pintarColoresYHoy(tasksData) {
     });
     
     if (!minDate) return;
-
-    // Frappe Gantt añade por defecto 2 columnas de relleno (padding) antes de la primera tarea
+    // Frappe Gantt tiene un padding de 2 días por defecto antes de la primera tarea
     minDate.setDate(minDate.getDate() - 2); 
 
     const today = new Date();
     today.setHours(0,0,0,0);
-    
-    // Distancia en días
     const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
     
-    // Si el gráfico aún no llega a hoy, no dibujar
     if (diffDays < 0) return;
 
-    // Calcular el ancho según la vista (Día=40, Semana=60, Mes=100)
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
-    if (ganttState.viewMode === 'Day') {
-        offsetPx = diffDays * colWidth;
-    } else if (ganttState.viewMode === 'Week') {
-        offsetPx = (diffDays / 7) * colWidth;
-    } else if (ganttState.viewMode === 'Month') {
-        offsetPx = (diffDays / 30.44) * colWidth;
-    }
+    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
+    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
+    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // Ancho de la columna izquierda de Frappe (por defecto 150px)
-    const sidebarWidth = 150; 
+    const sidebarWidth = 150; // Ancho de la columna de nombres de tareas
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear el contenedor "Overlay" pegado al Gantt
+    // Crear contenedor Overlay (con overflow hidden para que no se salga del gráfico)
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Buscamos la altura del encabezado para que la línea no lo pise
-    const header = ganttContainer.querySelector('.grid-header');
+    // Ajustar el top para que no pise el encabezado (usamos 50px que es el estándar de Frappe)
+    const header = ganttWrapper.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
     overlay.style.cssText = `
@@ -395,6 +385,7 @@ function pintarColoresYHoy(tasksData) {
         z-index: 50;
     `;
 
+    // Crear la línea roja
     const line = document.createElement('div');
     line.style.cssText = `
         position: absolute;
@@ -406,6 +397,7 @@ function pintarColoresYHoy(tasksData) {
         pointer-events: none;
     `;
     
+    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -424,34 +416,27 @@ function pintarColoresYHoy(tasksData) {
     `;
 
     overlay.appendChild(line);
+    
+    // ¡LA CLAVE! Inyectamos el overlay directamente en el WRAPPER, no en el grid-body
+    ganttWrapper.style.position = 'relative';
     ganttWrapper.appendChild(overlay);
 
-    // Sincronizar con el scroll del gráfico
-    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
-    
+    // Sincronizar con el scroll
+    // Como el wrapper es el que tiene overflow-x-auto, escuchamos su scroll
     if (window.todayScrollListener) {
-        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
+        ganttWrapper.removeEventListener('scroll', window.todayScrollListener);
     }
     
     window.todayScrollListener = () => {
-        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
+        // Movemos la línea hacia la izquierda según el scroll
+        line.style.transform = `translateX(-${ganttWrapper.scrollLeft}px)`;
     };
     
-    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+    ganttWrapper.addEventListener('scroll', window.todayScrollListener);
     
-    // Forzar actualización visual
+    // Forzar actualización inicial
     window.todayScrollListener();
 }
-window.toggleGanttEstadoOculto = function(estado, checked) {
-    if (checked) {
-        if (!ganttState.estadosOcultos.includes(estado)) {
-            ganttState.estadosOcultos.push(estado);
-        }
-    } else {
-        ganttState.estadosOcultos = ganttState.estadosOcultos.filter(e => e !== estado);
-    }
-    window.renderView();
-};
 
 window.clearGanttFilters = function() {
     ganttState = {
