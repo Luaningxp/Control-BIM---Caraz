@@ -139,10 +139,14 @@ function actualizarPlanosUI() {
         const plano = (state.planosCache || []).find(p => p.id === pid);
         if (!plano) return '';
         return `
-            <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
+            <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium relative z-10">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5">×</button>
+                <button type="button" 
+                        onpointerdown="event.preventDefault(); event.stopPropagation(); document.activeElement.blur(); window.quitarPlano('${pid}');" 
+                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 cursor-pointer relative z-20">
+                    ×
+                </button>
             </span>
         `;
     }).join('');
@@ -163,6 +167,9 @@ function inicializarBuscadorPlanos() {
     nuevoInput.addEventListener('input', (e) => mostrarDropdownPlanos(e.target.value));
     
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
+    
+    // ESTO ES CLAVE: Quitar el foco del input cuando se hace clic en el dropdown
+    dropdown.addEventListener('click', () => document.activeElement.blur());
 
     document.addEventListener('click', (e) => {
         if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
@@ -199,9 +206,9 @@ window.agregarPlano = function(pid) {
     planosSeleccionados.add(pid);
     actualizarPlanosUI();
     const input = document.getElementById('planos-search');
-    if (input) input.value = ''; // Limpieza explícita del input
+    if (input) input.value = '';
     const dd = document.getElementById('planos-dropdown');
-    if (dd) dd.classList.add('hidden'); // Cierre explícito del dropdown
+    if (dd) dd.classList.add('hidden');
 };
 
 window.quitarPlano = function(pid) {
