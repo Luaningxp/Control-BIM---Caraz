@@ -609,25 +609,56 @@ function renderCustomProps(pendienteId) {
     const inputs = document.getElementById('custom-props-inputs');
     if (state.propDefsCache.length === 0) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
-    inputs.innerHTML = state.propDefsCache.map(pd => {
-        let valor = '';
-        if (pendienteId) {
-            const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
-            if (pv) valor = pd.tipo === 'numero' ? (pv.valor_numero !== null ? pv.valor_numero : '') : pd.tipo === 'fecha' ? (pv.valor_fecha || '') : pd.tipo === 'booleano' ? pv.valor_booleano : (pv.valor_texto || '');
-        }
-        let inputHtml = '';
-        if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${escapeHtml(valor)}">`;
-        else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor}">`;
-        else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor}">`;
-        else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
-        else if (pd.tipo === 'seleccion') {
-            const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
-            inputHtml = `<select class="inp custom-prop-input" data-pid="${pd.id}" data-type="seleccion"><option value="">— Seleccionar —</option>${opts}</select>`;
-        }
-        return `<div><label class="block font-semibold text-slate-600 mb-1">${escapeHtml(pd.nombre)} ${pd.requerido ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
-    }).join('');
-}
+    
+    // Separar los planos de los demás parámetros
+    const propPlanos = state.propDefsCache.find(pd => pd.tipo === 'planos');
+    const otrosProps = state.propDefsCache.filter(pd => pd.tipo !== 'planos');
 
+    let html = '';
+
+    // Renderizar el buscador de Planos primero (si existe el parámetro)
+    if (propPlanos) {
+        html += `
+            <div class="relative mb-4">
+                <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Planos Asociados</label>
+                <div id="planos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"></div>
+                <div class="relative">
+                    <input type="text" id="planos-search" placeholder="Escribe código o título..." class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                    <div id="planos-dropdown" class="hidden absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Renderizar el resto de propiedades normales
+    if (otrosProps.length > 0) {
+        html += otrosProps.map(pd => {
+            let valor = '';
+            if (pendienteId) {
+                const pv = state.propValsCache.find(v => v.pendiente_id === pendienteId && v.propiedad_id === pd.id);
+                if (pv) valor = pd.tipo === 'numero' ? (pv.valor_numero !== null ? pv.valor_numero : '') : pd.tipo === 'fecha' ? (pv.valor_fecha || '') : pd.tipo === 'booleano' ? pv.valor_booleano : (pv.valor_texto || '');
+            }
+            let inputHtml = '';
+            if (pd.tipo === 'texto') inputHtml = `<input type="text" class="inp custom-prop-input" data-pid="${pd.id}" data-type="texto" value="${escapeHtml(valor)}">`;
+            else if (pd.tipo === 'numero') inputHtml = `<input type="number" step="any" class="inp custom-prop-input" data-pid="${pd.id}" data-type="numero" value="${valor}">`;
+            else if (pd.tipo === 'fecha') inputHtml = `<input type="date" class="inp custom-prop-input" data-pid="${pd.id}" data-type="fecha" value="${valor}">`;
+            else if (pd.tipo === 'booleano') inputHtml = `<input type="checkbox" class="custom-prop-input w-4 h-4 mt-1" data-pid="${pd.id}" data-type="booleano" ${valor ? 'checked' : ''}>`;
+            else if (pd.tipo === 'seleccion') {
+                const opts = (pd.opciones || []).map(o => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
+                inputHtml = `<select class="inp custom-prop-input" data-pid="${pd.id}" data-type="seleccion"><option value="">— Seleccionar —</option>${opts}</select>`;
+            }
+            return `<div class="mb-2"><label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">${escapeHtml(pd.nombre)}</label>${inputHtml}</div>`;
+        }).join('');
+    }
+
+    inputs.innerHTML = html;
+
+    // Inicializar el buscador de planos si existe
+    if (propPlanos) {
+        renderPlanosChips(pendienteId);
+        inicializarBuscadorPlanos();
+    }
+}
 export function closeModal() { 
     document.getElementById('modal-task').classList.add('hidden'); 
     document.getElementById('modal-task').classList.remove('flex'); 
