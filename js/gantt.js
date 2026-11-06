@@ -320,6 +320,7 @@ function inicializarGantt(tareas) {
 }
 
 function pintarColoresYHoy(tasksData) {
+    // 1. Pintar las barras con su color por estado
     const bars = document.querySelectorAll('.bar-wrapper .bar');
     bars.forEach((bar, idx) => {
         const t = tasksData[idx];
@@ -330,41 +331,68 @@ function pintarColoresYHoy(tasksData) {
         if (progress) progress.style.fill = color;
     });
 
+    // 2. Línea de "HOY" nativa dentro de las columnas del Gantt
     const ganttContainer = document.getElementById('gantt-container');
     if (!ganttContainer) return;
-    
-    const oldLine = document.getElementById('gantt-today-line');
-    if (oldLine) oldLine.remove();
 
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    
-    let minDate = null;
-    tasksData.forEach(t => {
-        const d = new Date(t.start + 'T00:00:00');
-        if (!minDate || d < minDate) minDate = d;
-    });
-    if (!minDate) return;
+    // Eliminar marcas anteriores si existen
+    ganttContainer.querySelectorAll('.hoy-marker').forEach(el => el.remove());
 
+    // Obtener la fecha de hoy en formato YYYY-MM-DD
     const today = new Date();
-    today.setHours(0,0,0,0);
-    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    // Buscar el elemento que representa el día de hoy
+    const ticks = ganttContainer.querySelectorAll('.tick');
+    let todayTick = null;
     
-    let offsetPx = 0;
-    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
-    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
-    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30) * colWidth;
+    ticks.forEach(tick => {
+        // En Frappe Gantt, los ticks inferiores tienen el atributo data-date
+        if (tick.dataset.date === todayStr) {
+            todayTick = tick;
+        }
+    });
 
-    const sidebarWidth = ganttContainer.querySelector('.side-header')?.offsetWidth || 200;
-    const finalLeft = sidebarWidth + offsetPx;
+    if (todayTick) {
+        // Crear la línea roja
+        const line = document.createElement('div');
+        line.className = 'hoy-marker';
+        line.style.cssText = `
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: -1px; /* Centrado en el borde de la columna */
+            width: 2px;
+            background: #ef4444;
+            z-index: 10;
+            pointer-events: none;
+        `;
+        
+        // Etiqueta "HOY" arriba
+        const label = document.createElement('div');
+        label.textContent = 'HOY';
+        label.style.cssText = `
+            position: absolute;
+            top: -24px;
+            left: -16px; /* Para centrar la etiqueta sobre la línea */
+            background: #ef4444;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        `;
+        line.appendChild(label);
 
-    const line = document.createElement('div');
-    line.id = 'gantt-today-line';
-    line.style.cssText = `position:absolute;top:0;bottom:0;left:${finalLeft}px;width:2px;background:#ef4444;z-index:5;pointer-events:none;`;
-    line.innerHTML = `<div style="position:absolute;top:0;left:50%;transform:translateX(-50%);background:#ef4444;color:white;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;letter-spacing:0.5px;">HOY</div>`;
-
-    const ganttGrid = ganttContainer.querySelector('.grid-body') || ganttContainer;
-    ganttGrid.style.position = 'relative';
-    ganttGrid.appendChild(line);
+        // Añadir la línea al tick de hoy
+        todayTick.style.position = 'relative'; // Asegurar que el tick sea el contenedor
+        todayTick.appendChild(line);
+    }
 }
 
 window.setGanttView = function(mode) {
