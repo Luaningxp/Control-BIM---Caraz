@@ -1,8 +1,16 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { 
-    escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, getIniciales, colorAvatar,
-    confirmDelete
+    escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
+    getIniciales, colorAvatar, confirmDelete
 } from './utils.js';
+
+// Conversión: 100% equivale a 9.3333 horas hombre
+const HORAS_POR_100 = 9.3333;
+function pctAHoras(pct) {
+    return (parseFloat(pct || 0) * HORAS_POR_100) / 100;
+}
+
+// Filtros del listado
 let manpowerState = {
     search: '',
     filterResp: '',
@@ -19,6 +27,9 @@ function isUserInvolved(t) {
     return esResponsable || esRecurso;
 }
 
+// ============================================================
+// MI TRABAJO
+// ============================================================
 export function renderMiTrabajo(container) {
     const misTareas = state.tasksCache.filter(t => 
         t.estado !== 'Cerrado' && 
@@ -26,12 +37,10 @@ export function renderMiTrabajo(container) {
         isUserInvolved(t)
     );
     
-    // Verificar si ayer (o el último día hábil) llenó al 100%
     const hoy = new Date();
     hoy.setHours(0,0,0,0);
     const ayer = new Date(hoy);
     ayer.setDate(ayer.getDate() - 1);
-    // Si ayer fue domingo, retroceder al sábado
     while (ayer.getDay() === 0) { ayer.setDate(ayer.getDate() - 1); }
     
     const ayerStr = ayer.toISOString().split('T')[0];
@@ -49,7 +58,7 @@ export function renderMiTrabajo(container) {
                     <i class="fa-solid fa-triangle-exclamation text-amber-600 text-lg mt-0.5"></i>
                     <div>
                         <p class="font-bold text-amber-900 text-sm">Aviso de registro pendiente</p>
-                        <p class="text-amber-800 text-xs mt-0.5">No completaste tu <b>100%</b> el día <b>${fmtDate(ayerStr)}</b> (registraste ${porcentajeAyer.toFixed(1)}%). <a href="javascript:void(0)" onclick="window.openManpowerModal(null, '${ayerStr}')" class="underline font-semibold">Registrar ahora</a>.</p>
+                        <p class="text-amber-800 text-xs mt-0.5">No completaste tu <b>100%</b> el día <b>${fmtDate(ayerStr)}</b> (registraste ${porcentajeAyer.toFixed(1)}% = ${pctAHoras(porcentajeAyer).toFixed(2)} h). <a href="javascript:void(0)" onclick="window.openManpowerModal(null, '${ayerStr}')" class="underline font-semibold">Registrar ahora</a>.</p>
                     </div>
                 </div>
             </div>
@@ -66,7 +75,6 @@ export function renderMiTrabajo(container) {
             ${misTareas.length === 0 ? '<div class="card p-6 text-center text-slate-500 text-sm">No tienes actividades pendientes.</div>' : ''}
             ${misTareas.map(t => {
                 const equipo = state.actividadRecursosCache.filter(r => r.pendiente_id === t.id);
-                // Total registrado en la tarea por el usuario actual (histórico)
                 const totalUsuarioTarea = state.manpowerCache
                     .filter(m => m.usuario_id === state.currentUser.id && m.pendiente_id === t.id)
                     .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
@@ -74,10 +82,10 @@ export function renderMiTrabajo(container) {
                 return `
                 <div class="card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                     <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
                             <span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">${t.codigo_contenedor || '–'}</span>
                             <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">${semaforo(t)}</span>
-                            ${totalUsuarioTarea > 0 ? `<span class="text-[10px] bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">Acumulado: ${totalUsuarioTarea.toFixed(1)}%</span>` : ''}
+                            ${totalUsuarioTarea > 0 ? `<span class="text-[10px] bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">Acumulado: ${totalUsuarioTarea.toFixed(1)}% · ${pctAHoras(totalUsuarioTarea).toFixed(2)} h</span>` : ''}
                         </div>
                         <h4 class="font-bold text-slate-800 text-sm">${escapeHtml(t.actividad)}</h4>
                         <p class="text-xs text-slate-500 mt-1">${escapeHtml(t.grupo || '-')} · Vence: ${fmtDate(t.fecha_fin)}</p>
@@ -100,6 +108,9 @@ export function renderMiTrabajo(container) {
     `;
 }
 
+// ============================================================
+// MANPOWER (listado con filtros + conversión a horas)
+// ============================================================
 export function renderManpower(container) {
     // Base: registros visibles según rol
     let registros = state.manpowerCache.filter(m => 
@@ -129,7 +140,7 @@ export function renderManpower(container) {
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
 
     const filtrosActivos = Object.values(manpowerState).filter(v => v !== '').length;
-    const totalPct = registros.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
+    const totalHoras = registros.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
 
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
@@ -145,8 +156,8 @@ export function renderManpower(container) {
             </div>
             <div class="flex items-center gap-3">
                 <div class="text-right hidden md:block">
-                    <p class="text-[10px] text-slate-500 uppercase font-bold">Total %</p>
-                    <p class="text-lg font-bold text-sky-700">${totalPct.toFixed(0)}%</p>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold">Total Horas</p>
+                    <p class="text-lg font-bold text-sky-700">${totalHoras.toFixed(2)} h</p>
                 </div>
                 <button onclick="window.openManpowerModal()" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700">+ Registrar %</button>
             </div>
@@ -160,6 +171,7 @@ export function renderManpower(container) {
                         <th class="p-3">Usuario</th>
                         <th class="p-3">Actividad</th>
                         <th class="p-3">% Día</th>
+                        <th class="p-3">Horas</th>
                         <th class="p-3">Nota</th>
                         ${state.isAdmin ? '<th class="p-3 text-center">Acciones</th>' : ''}
                     </tr>
@@ -169,11 +181,14 @@ export function renderManpower(container) {
                         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
                         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
                         const nombre = p ? nombreFormateado(p) : 'Desconocido';
+                        const pct = parseFloat(r.porcentaje_dia || 0);
+                        const horas = pctAHoras(pct);
                         return `<tr class="hover:bg-slate-50">
                             <td class="p-3 text-slate-600">${fmtDate(r.fecha)}</td>
                             <td class="p-3 font-semibold text-slate-700">${escapeHtml(nombre)}</td>
                             <td class="p-3 text-slate-700">${escapeHtml(t ? t.actividad : 'General')}</td>
-                            <td class="p-3 font-bold text-sky-600">${parseFloat(r.porcentaje_dia || 0).toFixed(1)} %</td>
+                            <td class="p-3 text-slate-500">${pct.toFixed(1)}%</td>
+                            <td class="p-3 font-bold text-sky-600">${horas.toFixed(2)} h</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
                             ${state.isAdmin ? `
                                 <td class="p-3 text-center whitespace-nowrap">
@@ -183,8 +198,17 @@ export function renderManpower(container) {
                                 </td>
                             ` : ''}
                         </tr>`;
-                    }).join('') || `<tr><td colspan="${state.isAdmin ? 6 : 5}" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
+                    }).join('') || `<tr><td colspan="${state.isAdmin ? 7 : 6}" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
                 </tbody>
+                ${registros.length > 0 ? `
+                    <tfoot class="bg-slate-50 border-t-2 border-slate-200">
+                        <tr>
+                            <td colspan="4" class="p-3 text-right font-bold text-slate-700 uppercase text-[10px] tracking-wider">Total del periodo filtrado:</td>
+                            <td class="p-3 font-bold text-sky-700 text-sm">${totalHoras.toFixed(2)} h</td>
+                            <td colspan="${state.isAdmin ? 2 : 1}" class="p-3"></td>
+                        </tr>
+                    </tfoot>
+                ` : ''}
             </table>
         </div>
     `;
@@ -247,29 +271,9 @@ export function renderManpower(container) {
     });
 }
 
-window.toggleManpowerFilterDrawer = function() {
-    const drawer = document.getElementById('manpower-filter-drawer');
-    const overlay = document.getElementById('manpower-filter-drawer-overlay');
-    if (!drawer || !overlay) return;
-    const isOpen = !drawer.classList.contains('translate-x-full');
-    if (isOpen) {
-        drawer.classList.add('translate-x-full');
-        overlay.classList.add('hidden');
-    } else {
-        drawer.classList.remove('translate-x-full');
-        overlay.classList.remove('hidden');
-    }
-};
-
-window.applyManpowerFilter = function(key, value) {
-    manpowerState[key] = value;
-    window.renderView();
-};
-
-window.clearManpowerFilters = function() {
-    manpowerState = { search: '', filterResp: '', filterGrupo: '', iniDesde: '', iniHasta: '' };
-    window.renderView();
-};
+// ============================================================
+// MODAL REGISTRAR HORAS
+// ============================================================
 export function openManpowerModal(pendienteId, fechaPredefinida) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
@@ -291,7 +295,8 @@ export function openManpowerModal(pendienteId, fechaPredefinida) {
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-1">% del Día</label>
-                                <input type="number" step="1" min="1" max="100" id="mp-porcentaje" required class="inp" placeholder="Ej. 25">
+                                <input type="number" step="1" min="1" max="100" id="mp-porcentaje" required class="inp" placeholder="Ej. 25" oninput="window.actualizarHorasManpower()">
+                                <p id="mp-horas-equivalentes" class="text-[10px] text-slate-500 mt-1">= 0.00 h</p>
                             </div>
                         </div>
                         <div>
@@ -324,6 +329,7 @@ export function openManpowerModal(pendienteId, fechaPredefinida) {
     document.getElementById('mp-porcentaje').value = '';
     
     window.actualizarRestanteManpower();
+    window.actualizarHorasManpower();
     
     document.getElementById('modal-manpower').classList.remove('hidden');
     document.getElementById('modal-manpower').classList.add('flex');
@@ -342,8 +348,15 @@ window.actualizarRestanteManpower = function() {
     if (restante === 0) {
         info.innerHTML = `<b class="text-red-600">Ya registraste el 100% de este día.</b> No puedes agregar más.`;
     } else {
-        info.innerHTML = `Tienes <b class="text-sky-700">${restante.toFixed(0)}% disponible</b> para registrar en este día (ya usaste ${totalDia.toFixed(0)}%).`;
+        info.innerHTML = `Tienes <b class="text-sky-700">${restante.toFixed(0)}%</b> disponible (${pctAHoras(restante).toFixed(2)} h) — ya usaste ${totalDia.toFixed(0)}% (${pctAHoras(totalDia).toFixed(2)} h).`;
     }
+};
+
+window.actualizarHorasManpower = function() {
+    const pct = parseFloat(document.getElementById('mp-porcentaje')?.value || 0);
+    const horas = pctAHoras(pct);
+    const el = document.getElementById('mp-horas-equivalentes');
+    if (el) el.textContent = `= ${horas.toFixed(2)} h`;
 };
 
 export function closeManpowerModal() {
@@ -356,13 +369,12 @@ export async function saveManpower(e) {
     const fecha = document.getElementById('mp-fecha').value;
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
     
-    // Validar en cliente también (la BD lo hace de nuevo por seguridad)
     const totalDia = state.manpowerCache
         .filter(m => m.usuario_id === state.currentUser.id && m.fecha === fecha)
         .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
     
     if (totalDia + porcentaje > 100) {
-        toast(`No puedes exceder 100%. Ya tienes ${totalDia.toFixed(0)}% registrado.`);
+        toast(`No puedes exceder 100%. Ya tienes ${totalDia.toFixed(0)}% (${pctAHoras(totalDia).toFixed(2)} h) registrado.`);
         return;
     }
     
@@ -377,8 +389,12 @@ export async function saveManpower(e) {
     if (error) { toast('Error: ' + error.message); return; }
     closeManpowerModal();
     await fetchAll(); window.renderView();
-    toast('Registro guardado');
+    toast(`Registro guardado: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
 }
+
+// ============================================================
+// ELIMINAR REGISTRO (solo admin)
+// ============================================================
 window.deleteManpower = async function(id) {
     if (!state.isAdmin) { toast('Solo los administradores pueden eliminar registros.'); return; }
     
@@ -389,10 +405,12 @@ window.deleteManpower = async function(id) {
     const t = state.tasksCache.find(x => x.id === r.pendiente_id);
     const nombreUsuario = p ? nombreFormateado(p) : 'Desconocido';
     const nombreActividad = t ? t.actividad : 'General';
+    const pct = parseFloat(r.porcentaje_dia || 0);
+    const horas = pctAHoras(pct);
     
     const confirmado = await confirmDelete({
-        title: 'Eliminar registro de horas',
-        message: `Vas a eliminar el registro de "${nombreUsuario}" del ${fmtDate(r.fecha)} (${parseFloat(r.porcentaje_dia || 0).toFixed(1)}% en "${nombreActividad}"). Esta acción no se puede deshacer.`
+        title: 'Eliminar registro',
+        message: `Vas a eliminar el registro de "${nombreUsuario}" del ${fmtDate(r.fecha)} (${pct.toFixed(1)}% = ${horas.toFixed(2)} h en "${nombreActividad}"). Esta acción no se puede deshacer.`
     });
     
     if (!confirmado) return;
@@ -402,5 +420,32 @@ window.deleteManpower = async function(id) {
     
     toast('Registro eliminado');
     await fetchAll();
+    window.renderView();
+};
+
+// ============================================================
+// FILTROS DEL DRAWER
+// ============================================================
+window.toggleManpowerFilterDrawer = function() {
+    const drawer = document.getElementById('manpower-filter-drawer');
+    const overlay = document.getElementById('manpower-filter-drawer-overlay');
+    if (!drawer || !overlay) return;
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyManpowerFilter = function(key, value) {
+    manpowerState[key] = value;
+    window.renderView();
+};
+
+window.clearManpowerFilters = function() {
+    manpowerState = { search: '', filterResp: '', filterGrupo: '', iniDesde: '', iniHasta: '' };
     window.renderView();
 };
