@@ -331,44 +331,65 @@ function pintarColoresYHoy(tasksData) {
         if (progress) progress.style.fill = color;
     });
 
-    // 2. Dibujar Línea de HOY
+    // 2. Línea de HOY
+    const ganttWrapper = document.getElementById('gantt-wrapper');
     const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttContainer) return;
+    if (!ganttWrapper || !ganttContainer) return;
 
-    const oldLine = document.getElementById('gantt-today-line');
-    if (oldLine) oldLine.remove();
+    // Eliminar contenedor anterior si existe (para no duplicar)
+    const oldContainer = document.getElementById('today-line-container');
+    if (oldContainer) oldContainer.remove();
 
-    if (tasksData.length === 0) return;
+    // Obtener la fecha REAL de inicio leyendo el primer "tick" del calendario
+    const ticks = ganttContainer.querySelectorAll('.tick');
+    if (ticks.length === 0) return;
+    
+    // Frappe guarda la fecha en el atributo data-date (ej. "2026-11-01")
+    const firstTickDate = ticks[0].getAttribute('data-date');
+    if (!firstTickDate) return;
 
-    // Fecha mínima del gráfico (con padding de 2 días que añade Frappe)
-    let minDate = null;
-    tasksData.forEach(t => {
-        const d = new Date(t.start + 'T00:00:00');
-        if (!minDate || d < minDate) minDate = d;
-    });
-    minDate.setDate(minDate.getDate() - 2); 
-
+    const startDate = new Date(firstTickDate + 'T00:00:00');
     const today = new Date();
     today.setHours(0,0,0,0);
-    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return;
-
-    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
-    let offsetPx = 0;
     
+    // Calcular días exactos transcurridos
+    const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    
+    // Ancho de la columna izquierda (donde están los nombres)
+    const sideHeader = ganttContainer.querySelector('.side-header');
+    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
+    
+    // Ancho de la columna según la vista
+    const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
+    
+    let offsetPx = 0;
     if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
     else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
     else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    // Calcular el ancho de la columna izquierda (donde van los nombres de las tareas)
-    // Si no la encuentra, usa 200 por defecto
-    const sideHeader = ganttContainer.querySelector('.side-header');
-    const sidebarWidth = sideHeader ? sideHeader.offsetWidth : 200;
-    
     const finalLeft = sidebarWidth + offsetPx;
 
+    // 3. Crear un contenedor "espejo" que oculte lo que sobra pero permita el scroll
+    const lineContainer = document.createElement('div');
+    lineContainer.id = 'today-line-container';
+    
+    // Calculamos la altura del header para que no pase por encima
+    const header = ganttContainer.querySelector('.grid-header');
+    const headerHeight = header ? header.offsetHeight : 50;
+
+    lineContainer.style.cssText = `
+        position: absolute;
+        top: ${headerHeight}px; /* Empieza justo debajo del encabezado del calendario */
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden; /* Evita que la línea se escape a los lados */
+        pointer-events: none;
+        z-index: 50;
+    `;
+
+    // 4. Crear la línea
     const line = document.createElement('div');
-    line.id = 'gantt-today-line';
     line.style.cssText = `
         position: absolute;
         top: 0;
@@ -376,10 +397,10 @@ function pintarColoresYHoy(tasksData) {
         left: ${finalLeft}px;
         width: 2px;
         background: #ef4444;
-        z-index: 50;
         pointer-events: none;
     `;
     
+    // Etiqueta HOY
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -397,16 +418,29 @@ function pintarColoresYHoy(tasksData) {
         ">HOY</div>
     `;
 
-    // LA CLAVE: Inyectar la línea directamente en la capa que contiene el grid del calendario.
-    // Esto hace que el navegador la mueva automáticamente al hacer scroll.
-    const grid = ganttContainer.querySelector('.grid-body') || 
-                 ganttContainer.querySelector('.gantt-container') || 
-                 ganttContainer;
+    lineContainer.appendChild(line);
     
-    grid.style.position = 'relative';
-    grid.appendChild(line);
-}
+    // Hacemos que el contenedor sea pariente del contenedor del gantt para posicionarlo bien
+    ganttWrapper.style.position = 'relative';
+    ganttWrapper.appendChild(lineContainer);
 
+    // 5. Sincronizar el scroll
+    // Buscamos el contenedor que realmente scrollea en Frappe
+    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
+    
+    // Removemos el evento anterior si existía
+    if (window.todayScrollListener) {
+        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
+    }
+    
+    // Agregamos el nuevo
+    window.todayScrollListener = () => {
+        const scrollLeft = scrollWrapper.scrollLeft;
+        // Movemos la línea en sentido contrario para que parezca que está quieta en su fecha
+        line.style.transform = `translateX(-${scrollLeft}px)`;
+    };
+    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+}
 
 window.toggleGanttFilterDrawer = function() {
     const drawer = document.getElementById('gantt-filter-drawer');
