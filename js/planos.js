@@ -11,7 +11,6 @@ let planosState = {
         revision: true, fecha: true, estado: true, aconex: true, 
         responsable: true, estatus_bim: true, modelo_bim: true, actividades: true
     },
-    // ANCHOS POR DEFECTO
     colWidths: {
         codigo: 150, titulo: 250, disciplina: 120, clasificacion: 120, 
         revision: 80, fecha: 100, estado: 100, aconex: 120, 
@@ -19,7 +18,7 @@ let planosState = {
     }
 };
 
-// --- LÓGICA DE REDIMENSIONADO ---
+// --- SISTEMA DE REDIMENSIONADO ---
 let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
 
 function initResize(e, colKey) {
@@ -29,7 +28,6 @@ function initResize(e, colKey) {
     startWidth = planosState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    // Evitar que el clic del mouse seleccione texto mientras se arrastra
     document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'none'; });
     
     document.addEventListener('mousemove', doResize);
@@ -41,10 +39,9 @@ function initResize(e, colKey) {
 function doResize(e) {
     if (!isResizing) return;
     const diff = e.pageX - startX;
-    const newWidth = Math.max(50, startWidth + diff); // Ancho mínimo de 50px
+    const newWidth = Math.max(50, startWidth + diff);
     planosState.colWidths[currentCol] = newWidth;
     
-    // Actualizar visualmente sin re-renderizar toda la tabla para que sea fluido
     const th = document.querySelector(`th[data-col="${currentCol}"]`);
     if (th) {
         th.style.width = `${newWidth}px`;
@@ -94,7 +91,6 @@ export function renderLogPlanos(container) {
 
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
 
-    // Helpers para inyectar estilos de ancho
     const colStyle = (key) => `width: ${planosState.colWidths[key]}px; min-width: ${planosState.colWidths[key]}px; max-width: ${planosState.colWidths[key]}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResizePlanos(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 whitespace-nowrap overflow-hidden text-ellipsis";
@@ -157,7 +153,7 @@ export function renderLogPlanos(container) {
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
             <div class="overflow-x-auto overflow-y-auto max-h-[75vh] custom-scrollbar">
-                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1200px;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1400px;">
                     <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold sticky top-0 z-10 shadow-sm">
                         <tr>
                             ${planosState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass}">Código ${resizer('codigo')}</th>` : ''}
@@ -198,20 +194,37 @@ export function renderLogPlanos(container) {
         </div>
     `;
 
-    document.getElementById('pl-search').addEventListener('input', (e) => {
+    // --- LISTENERS DE FILTROS (EVITA QUE SE PIERDA EL FOCO) ---
+    const inputSearch = document.getElementById('pl-search');
+    inputSearch.addEventListener('input', (e) => {
         planosState.search = e.target.value;
-        setTimeout(() => window.renderView(), 300);
+        
+        clearTimeout(window.planosSearchTimeout);
+        window.planosSearchTimeout = setTimeout(() => {
+            window.renderView();
+            // Mantener el foco en el buscador después de redibujar
+            const newInput = document.getElementById('pl-search');
+            if (newInput) {
+                newInput.focus();
+                const val = newInput.value;
+                newInput.value = '';
+                newInput.value = val;
+            }
+        }, 500);
     });
+
     document.getElementById('pl-fil-disciplina').addEventListener('change', (e) => {
         planosState.filterDisciplina = e.target.value;
         window.renderView();
     });
+    
     document.getElementById('pl-fil-estatus').addEventListener('change', (e) => {
         planosState.filterEstatus = e.target.value;
         window.renderView();
     });
 }
 
+// --- FUNCIONES EXPUESTAS AL HTML ---
 window.togglePlanosColMenu = function() {
     planosState.showColMenu = !planosState.showColMenu;
     window.renderView();
@@ -229,10 +242,8 @@ window.toggleTodasPlanosCols = function(estado) {
     window.renderView();
 };
 
-// Exportar la función de redimensionado
 window.initResizePlanos = initResize;
 
-// --- IMPORTAR EXCEL DE PLANOS ---
 window.handlePlanosUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
