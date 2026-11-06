@@ -320,7 +320,7 @@ function inicializarGantt(tareas) {
 }
 
 function pintarColoresYHoy(tasksData) {
-    // 1. Pintar las barras con sus colores
+    // 1. Pintar las barras
     const bars = document.querySelectorAll('.bar-wrapper .bar');
     bars.forEach((bar, idx) => {
         const t = tasksData[idx];
@@ -331,67 +331,55 @@ function pintarColoresYHoy(tasksData) {
         if (progress) progress.style.fill = color;
     });
 
-    // 2. Dibujar Línea de HOY
+    // 2. Línea de HOY
     const ganttWrapper = document.getElementById('gantt-wrapper');
-    const ganttContainer = document.getElementById('gantt-container');
-    if (!ganttWrapper || !ganttContainer || tasksData.length === 0) return;
+    if (!ganttWrapper || !ganttState.currentGantt) return;
 
-    // Eliminar capa anterior si existe
+    // Limpiar overlay anterior
     const oldOverlay = document.getElementById('gantt-today-overlay');
     if (oldOverlay) oldOverlay.remove();
 
-    // Calcular fecha de inicio (primera tarea - 2 días de padding)
-    let minDate = null;
-    tasksData.forEach(t => {
-        const d = new Date(t.start + 'T00:00:00');
-        if (!minDate || d < minDate) minDate = d;
-    });
-    if (!minDate) return;
-    
-    // Frappe añade 2 días de padding antes de la primera tarea
-    minDate.setDate(minDate.getDate() - 2); 
+    // Frappe Gantt tiene una propiedad interna 'gantt_start' que guarda la fecha con la que inicia el gráfico
+    const ganttStartDate = ganttState.currentGantt.gantt_start;
+    if (!ganttStartDate) return;
 
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    // Días de diferencia entre el inicio del gráfico y hoy
-    const diffDays = Math.floor((today - minDate) / (1000 * 60 * 60 * 24));
+    // Días transcurridos
+    const diffDays = Math.floor((today - ganttStartDate) / (1000 * 60 * 60 * 24));
     
-    // Si hoy es antes de que empiece el gráfico, no mostramos la línea
-    if (diffDays < 0) return;
+    if (diffDays < 0) return; // Si hoy es antes del inicio, no dibujar
 
-    // Calcular ancho de píxeles según la vista
+    // Anchos según vista
     const colWidth = ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100;
     let offsetPx = 0;
     
-    if (ganttState.viewMode === 'Day') {
-        offsetPx = diffDays * colWidth;
-    } else if (ganttState.viewMode === 'Week') {
-        offsetPx = (diffDays / 7) * colWidth;
-    } else if (ganttState.viewMode === 'Month') {
-        offsetPx = (diffDays / 30.44) * colWidth;
-    }
+    if (ganttState.viewMode === 'Day') offsetPx = diffDays * colWidth;
+    else if (ganttState.viewMode === 'Week') offsetPx = (diffDays / 7) * colWidth;
+    else if (ganttState.viewMode === 'Month') offsetPx = (diffDays / 30.44) * colWidth;
 
-    const sidebarWidth = 150; // Ancho de la columna de nombres
+    const sidebarWidth = 150; // Ancho de la barra lateral
     const finalLeft = sidebarWidth + offsetPx;
 
-    // Crear contenedor "Overlay" para evitar que la línea se salga o pise los encabezados
+    // Crear contenedor
     const overlay = document.createElement('div');
     overlay.id = 'gantt-today-overlay';
     
-    // Buscar la altura del encabezado
-    const header = ganttContainer.querySelector('.grid-header');
+    // Usar 50px fijos de altura para el header (el estándar de Frappe)
+    // o calcularlo si existe
+    const header = document.querySelector('.grid-header');
     const headerHeight = header ? header.offsetHeight : 50;
 
     overlay.style.cssText = `
         position: absolute;
-        top: ${headerHeight}px; /* Evita pisar el encabezado */
+        top: ${headerHeight}px;
         left: 0;
         right: 0;
         bottom: 0;
-        overflow: hidden; /* Recorta la línea cuando sale del área */
+        overflow: hidden;
         pointer-events: none;
-        z-index: 50;
+        z-index: 10; /* z-index moderado para no tapar menús */
     `;
 
     const line = document.createElement('div');
@@ -425,21 +413,18 @@ function pintarColoresYHoy(tasksData) {
     overlay.appendChild(line);
     ganttWrapper.appendChild(overlay);
 
-    // Sincronizar con el scroll horizontal del gráfico
-    const scrollWrapper = ganttContainer.querySelector('.gantt-container') || ganttContainer;
-    
-    if (window.todayScrollListener) {
-        scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
+    // Scroll
+    const scrollWrapper = document.querySelector('.gantt-container');
+    if (scrollWrapper) {
+        if (window.todayScrollListener) {
+            scrollWrapper.removeEventListener('scroll', window.todayScrollListener);
+        }
+        window.todayScrollListener = () => {
+            line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
+        };
+        scrollWrapper.addEventListener('scroll', window.todayScrollListener);
+        window.todayScrollListener();
     }
-    
-    window.todayScrollListener = () => {
-        line.style.transform = `translateX(-${scrollWrapper.scrollLeft}px)`;
-    };
-    
-    scrollWrapper.addEventListener('scroll', window.todayScrollListener);
-    
-    // Forzar una actualización inicial por si ya estaba scrolleado
-    window.todayScrollListener();
 }
 
 window.toggleGanttFilterDrawer = function() {
