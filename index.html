@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Control BIM · Hospital Caraz II-1</title>
     <script src="https://cdn.tailwindcss.com"></script>
-<script>
-    tailwind.config = {
-        darkMode: 'class', // <-- ESTO ES CLAVE
-    }
-</script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -21,12 +21,10 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-      <!-- LOGIN -->
+    <!-- LOGIN -->
     <div id="login-screen" class="login-page relative min-h-screen flex items-center justify-center p-4">
-        <!-- Fondo con la imagen y capa oscura -->
         <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm z-0"></div>
         
-        <!-- Caja del Login -->
         <div class="login-box relative z-10">
             <div class="login-header">
                 <div class="login-logos">
@@ -78,20 +76,19 @@
 
     <!-- APP -->
     <div id="app-screen" class="hidden flex-col min-h-screen">
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <!-- AHORA -->
-<div class="flex items-center gap-2 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-    <img src="assets/suyay.png" alt="SUYAY" class="h-6 w-auto object-contain">
-    <div class="w-px h-5 bg-slate-300 dark:bg-slate-600"></div>
-    <img src="assets/anin.png" alt="ANIN" class="h-6 w-auto object-contain">
-</div>
+                    <div class="flex items-center gap-2 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <img src="assets/suyay.png" alt="SUYAY" class="h-6 w-auto object-contain">
+                        <div class="w-px h-5 bg-slate-300 dark:bg-slate-600"></div>
+                        <img src="assets/anin.png" alt="ANIN" class="h-6 w-auto object-contain">
+                    </div>
                     <div>
-                        <h1 class="font-bold text-slate-900 leading-tight">Control BIM</h1>
-                        <p class="text-xs text-slate-500">
-                            <b id="user-display" class="text-sky-600"></b>
-                            (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700"></span>)
+                        <h1 class="font-bold text-slate-900 dark:text-white leading-tight">Control BIM</h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            <b id="user-display" class="text-sky-600 dark:text-sky-400"></b>
+                            (<span id="role-display" class="font-semibold uppercase text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300"></span>)
                         </p>
                     </div>
                 </div>
@@ -99,30 +96,28 @@
                     <button id="btn-new-task" onclick="window.openModal()" class="hidden px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
                         + Nueva Actividad
                     </button>
-
-                    <button onclick="window.toggleDarkMode()" id="btn-dark-mode" class="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg transition" title="Cambiar tema">
-    <i class="fa-solid fa-moon text-sm" id="dark-mode-icon"></i>
-</button>
-                    
-                    <button id="btn-logout" class="px-3 py-2 text-xs border border-slate-300 rounded-lg hover:bg-slate-100 transition text-slate-600">
+                    <button onclick="window.toggleDarkMode()" id="btn-dark-mode" class="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 rounded-lg transition" title="Cambiar tema">
+                        <i class="fa-solid fa-moon text-sm" id="dark-mode-icon"></i>
+                    </button>
+                    <button id="btn-logout" class="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-600 dark:text-slate-300">
                         Cerrar Sesión
                     </button>
                 </div>
             </div>
         </header>
 
-        <nav class="bg-white border-b border-slate-200 sticky top-16 z-20">
+        <nav class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-16 z-20">
             <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto" id="tabs-nav">
-                <button data-tab="mitrabajo" onclick="window.switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hidden">👤 Mi Trabajo</button>
-                <button data-tab="dashboard" onclick="window.switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Dashboard</button>
-                <button data-tab="tabla" onclick="window.switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📋 Gestión de Actividades</button>
-                <button data-tab="log-planos" onclick="window.switchTab('log-planos')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📑 Log de Planos</button>
-                <button data-tab="kanban" onclick="window.switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🗂 Kanban</button>
-                <button data-tab="eisenhower" onclick="window.switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">🎯 Eisenhower</button>
-                <button data-tab="gantt" onclick="window.switchTab('gantt')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📅 Gantt</button>
-                <button data-tab="manpower" onclick="window.switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⏱ MANPOWER</button>
-                <button data-tab="recursos" onclick="window.switchTab('recursos')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">📊 Recursos</button>
-                <button id="tab-config-btn" data-tab="config" onclick="window.switchTab('config')" class="tab-btn hidden px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap">⚙️ Configuración</button>
+                <button data-tab="mitrabajo" onclick="window.switchTab('mitrabajo')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap hidden">👤 Mi Trabajo</button>
+                <button data-tab="dashboard" onclick="window.switchTab('dashboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">📊 Dashboard</button>
+                <button data-tab="tabla" onclick="window.switchTab('tabla')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">📋 Gestión de Actividades</button>
+                <button data-tab="log-planos" onclick="window.switchTab('log-planos')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">📑 Log de Planos</button>
+                <button data-tab="kanban" onclick="window.switchTab('kanban')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">🗂 Kanban</button>
+                <button data-tab="eisenhower" onclick="window.switchTab('eisenhower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">🎯 Eisenhower</button>
+                <button data-tab="gantt" onclick="window.switchTab('gantt')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">📅 Gantt</button>
+                <button data-tab="manpower" onclick="window.switchTab('manpower')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">⏱ MANPOWER</button>
+                <button data-tab="recursos" onclick="window.switchTab('recursos')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">📊 Recursos</button>
+                <button id="tab-config-btn" data-tab="config" onclick="window.switchTab('config')" class="tab-btn hidden px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 dark:text-slate-400 whitespace-nowrap">⚙️ Configuración</button>
             </div>
         </nav>
 
@@ -130,55 +125,66 @@
             <div id="view-container"></div>
         </main>
 
-        <footer class="mt-auto py-3 text-center border-t border-slate-200 bg-white">
-            <p class="text-[10px] text-slate-400">
-                Desarrollado por <span class="text-slate-600 font-semibold">Ing. Luis Romero</span> · 
-                <a href="tel:928283031" class="text-sky-600 hover:underline">928283031</a>
+        <footer class="mt-auto py-3 text-center border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <p class="text-[10px] text-slate-400 dark:text-slate-500">
+                Desarrollado por <span class="text-slate-600 dark:text-slate-300 font-semibold">Ing. Luis Romero</span> · 
+                <a href="tel:928283031" class="text-sky-600 dark:text-sky-400 hover:underline">928283031</a>
             </p>
         </footer>
     </div>
 
     <!-- MODAL TASK -->
     <div id="modal-task" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
-            <h3 class="font-bold text-sm text-slate-800" id="modal-title">Nueva Actividad</h3>
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
+            <h3 class="font-bold text-sm text-slate-800 dark:text-white" id="modal-title">Nueva Actividad</h3>
             <form onsubmit="window.saveTask(event)" class="space-y-3 text-xs">
                 <input type="hidden" id="task-id">
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Actividad *</label>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Actividad *</label>
                     <input type="text" id="task-actividad" required class="inp">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Grupo</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Grupo</label>
                         <select id="task-grupo" class="inp"></select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Responsable (Dueño)</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Responsable (Dueño)</label>
                         <select id="task-responsable" class="inp"></select>
                     </div>
                 </div>
 
                 <!-- RECURSOS (MODELADORES) -->
                 <div class="relative">
-                    <label class="block font-semibold text-slate-600 mb-1">Recursos (Modeladores)</label>
-                    <div id="recursos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 rounded-lg bg-white"></div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Recursos (Modeladores)</label>
+                    <div id="recursos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
                     <div class="relative">
                         <input type="text" id="recursos-search" placeholder="Escribe para buscar modelador..." 
-                               class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
-                        <div id="recursos-dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                               class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                        <div id="recursos-dropdown" class="hidden absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- PLANOS ASOCIADOS -->
+                <div class="relative">
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Planos Asociados</label>
+                    <div id="planos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
+                    <div class="relative">
+                        <input type="text" id="planos-search" placeholder="Escribe código o título de plano..." 
+                               class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                        <div id="planos-dropdown" class="hidden absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Importancia</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Importancia</label>
                         <select id="task-importancia" class="inp">
                             <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Urgencia</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Urgencia</label>
                         <select id="task-urgencia" class="inp">
                             <option>Muy alto</option><option>Alto</option><option>Medio</option><option>Bajo</option>
                         </select>
@@ -187,40 +193,40 @@
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Estado</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Estado</label>
                         <select id="task-estado" class="inp">
                             <option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option><option>Cerrado</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Cierre Real</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Cierre Real</label>
                         <input type="date" id="task-fecha-cierre" class="inp">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Inicio Prog.</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Inicio Prog.</label>
                         <input type="date" id="task-fecha-inicio" class="inp">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1">Fin Prog.</label>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Fin Prog.</label>
                         <input type="date" id="task-fecha-fin" class="inp">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Nota / restricción</label>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Nota / restricción</label>
                     <textarea id="task-nota" rows="2" class="inp"></textarea>
                 </div>
 
-                <div id="custom-props-container" class="border-t border-slate-200 pt-3 mt-3 hidden">
-                    <p class="text-[11px] font-bold text-slate-700 mb-2">Propiedades Personalizadas</p>
+                <div id="custom-props-container" class="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3 hidden">
+                    <p class="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">Propiedades Personalizadas</p>
                     <div id="custom-props-inputs" class="space-y-2"></div>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="window.closeModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <button type="button" onclick="window.closeModal()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Cancelar</button>
                     <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
                 </div>
             </form>
@@ -229,19 +235,19 @@
 
     <!-- MODAL CDE -->
     <div id="modal-cde" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800" id="cde-title">Transición CDE · ISO 19650</h3>
-            <p id="cde-current" class="text-[11px] text-slate-500"></p>
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-5 space-y-3 border border-slate-200 dark:border-slate-700">
+            <h3 class="font-bold text-sm text-slate-800 dark:text-white" id="cde-title">Transición CDE · ISO 19650</h3>
+            <p id="cde-current" class="text-[11px] text-slate-500 dark:text-slate-400"></p>
             <div class="space-y-2 text-xs">
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Estado destino</label>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Estado destino</label>
                     <select id="cde-estado" class="inp">
                         <option value="WIP">WIP</option><option value="Shared">Shared</option>
                         <option value="Published">Published</option><option value="Archived">Archived</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Aptitud</label>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aptitud</label>
                     <select id="cde-aptitud" class="inp">
                         <option value="">— No cambiar —</option>
                         <option value="S0">S0 · WIP</option><option value="S1">S1 · Coordinación</option>
@@ -250,12 +256,12 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-600 mb-1">Comentario (auditoría)</label>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Comentario (auditoría)</label>
                     <textarea id="cde-comentario" rows="2" class="inp" placeholder="Motivo de la transición..."></textarea>
                 </div>
             </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="window.closeModalCDE()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600 text-xs">Cancelar</button>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <button type="button" onclick="window.closeModalCDE()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300 text-xs">Cancelar</button>
                 <button type="button" onclick="window.confirmarTransicion()" class="px-4 py-1.5 bg-teal-600 text-white font-semibold rounded hover:bg-teal-700 text-xs">Confirmar</button>
             </div>
         </div>
@@ -263,10 +269,10 @@
 
     <!-- MODAL HISTORIAL -->
     <div id="modal-hist" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[85vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
             <div class="flex justify-between items-center">
-                <h3 class="font-bold text-sm text-slate-800">Historial CDE</h3>
-                <button onclick="document.getElementById('modal-hist').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+                <h3 class="font-bold text-sm text-slate-800 dark:text-white">Historial CDE</h3>
+                <button onclick="document.getElementById('modal-hist').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="hist-content" class="space-y-2 text-xs"></div>
         </div>
@@ -274,27 +280,27 @@
 
     <!-- MODAL CONFIRMAR ELIMINACIÓN -->
     <div id="modal-confirm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 dark:border-slate-700">
             <div class="flex items-start gap-3">
-                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 flex items-center justify-center flex-shrink-0">
                     <i class="fa-solid fa-triangle-exclamation text-lg"></i>
                 </div>
                 <div class="flex-1">
-                    <h3 class="font-bold text-base text-slate-900" id="confirm-title">Confirmar eliminación</h3>
-                    <p class="text-sm text-slate-600 mt-1" id="confirm-message">¿Estás seguro?</p>
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white" id="confirm-title">Confirmar eliminación</h3>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 mt-1" id="confirm-message">¿Estás seguro?</p>
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">
-                    Escribe <b class="text-red-600 font-mono">Eliminar</b> para confirmar:
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                    Escribe <b class="text-red-600 dark:text-red-400 font-mono">Eliminar</b> para confirmar:
                 </label>
                 <input type="text" id="confirm-input" autocomplete="off" 
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100" 
+                       class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 dark:focus:ring-red-900" 
                        placeholder="Eliminar">
-                <p id="confirm-error" class="text-xs text-red-600 mt-1 hidden">Debes escribir exactamente "Eliminar".</p>
+                <p id="confirm-error" class="text-xs text-red-600 dark:text-red-400 mt-1 hidden">Debes escribir exactamente "Eliminar".</p>
             </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="window.closeConfirm()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50">Cancelar</button>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <button type="button" onclick="window.closeConfirm()" class="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700">Cancelar</button>
                 <button type="button" id="confirm-btn" onclick="window.executeConfirm()" 
                         class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition" 
                         disabled>
@@ -304,7 +310,7 @@
         </div>
     </div>
 
-    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-200 dark:text-slate-900 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
 
     <!-- SCRIPTS -->
     <script type="module" src="js/app.js"></script>
