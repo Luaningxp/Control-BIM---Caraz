@@ -142,7 +142,7 @@ function actualizarPlanosUI() {
             <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none">×</button>
+                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-0.5">×</button>
             </span>
         `;
     }).join('');
