@@ -287,7 +287,6 @@ td.sticky {
     background-color: var(--bg-card) !important;
     z-index: 10 !important;
 }
-/* Fondo sólido también en hover, sin transparencia */
 tr:hover td.sticky {
     background-color: #f8fafc !important;
 }
