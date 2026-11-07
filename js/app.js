@@ -61,21 +61,18 @@ async function initApp(user) {
     state.isModelador = !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
     document.getElementById('user-display').innerText = user.email;
-    // Muestra el cargo real en la barra
     document.getElementById('role-display').innerText = state.currentCargo || 'Sin Cargo';
 
-  if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
-    document.getElementById('btn-new-task').classList.remove('hidden');
-}
-if (state.isAdmin) {
-    document.getElementById('tab-config-btn').classList.remove('hidden');
-}
+    if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
+        document.getElementById('btn-new-task').classList.remove('hidden');
+    }
+    if (state.isAdmin) {
+        document.getElementById('tab-config-btn').classList.remove('hidden');
+    }
     
-    // Supervisores y Modeladores van a "Mi Trabajo" por defecto
     if (!state.isAdmin && !state.isCoordinador) {
         document.querySelector('[data-tab="mitrabajo"]').classList.remove('hidden');
     }
-    // Ocultar config a quien no es admin
     if (!state.isAdmin) {
         document.getElementById('tab-config-btn').classList.add('hidden');
     }
@@ -109,16 +106,16 @@ window.renderView = function() {
     else if (state.currentTab === 'config') renderConfig(container);
 }
 
-// Asignar a window para que el HTML los use
 window.openModal = openModal; window.closeModal = closeModal; window.saveTask = saveTask; window.editTask = editTask; window.deleteTask = deleteTask;
 window.openModalCDE = openModalCDE; window.closeModalCDE = closeModalCDE; window.confirmarTransicion = confirmarTransicion;
 window.onDragStart = onDragStart; window.onDragEnd = onDragEnd; window.onDragOver = onDragOver; window.onDragLeave = onDragLeave; window.onDrop = onDrop;
 window.openGrupoModal = openGrupoModal; window.closeGrupoModal = closeGrupoModal; window.saveGrupo = saveGrupo; window.deleteGrupo = deleteGrupo;
 window.openCargoModal = openCargoModal; window.closeCargoModal = closeCargoModal; window.saveCargo = saveCargo;
 window.openPropModal = openPropModal; window.closePropModal = closePropModal; window.saveProp = saveProp; window.deleteProp = deleteProp;
-window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
 window.openCausaModal = openCausaModal; window.closeCausaModal = closeCausaModal; window.saveCausa = saveCausa; window.deleteCausa = deleteCausa;
+window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
 window.fetchAll = fetchAll;
+window.guardarSnapshotSemanal = guardarSnapshotSemanal;
 
 window.addEventListener('DOMContentLoaded', async () => {
     const user = await checkUser();
@@ -130,6 +127,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         await initApp(user);
     }
 });
+
 window.togglePassword = function() {
     const passInput = document.getElementById('login-password');
     const eyeIcon = document.getElementById('eye-icon');
@@ -145,7 +143,6 @@ window.togglePassword = function() {
     }
 };
 
-// Mostrar/ocultar el ojito según si hay texto escrito
 document.addEventListener('DOMContentLoaded', () => {
     const passInput = document.getElementById('login-password');
     const eyeBtn = document.querySelector('#login-password + button');
@@ -161,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 eyeBtn.style.opacity = '0';
                 eyeBtn.style.pointerEvents = 'none';
-                // Si se borra el texto, volver a ocultar la contraseña
                 passInput.type = 'password';
                 const eyeIcon = document.getElementById('eye-icon');
                 if (eyeIcon) {
@@ -172,19 +168,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-// --- MODO OSCURO ---
+
 window.toggleDarkMode = function() {
     const html = document.documentElement;
     const icon = document.getElementById('dark-mode-icon');
     
     if (html.classList.contains('dark')) {
-        // Cambiar a claro
         html.classList.remove('dark');
         localStorage.setItem('theme', 'light');
         icon.classList.remove('fa-sun');
         icon.classList.add('fa-moon');
     } else {
-        // Cambiar a oscuro
         html.classList.add('dark');
         localStorage.setItem('theme', 'dark');
         icon.classList.remove('fa-moon');
@@ -192,7 +186,6 @@ window.toggleDarkMode = function() {
     }
 };
 
-// Al cargar la página, verificar si el usuario ya había elegido el modo oscuro
 window.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
@@ -203,4 +196,3 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-window.guardarSnapshotSemanal = guardarSnapshotSemanal;
