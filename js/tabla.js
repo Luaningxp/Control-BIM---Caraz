@@ -122,7 +122,7 @@ function renderPlanosChips(pendienteId) {
     if (pendienteId) {
         const existentes = (state.actividadPlanosCache || [])
             .filter(ap => Number(ap.pendiente_id) === Number(pendienteId))
-            .map(ap => Number(ap.plano_id)); // Forzamos a número
+            .map(ap => Number(ap.plano_id));
         existentes.forEach(id => planosSeleccionados.add(id));
     }
     actualizarPlanosUI();
@@ -136,7 +136,6 @@ function actualizarPlanosUI() {
         return;
     }
     box.innerHTML = Array.from(planosSeleccionados).map(pid => {
-        // Buscamos con Number() en ambos lados
         const plano = (state.planosCache || []).find(p => Number(p.id) === Number(pid));
         if (!plano) return '';
         return `
@@ -174,7 +173,6 @@ function inicializarBuscadorPlanos() {
     function mostrarDropdownPlanos(query) {
         const q = (query || '').toLowerCase();
         const disponibles = (state.planosCache || []).filter(p => {
-            // Verificamos si ya está seleccionado usando Number()
             if (planosSeleccionados.has(Number(p.id))) return false;
             const text = `${p.codigo} ${p.titulo || ''}`.toLowerCase();
             return text.includes(q);
@@ -200,7 +198,6 @@ function inicializarBuscadorPlanos() {
 }
 
 window.agregarPlano = function(pid) {
-    // Forzamos a número al agregar
     planosSeleccionados.add(Number(pid));
     actualizarPlanosUI();
     const input = document.getElementById('planos-search');
@@ -210,10 +207,10 @@ window.agregarPlano = function(pid) {
 };
 
 window.quitarPlano = function(pid) {
-    // Forzamos a número al eliminar
     planosSeleccionados.delete(Number(pid));
     actualizarPlanosUI();
 };
+
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
@@ -419,7 +416,11 @@ export function renderTabla(container) {
                                 }).join('')}
                                 <td data-col="acciones" style="width:100px !important;min-width:100px !important;max-width:100px !important;"
                                     class="p-3 text-center whitespace-nowrap sticky right-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
-                                    <!-- botones -->
+                                    <div class="flex items-center justify-center gap-0.5">
+                                        ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
+                                        ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition" title="Transición CDE"><i class="fa-solid fa-arrows-rotate text-[11px]"></i></button>` : ''}
+                                        ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" title="Eliminar"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
+                                    </div>
                                 </td>
                             </tr>
                         `}).join('')}
@@ -512,7 +513,6 @@ function renderCustomProps(pendienteId) {
     const container = document.getElementById('custom-props-container');
     const inputs = document.getElementById('custom-props-inputs');
     
-    // Solo renderizamos las propiedades personalizadas que NO son de tipo 'planos'
     const otrosProps = state.propDefsCache.filter(pd => pd.tipo !== 'planos');
     
     if (otrosProps.length === 0) {
@@ -585,7 +585,6 @@ export async function saveTask(e) {
         taskId = data[0].id;
     }
 
-    // Guardar Propiedades
     const propInputs = document.querySelectorAll('.custom-prop-input');
     for (const input of propInputs) {
         const pid = parseInt(input.dataset.pid); const type = input.dataset.type;
@@ -603,14 +602,12 @@ export async function saveTask(e) {
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
 
-    // Guardar Recursos
     await supabaseClient.from('actividad_recursos').delete().eq('pendiente_id', parseInt(taskId));
     if (recursosSeleccionados.size > 0) {
         const recursosData = Array.from(recursosSeleccionados).map(uid => ({ pendiente_id: parseInt(taskId), usuario_id: uid }));
         await supabaseClient.from('actividad_recursos').insert(recursosData);
     }
 
-    // Guardar Planos
     await supabaseClient.from('actividad_planos').delete().eq('pendiente_id', parseInt(taskId));
     if (planosSeleccionados.size > 0) {
         const planosData = Array.from(planosSeleccionados).map(pid => ({ pendiente_id: parseInt(taskId), plano_id: pid }));
