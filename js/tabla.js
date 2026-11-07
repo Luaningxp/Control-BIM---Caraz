@@ -237,7 +237,14 @@ let tableState = {
 
 export function canEdit(t) { 
     if (state.isAdmin || state.isCoordinador || state.isSupervisor) return true;
-    if (state.isModelador && t.estado_cde === 'WIP' && t.user_id === state.currentUser?.id) return true;
+    if (state.isModelador && t.estado_cde === 'WIP') {
+        const esOwner = t.user_id === state.currentUser?.id;
+        const esResponsable = t.responsable_id === state.currentUser?.id;
+        const esRecurso = (state.actividadRecursosCache || []).some(
+            r => r.pendiente_id === t.id && r.usuario_id === state.currentUser?.id
+        );
+        if (esOwner || esResponsable || esRecurso) return true;
+    }
     return false;
 }
 export function canDelete() { return state.isAdmin; }
@@ -587,13 +594,62 @@ export function openModal() {
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
-    renderCustomProps(null);
-    renderRecursosChips(null);
-    renderPlanosChips(null);
+        renderCustomProps(t.id);
+    renderRecursosChips(t.id);
+    renderPlanosChips(t.id);
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
-    
+
+    aplicarBloqueoModelador();
+
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
+}
+
+function aplicarBloqueoModelador() {
+    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+
+    const camposBloqueados = [
+        'task-actividad', 'task-grupo', 'task-responsable',
+        'task-importancia', 'task-urgencia', 'task-estado',
+        'task-fecha-inicio', 'task-fecha-fin'
+    ];
+    camposBloqueados.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = soloModelador;
+        if (soloModelador) {
+            el.classList.add('opacity-60', 'cursor-not-allowed', 'bg-slate-100', 'dark:bg-slate-900');
+        } else {
+            el.classList.remove('opacity-60', 'cursor-not-allowed', 'bg-slate-100', 'dark:bg-slate-900');
+        }
+    });
+
+    // Los chips de recursos tampoco se tocan
+    const recursosSearch = document.getElementById('recursos-search');
+    if (recursosSearch) {
+        recursosSearch.disabled = soloModelador;
+        recursosSearch.classList.toggle('opacity-60', soloModelador);
+    }
+    document.querySelectorAll('#recursos-chips button').forEach(b => {
+        b.style.display = soloModelador ? 'none' : '';
+    });
+
+    // Propiedades personalizadas: tampoco
+    document.querySelectorAll('.custom-prop-input').forEach(el => {
+        el.disabled = soloModelador;
+        el.classList.toggle('opacity-60', soloModelador);
+    });
+
+    // Los tres campos permitidos: SIEMPRE editables
+    ['task-fecha-cierre', 'task-nota'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = false;
+    });
+    const planosSearch = document.getElementById('planos-search');
+    if (planosSearch) planosSearch.disabled = false;
+    document.querySelectorAll('#planos-chips button').forEach(b => {
+        b.style.display = '';
+    });
 }
 
 export function editTask(id) {
@@ -624,8 +680,51 @@ export function editTask(id) {
     renderPlanosChips(t.id);
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
-    
+
+    aplicarBloqueoModelador();
+
     document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
+}
+
+function aplicarBloqueoModelador() {
+    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+
+    const camposBloqueados = [
+        'task-actividad', 'task-grupo', 'task-responsable',
+        'task-importancia', 'task-urgencia', 'task-estado',
+        'task-fecha-inicio', 'task-fecha-fin'
+    ];
+    camposBloqueados.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = soloModelador;
+        el.classList.toggle('opacity-60', soloModelador);
+        el.classList.toggle('cursor-not-allowed', soloModelador);
+    });
+
+    const recursosSearch = document.getElementById('recursos-search');
+    if (recursosSearch) {
+        recursosSearch.disabled = soloModelador;
+        recursosSearch.classList.toggle('opacity-60', soloModelador);
+    }
+    document.querySelectorAll('#recursos-chips button').forEach(b => {
+        b.style.display = soloModelador ? 'none' : '';
+    });
+
+    document.querySelectorAll('.custom-prop-input').forEach(el => {
+        el.disabled = soloModelador;
+        el.classList.toggle('opacity-60', soloModelador);
+    });
+
+    ['task-fecha-cierre', 'task-nota'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = false;
+    });
+    const planosSearch = document.getElementById('planos-search');
+    if (planosSearch) planosSearch.disabled = false;
+    document.querySelectorAll('#planos-chips button').forEach(b => {
+        b.style.display = '';
+    });
 }
 
 function renderCustomProps(pendienteId) {
@@ -680,19 +779,29 @@ export async function saveTask(e) {
         return;
     }
 
-    const payload = {
-        actividad: document.getElementById('task-actividad').value,
-        grupo: document.getElementById('task-grupo').value || null,
-        responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
-        responsable_id: respId,
-        importancia: document.getElementById('task-importancia').value,
-        urgencia: document.getElementById('task-urgencia').value,
-        estado: estado,
-        fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
-        fecha_fin: document.getElementById('task-fecha-fin').value || null,
-        fecha_cierre: fechaCierre || null,
-        nota: document.getElementById('task-nota').value
-    };
+    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+
+    let payload;
+    if (soloModelador && id) {
+        payload = {
+            fecha_cierre: fechaCierre || null,
+            nota: document.getElementById('task-nota').value
+        };
+    } else {
+        payload = {
+            actividad: document.getElementById('task-actividad').value,
+            grupo: document.getElementById('task-grupo').value || null,
+            responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
+            responsable_id: respId,
+            importancia: document.getElementById('task-importancia').value,
+            urgencia: document.getElementById('task-urgencia').value,
+            estado: estado,
+            fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
+            fecha_fin: document.getElementById('task-fecha-fin').value || null,
+            fecha_cierre: fechaCierre || null,
+            nota: document.getElementById('task-nota').value
+        };
+    }
     let taskId = id;
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
