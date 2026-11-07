@@ -451,6 +451,12 @@ function renderOcupacion(container, tareasFiltradas) {
     const totalDias = dias.length;
     const anchoDiaPct = 100 / totalDias;
 
+        const hoyDate = new Date();
+    hoyDate.setHours(0, 0, 0, 0);
+    const hoyIdx = Math.round((hoyDate - inicio) / 86400000);
+    const hoyEnRango = hoyIdx >= 0 && hoyIdx < totalDias;
+    const hoyLeft = hoyEnRango ? hoyIdx * anchoDiaPct : -1;
+
     const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
     const COLOR_CRIT = {
@@ -467,15 +473,21 @@ function renderOcupacion(container, tareasFiltradas) {
         'Cerrado':      '#10b981'
     };
 
-    const cabeceraDias = dias.map((d, i) => {
+        const cabeceraDias = dias.map((d, i) => {
         const esLunes = d.getDay() === 1;
         const esDomingo = d.getDay() === 0;
         const esPrimero = d.getDate() === 1;
+        const esHoy = i === hoyIdx;
         const etiquetaMes = (esPrimero || i === 0) ? `<div class="text-[8px] font-bold text-slate-500 dark:text-slate-400 leading-none">${MESES_CORTO[d.getMonth()]}</div>` : '';
-        return `<div class="text-center ${esDomingo ? 'bg-slate-200 dark:bg-slate-700' : ''} ${esLunes ? 'border-l border-slate-300 dark:border-slate-600' : ''}" style="width:${anchoDiaPct}%;">
+        const claseFondo = esHoy
+            ? 'bg-sky-200 dark:bg-sky-900/60 ring-1 ring-inset ring-sky-500'
+            : esDomingo
+                ? 'bg-slate-200 dark:bg-slate-700'
+                : '';
+        return `<div class="text-center ${claseFondo} ${esLunes ? 'border-l border-slate-300 dark:border-slate-600' : ''}" style="width:${anchoDiaPct}%;">
             ${etiquetaMes}
-            <div class="text-[9px] leading-tight text-slate-600 dark:text-slate-300">${['D','L','M','M','J','V','S'][d.getDay()]}</div>
-            <div class="text-[9px] font-bold text-slate-700 dark:text-slate-200">${d.getDate()}</div>
+            <div class="text-[9px] leading-tight ${esHoy ? 'text-sky-800 dark:text-sky-200 font-bold' : 'text-slate-600 dark:text-slate-300'}">${['D','L','M','M','J','V','S'][d.getDay()]}</div>
+            <div class="text-[9px] font-bold ${esHoy ? 'text-sky-900 dark:text-white' : 'text-slate-700 dark:text-slate-200'}">${d.getDate()}</div>
         </div>`;
     }).join('');
 
@@ -579,6 +591,7 @@ function renderOcupacion(container, tareasFiltradas) {
                 </div>
                 <div class="relative flex-1" style="min-height:${alturaFila}px;">
                     ${fondoFranjas}
+                    ${hoyEnRango ? `<div class="absolute top-0 bottom-0 pointer-events-none" style="left:${hoyLeft}%;width:${anchoDiaPct}%;background:rgba(56,189,248,0.18);border-left:1px solid rgba(14,165,233,0.6);border-right:1px solid rgba(14,165,233,0.6);"></div>` : ''}
                     ${barras}
                 </div>
             </div>
