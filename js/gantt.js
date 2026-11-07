@@ -453,6 +453,20 @@ function renderOcupacion(container, tareasFiltradas) {
 
     const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+    const COLOR_CRIT = {
+        'Muy alto': '#b91c1c',
+        'Alto':     '#f59e0b',
+        'Medio':    '#2563eb',
+        'Bajo':     '#94a3b8'
+    };
+    const BORDE_ESTADO = {
+        'No iniciado':  '#64748b',
+        'En proceso':   '#0ea5e9',
+        'En espera':    '#eab308',
+        'Reprogramado': '#a855f7',
+        'Cerrado':      '#10b981'
+    };
+
     const cabeceraDias = dias.map((d, i) => {
         const esLunes = d.getDay() === 1;
         const esDomingo = d.getDay() === 0;
@@ -473,13 +487,45 @@ function renderOcupacion(container, tareasFiltradas) {
         });
 
         const conFechas = tareasUsuario.filter(t => t.fecha_inicio_programado && t.fecha_fin);
-        const sinFechas = tareasUsuario.filter(t => !t.fecha_inicio_programado || !t.fecha_fin);
+
+        // Calcular índices de cada barra dentro del rango visible
+        const barrasCalc = conFechas.map(t => {
+            const iniT = new Date(t.fecha_inicio_programado + 'T00:00:00');
+            const finT = new Date(t.fecha_fin + 'T00:00:00');
+            const iniIdx = Math.max(0, Math.round((iniT - inicio) / 86400000));
+            const finIdx = Math.min(totalDias - 1, Math.round((finT - inicio) / 86400000));
+            if (finIdx < 0 || iniIdx > totalDias - 1 || finIdx < iniIdx) return null;
+            return { t, iniIdx, finIdx };
+        }).filter(Boolean);
+
+        // Asignar sub-fila por apilado (interval partitioning greedy)
+        // Se ordena por iniIdx, cada barra va a la primera sub-fila cuyo última finIdx sea < iniIdx
+        const ordenadas = [...barrasCalc].sort((a, b) => a.iniIdx - b.iniIdx);
+        const subfilas = [];
+        ordenadas.forEach(b => {
+            let asignada = -1;
+            for (let s = 0; s < subfilas.length; s++) {
+                if (subfilas[s] < b.iniIdx) { asignada = s; break; }
+            }
+            if (asignada === -1) { asignada = subfilas.length; subfilas.push(b.finIdx); }
+            else { subfilas[asignada] = b.finIdx; }
+            b.subfila = asignada;
+        });
+        const numSubfilas = Math.max(1, subfilas.length);
+
+        // Franjas no laborables: DO solo si el día no tiene ninguna tarea asignada a este modelador;
+        // DE y FE siempre se rayan porque son bloqueos explícitos.
+        const diasConTarea = new Set();
+        barrasCalc.forEach(b => { for (let i = b.iniIdx; i <= b.finIdx; i++) diasConTarea.add(i); });
 
         const franjasNoLaborables = [];
         for (let i = 0; i < dias.length; i++) {
             const dStr = dias[i].toISOString().split('T')[0];
             const tipo = tipoDia(p.id, dStr);
-            if (tipo === 'DO' || tipo === 'DE' || tipo === 'FE') {
+            let bloquear = false;
+            if (tipo === 'DE' || tipo === 'FE') bloquear = true;
+            else if (tipo === 'DO' && !diasConTarea.has(i)) bloquear = true;
+            if (bloquear) {
                 if (franjasNoLaborables.length > 0 && franjasNoLaborables[franjasNoLaborables.length - 1].finIdx === i - 1) {
                     franjasNoLaborables[franjasNoLaborables.length - 1].finIdx = i;
                 } else {
@@ -494,29 +540,30 @@ function renderOcupacion(container, tareasFiltradas) {
             return `<div class="absolute top-0 bottom-0 opacity-40" style="left:${left}%;width:${width}%;background:repeating-linear-gradient(45deg, #94a3b8 0, #94a3b8 2px, transparent 2px, transparent 8px);"></div>`;
         }).join('');
 
-        const barras = conFechas.map(t => {
-            const iniT = new Date(t.fecha_inicio_programado + 'T00:00:00');
-            const finT = new Date(t.fecha_fin + 'T00:00:00');
-            const iniIdx = Math.max(0, Math.round((iniT - inicio) / 86400000));
-            const finIdx = Math.min(totalDias - 1, Math.round((finT - inicio) / 86400000));
-            if (finIdx < 0 || iniIdx > totalDias - 1 || finIdx < iniIdx) return '';
+        const alturaFila = 8 + numSubfilas * 22;
+
+        const barras = barrasCalc.map(b => {
+            const { t, iniIdx, finIdx, subfila } = b;
             const left = iniIdx * anchoDiaPct;
             const width = (finIdx - iniIdx + 1) * anchoDiaPct;
             const crit = getCriticidad(t);
-            const color = crit === 'Muy alto' ? '#dc2626' : crit === 'Alto' ? '#ea580c' : crit === 'Medio' ? '#d97706' : '#64748b';
-            const bordeEstado = t.estado === 'Cerrado' ? '#0d9488' : t.estado === 'En proceso' ? '#0284c7' : t.estado === 'En espera' ? '#f59e0b' : t.estado === 'Reprogramado' ? '#7c3aed' : '#94a3b8';
+            const bg = COLOR_CRIT[crit] || '#94a3b8';
+            const borde = BORDE_ESTADO[t.estado] || '#94a3b8';
 
+            // Conflicto: solo DE o FE cuentan como aviso real, DO se ignora porque se asume trabajo
             let conflicto = false;
             for (let i = iniIdx; i <= finIdx; i++) {
                 const dStr = dias[i].toISOString().split('T')[0];
                 const tipo = tipoDia(p.id, dStr);
-                if (tipo === 'DO' || tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
+                if (tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
             }
 
-            const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}${conflicto ? '\n⚠ Programada sobre día no laborable' : ''}`;
-            return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:opacity-90 transition" 
-                        style="left:${left}%;width:${width}%;top:4px;bottom:4px;background:${color};border-left:3px solid ${bordeEstado};" 
+            const topPx = 4 + subfila * 22;
+            const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}${conflicto ? '\n⚠ Programada sobre descanso o feriado' : ''}`;
+            return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:brightness-110 transition" 
+                        style="left:${left}%;width:${width}%;top:${topPx}px;height:18px;background:${bg};border-left:3px solid ${borde};" 
                         title="${escapeHtml(titulo)}">
+                        <span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${escapeHtml(t.actividad)}</span>
                         ${conflicto ? `<i class="fa-solid fa-triangle-exclamation absolute -top-1 -right-1 text-[10px] text-amber-300 drop-shadow"></i>` : ''}
                     </div>`;
         }).join('');
@@ -527,10 +574,10 @@ function renderOcupacion(container, tareasFiltradas) {
                     <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>
                     <div class="min-w-0 flex-1">
                         <div class="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(nombreFormateado(p))}</div>
-                        <div class="text-[9px] text-slate-500 dark:text-slate-400">${tareasUsuario.length} tarea${tareasUsuario.length === 1 ? '' : 's'}${sinFechas.length > 0 ? ` · ${sinFechas.length} sin fecha` : ''}</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400">${tareasUsuario.length} tarea${tareasUsuario.length === 1 ? '' : 's'}</div>
                     </div>
                 </div>
-                <div class="relative flex-1" style="min-height:36px;">
+                <div class="relative flex-1" style="min-height:${alturaFila}px;">
                     ${fondoFranjas}
                     ${barras}
                 </div>
@@ -546,7 +593,7 @@ function renderOcupacion(container, tareasFiltradas) {
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-2">
             <div>
                 <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Ocupación por modelador</h4>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} · Fondo rayado = día no laborable</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} · Fondo rayado = día no laborable sin tarea</p>
             </div>
             <div class="flex items-center gap-1">
                 ${prevBtn}${todayBtn}${nextBtn}
@@ -565,15 +612,14 @@ function renderOcupacion(container, tareasFiltradas) {
         </div>
         <div class="flex flex-wrap items-center gap-3 text-[10px] mt-2 text-slate-500 dark:text-slate-400">
             <span class="font-bold uppercase tracking-wide">Criticidad:</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#dc2626"></span>Muy alto</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#ea580c"></span>Alto</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#d97706"></span>Medio</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#64748b"></span>Bajo</span>
-            <span class="inline-flex items-center gap-1 ml-2 pl-3 border-l border-slate-300 dark:border-slate-600"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i>Programada sobre día no laborable</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#b91c1c"></span>Muy alto</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#f59e0b"></span>Alto</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#2563eb"></span>Medio</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#94a3b8"></span>Bajo</span>
+            <span class="inline-flex items-center gap-1 ml-2 pl-3 border-l border-slate-300 dark:border-slate-600"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i>Sobre descanso o feriado</span>
         </div>
     `;
 }
-
 window.ocupacionMove = function(dir) {
     if (dir === 0) ocupacionState.semanaOffset = 0;
     else ocupacionState.semanaOffset += dir;
