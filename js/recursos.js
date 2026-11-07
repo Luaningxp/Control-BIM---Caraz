@@ -124,13 +124,11 @@ export function renderRecursos(container) {
         porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
     });
 
-    // Rango de semanas para los gráficos de líneas
     const fechas = registros.map(r => r.fecha).filter(Boolean).sort();
     const primera = fechas[0];
     const ultima = fechas[fechas.length - 1];
     const semanas = semanasEntre(semanaKey(primera), semanaKey(ultima));
 
-    // Series por grupo, cargo, importancia
     const serieGrupo = buildSeries(registros, semanas, r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         return t ? (t.grupo || 'Sin grupo') : 'General';
@@ -141,14 +139,13 @@ export function renderRecursos(container) {
         return t ? (t.importancia || 'Medio') : 'Sin tarea';
     });
 
-    // Cumplimiento semanal del 100% por modelador (nuevo dashboard)
     const semanasRecientes = semanas.slice(-6);
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
-            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4); // lunes a viernes
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4);
             const dias = [];
             for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
             const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
@@ -156,7 +153,6 @@ export function renderRecursos(container) {
         });
     });
 
-    // Horas vs tareas cerradas por grupo (nuevo dashboard)
     const porGrupoTareas = {};
     Object.keys(porGrupo).forEach(g => {
         const tareasGrupo = state.tasksCache.filter(t => (t.grupo || 'Sin grupo') === g);
@@ -166,6 +162,54 @@ export function renderRecursos(container) {
             abiertas: tareasGrupo.filter(t => t.estado !== 'Cerrado').length
         };
     });
+
+    // === SOBRECARGA POR MODELADOR ===
+    const CAPACIDAD_SEMANAL_H = 40;
+    const PESO_IMPORTANCIA = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
+    const hoyStrCap = new Date().toISOString().split('T')[0];
+
+    const cargaPorModelador = {};
+    state.perfilesCache.forEach(p => {
+        const esModelador = (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
+        if (!esModelador) return;
+        cargaPorModelador[p.id] = { nombre: nombreFormateado(p), avatar: p.id, tareas: 0, dias: 0, horasEstimadas: 0, horasReales: 0 };
+    });
+
+    state.tasksCache.filter(t => t.estado !== 'Cerrado').forEach(t => {
+        const asignados = new Set();
+        if (t.responsable_id) asignados.add(t.responsable_id);
+        (state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).forEach(r => asignados.add(r.usuario_id));
+        asignados.forEach(uid => {
+            if (!cargaPorModelador[uid]) return;
+            cargaPorModelador[uid].tareas += 1;
+            let dias = 0;
+            if (t.fecha_fin) {
+                const fin = new Date(t.fecha_fin + 'T00:00:00');
+                const hoyD = new Date(hoyStrCap + 'T00:00:00');
+                dias = Math.max(0, Math.ceil((fin - hoyD) / 86400000));
+            }
+            const peso = PESO_IMPORTANCIA[t.importancia] || 1;
+            cargaPorModelador[uid].dias += dias;
+            cargaPorModelador[uid].horasEstimadas += dias * 8 * peso;
+        });
+    });
+
+    registros.forEach(r => {
+        if (cargaPorModelador[r.usuario_id]) {
+            cargaPorModelador[r.usuario_id].horasReales += pctAHoras(r.porcentaje_dia);
+        }
+    });
+
+    const listaCarga = Object.values(cargaPorModelador).map(m => {
+        const semanasEquivalentes = m.horasEstimadas / CAPACIDAD_SEMANAL_H;
+        let estado, color;
+        if (semanasEquivalentes > 4) { estado = 'Sobrecargado'; color = 'text-red-700'; }
+        else if (semanasEquivalentes > 2) { estado = 'Alto'; color = 'text-amber-700'; }
+        else if (semanasEquivalentes > 0.5) { estado = 'Normal'; color = 'text-emerald-700'; }
+        else { estado = 'Libre'; color = 'text-slate-500'; }
+        return { ...m, semanasEquivalentes, estado, color };
+    }).sort((a, b) => b.semanasEquivalentes - a.semanasEquivalentes);
+    // === FIN SOBRECARGA ===
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
@@ -271,6 +315,42 @@ export function renderRecursos(container) {
                             <td class="p-3 font-semibold ${d.cerradas > 0 && d.horas / d.cerradas > 20 ? 'text-red-700' : 'text-slate-700'}">${ratio}</td>
                         </tr>`;
                     }).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card overflow-x-auto mb-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Sobrecarga por Modelador</h4>
+                <p class="text-[11px] text-slate-500">Estimación: días restantes × 8h × peso de importancia, contra capacidad de ${CAPACIDAD_SEMANAL_H}h/semana.</p>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Modelador</th>
+                        <th class="p-3">Tareas abiertas</th>
+                        <th class="p-3">Días restantes</th>
+                        <th class="p-3">Horas estimadas</th>
+                        <th class="p-3">Horas reales</th>
+                        <th class="p-3">Semanas equiv.</th>
+                        <th class="p-3">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${listaCarga.map(m => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
+                                <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
+                            </td>
+                            <td class="p-3">${m.tareas}</td>
+                            <td class="p-3">${m.dias}</td>
+                            <td class="p-3 font-bold text-sky-700">${m.horasEstimadas.toFixed(0)} h</td>
+                            <td class="p-3 font-bold text-teal-700">${m.horasReales.toFixed(1)} h</td>
+                            <td class="p-3">${m.semanasEquivalentes.toFixed(1)}</td>
+                            <td class="p-3 font-bold ${m.color}">${m.estado}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>'}
                 </tbody>
             </table>
         </div>
