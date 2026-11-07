@@ -1,5 +1,6 @@
 import { state } from './db.js';
-import { escapeHtml, fmtDate, nombreFormateado, semaforo } from './utils.js';
+import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar } from './utils.js';
+import { tipoDia } from './roster.js';
 
 let ganttState = {
     filterGrupo: '',
@@ -15,6 +16,11 @@ let ganttState = {
     soloSinFecha: false,
     viewMode: 'Week',
     currentGantt: null
+};
+
+let ocupacionState = {
+    semanaOffset: 0,
+    diasVisibles: 42
 };
 
 const COLORES_ESTADO = {
@@ -133,13 +139,16 @@ export function renderGantt(container) {
                 </div>
             </div>
 
-            <p class="text-[11px] text-slate-400 mt-2">
+                        <p class="text-[11px] text-slate-400 mt-2">
                 <i class="fa-solid fa-circle-info mr-1"></i>
                 Las tareas que no tienen fecha de inicio o fin no se muestran en el Gantt.
             </p>
         `}
+
+        <div id="ocupacion-wrapper" class="mt-4"></div>
     `;
 
+    renderOcupacion(document.getElementById('ocupacion-wrapper'), tareas);
     if (!document.getElementById('gantt-filter-drawer')) {
         const drawerHtml = `
             <div id="gantt-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleGanttFilterDrawer()"></div>
@@ -414,5 +423,159 @@ window.clearGanttFilters = function() {
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
         viewMode: ganttState.viewMode, currentGantt: ganttState.currentGantt
     };
+    window.renderView();
+};
+function rangoOcupacion() {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const inicio = new Date(hoy);
+    inicio.setDate(hoy.getDate() + ocupacionState.semanaOffset * 7 - 3);
+    const fin = new Date(inicio);
+    fin.setDate(inicio.getDate() + ocupacionState.diasVisibles - 1);
+    return { inicio, fin };
+}
+
+function renderOcupacion(container, tareasFiltradas) {
+    const { inicio, fin } = rangoOcupacion();
+    const dias = [];
+    const cur = new Date(inicio);
+    while (cur <= fin) {
+        dias.push(new Date(cur));
+        cur.setDate(cur.getDate() + 1);
+    }
+
+    const modeladores = state.perfilesCache.filter(p =>
+        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
+    ).sort((a, b) => nombreFormateado(a).localeCompare(nombreFormateado(b)));
+
+    const totalDias = dias.length;
+    const anchoDiaPct = 100 / totalDias;
+
+    const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    const cabeceraDias = dias.map((d, i) => {
+        const esLunes = d.getDay() === 1;
+        const esDomingo = d.getDay() === 0;
+        const esPrimero = d.getDate() === 1;
+        const etiquetaMes = (esPrimero || i === 0) ? `<div class="text-[8px] font-bold text-slate-500 dark:text-slate-400 leading-none">${MESES_CORTO[d.getMonth()]}</div>` : '';
+        return `<div class="text-center ${esDomingo ? 'bg-slate-200 dark:bg-slate-700' : ''} ${esLunes ? 'border-l border-slate-300 dark:border-slate-600' : ''}" style="width:${anchoDiaPct}%;">
+            ${etiquetaMes}
+            <div class="text-[9px] leading-tight text-slate-600 dark:text-slate-300">${['D','L','M','M','J','V','S'][d.getDay()]}</div>
+            <div class="text-[9px] font-bold text-slate-700 dark:text-slate-200">${d.getDate()}</div>
+        </div>`;
+    }).join('');
+
+    const filas = modeladores.map(p => {
+        const tareasUsuario = tareasFiltradas.filter(t => {
+            const esResp = t.responsable_id === p.id;
+            const esRec = (state.actividadRecursosCache || []).some(r => r.pendiente_id === t.id && r.usuario_id === p.id);
+            return esResp || esRec;
+        });
+
+        const conFechas = tareasUsuario.filter(t => t.fecha_inicio_programado && t.fecha_fin);
+        const sinFechas = tareasUsuario.filter(t => !t.fecha_inicio_programado || !t.fecha_fin);
+
+        const franjasNoLaborables = [];
+        for (let i = 0; i < dias.length; i++) {
+            const dStr = dias[i].toISOString().split('T')[0];
+            const tipo = tipoDia(p.id, dStr);
+            if (tipo === 'DO' || tipo === 'DE' || tipo === 'FE') {
+                if (franjasNoLaborables.length > 0 && franjasNoLaborables[franjasNoLaborables.length - 1].finIdx === i - 1) {
+                    franjasNoLaborables[franjasNoLaborables.length - 1].finIdx = i;
+                } else {
+                    franjasNoLaborables.push({ iniIdx: i, finIdx: i });
+                }
+            }
+        }
+
+        const fondoFranjas = franjasNoLaborables.map(f => {
+            const left = f.iniIdx * anchoDiaPct;
+            const width = (f.finIdx - f.iniIdx + 1) * anchoDiaPct;
+            return `<div class="absolute top-0 bottom-0 opacity-40" style="left:${left}%;width:${width}%;background:repeating-linear-gradient(45deg, #94a3b8 0, #94a3b8 2px, transparent 2px, transparent 8px);"></div>`;
+        }).join('');
+
+        const barras = conFechas.map(t => {
+            const iniT = new Date(t.fecha_inicio_programado + 'T00:00:00');
+            const finT = new Date(t.fecha_fin + 'T00:00:00');
+            const iniIdx = Math.max(0, Math.round((iniT - inicio) / 86400000));
+            const finIdx = Math.min(totalDias - 1, Math.round((finT - inicio) / 86400000));
+            if (finIdx < 0 || iniIdx > totalDias - 1 || finIdx < iniIdx) return '';
+            const left = iniIdx * anchoDiaPct;
+            const width = (finIdx - iniIdx + 1) * anchoDiaPct;
+            const crit = getCriticidad(t);
+            const color = crit === 'Muy alto' ? '#dc2626' : crit === 'Alto' ? '#ea580c' : crit === 'Medio' ? '#d97706' : '#64748b';
+            const bordeEstado = t.estado === 'Cerrado' ? '#0d9488' : t.estado === 'En proceso' ? '#0284c7' : t.estado === 'En espera' ? '#f59e0b' : t.estado === 'Reprogramado' ? '#7c3aed' : '#94a3b8';
+
+            let conflicto = false;
+            for (let i = iniIdx; i <= finIdx; i++) {
+                const dStr = dias[i].toISOString().split('T')[0];
+                const tipo = tipoDia(p.id, dStr);
+                if (tipo === 'DO' || tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
+            }
+
+            const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}${conflicto ? '\n⚠ Programada sobre día no laborable' : ''}`;
+            return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:opacity-90 transition" 
+                        style="left:${left}%;width:${width}%;top:4px;bottom:4px;background:${color};border-left:3px solid ${bordeEstado};" 
+                        title="${escapeHtml(titulo)}">
+                        ${conflicto ? `<i class="fa-solid fa-triangle-exclamation absolute -top-1 -right-1 text-[10px] text-amber-300 drop-shadow"></i>` : ''}
+                    </div>`;
+        }).join('');
+
+        return `
+            <div class="flex border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20">
+                <div class="sticky left-0 z-10 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-2 flex items-center gap-2" style="width:200px;min-width:200px;">
+                    <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(nombreFormateado(p))}</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400">${tareasUsuario.length} tarea${tareasUsuario.length === 1 ? '' : 's'}${sinFechas.length > 0 ? ` · ${sinFechas.length} sin fecha` : ''}</div>
+                    </div>
+                </div>
+                <div class="relative flex-1" style="min-height:36px;">
+                    ${fondoFranjas}
+                    ${barras}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const prevBtn = `<button onclick="window.ocupacionMove(-1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-left"></i></button>`;
+    const nextBtn = `<button onclick="window.ocupacionMove(1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-right"></i></button>`;
+    const todayBtn = `<button onclick="window.ocupacionMove(0)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Hoy</button>`;
+
+    container.innerHTML = `
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-2">
+            <div>
+                <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Ocupación por modelador</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} · Fondo rayado = día no laborable</p>
+            </div>
+            <div class="flex items-center gap-1">
+                ${prevBtn}${todayBtn}${nextBtn}
+            </div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <div style="min-width:900px;">
+                    <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                        <div class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" style="width:200px;min-width:200px;">Modelador</div>
+                        <div class="flex flex-1">${cabeceraDias}</div>
+                    </div>
+                    ${filas}
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 text-[10px] mt-2 text-slate-500 dark:text-slate-400">
+            <span class="font-bold uppercase tracking-wide">Criticidad:</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#dc2626"></span>Muy alto</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#ea580c"></span>Alto</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#d97706"></span>Medio</span>
+            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#64748b"></span>Bajo</span>
+            <span class="inline-flex items-center gap-1 ml-2 pl-3 border-l border-slate-300 dark:border-slate-600"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i>Programada sobre día no laborable</span>
+        </div>
+    `;
+}
+
+window.ocupacionMove = function(dir) {
+    if (dir === 0) ocupacionState.semanaOffset = 0;
+    else ocupacionState.semanaOffset += dir;
     window.renderView();
 };
