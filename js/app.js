@@ -1,10 +1,10 @@
-import { supabaseClient, state, fetchAll } from './db.js';
+import { supabaseClient, state, fetchAll, guardarSnapshotSemanal } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
 import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop } from './kanban.js';
 import { renderEisenhower } from './eisenhower.js';
-import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp } from './config.js';
+import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
 import { renderRecursos } from './recursos.js';
 import { renderGantt } from './gantt.js';
@@ -117,6 +117,7 @@ window.openGrupoModal = openGrupoModal; window.closeGrupoModal = closeGrupoModal
 window.openCargoModal = openCargoModal; window.closeCargoModal = closeCargoModal; window.saveCargo = saveCargo;
 window.openPropModal = openPropModal; window.closePropModal = closePropModal; window.saveProp = saveProp; window.deleteProp = deleteProp;
 window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
+window.openCausaModal = openCausaModal; window.closeCausaModal = closeCausaModal; window.saveCausa = saveCausa; window.deleteCausa = deleteCausa;
 window.fetchAll = fetchAll;
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -202,3 +203,4 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+window.guardarSnapshotSemanal = guardarSnapshotSemanal;
