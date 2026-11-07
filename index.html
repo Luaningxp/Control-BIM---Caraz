@@ -154,7 +154,6 @@
                     </div>
                 </div>
 
-                               <!-- RECURSOS (MODELADORES) -->
                 <div class="relative">
                     <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Recursos (Modeladores)</label>
                     <div id="recursos-chips" class="flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
@@ -165,18 +164,26 @@
                     </div>
                 </div>
 
-               <!-- PLANOS ASOCIADOS -->
-<div class="relative">
-    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Planos Asociados</label>
-    <!-- z-10 en los chips -->
-    <div id="planos-chips" class="relative z-10 flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
-    <div class="relative">
-        <input type="text" id="planos-search" placeholder="Escribe código o título de plano..." 
-               class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
-        <!-- z-20 en el dropdown (por encima de los chips) -->
-        <div id="planos-dropdown" class="hidden absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
-    </div>
-</div>
+                <div class="relative">
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Planos Asociados</label>
+                    <div id="planos-chips" class="relative z-10 flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
+                    <div class="relative">
+                        <input type="text" id="planos-search" placeholder="Escribe código o título de plano..." 
+                               class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                        <div id="planos-dropdown" class="hidden absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <div id="causas-container" class="relative hidden">
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Causas de incumplimiento (máx. 5)</label>
+                    <div id="causas-chips" class="relative z-10 flex flex-wrap gap-1.5 mb-1.5 min-h-[32px] p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"></div>
+                    <div class="relative">
+                        <input type="text" id="causas-search" placeholder="Buscar causa..." class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                        <div id="causas-dropdown" class="hidden absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">Aplica los 5 porqués: si la tarea se cerró fuera de fecha, registra hasta 5 causas raíz.</p>
+                </div>
+
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Importancia</label>
@@ -313,7 +320,6 @@
 
     <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-200 dark:text-slate-900 text-white text-sm px-4 py-2 rounded-lg z-50 shadow-lg"></div>
 
-    <!-- SCRIPTS -->
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
