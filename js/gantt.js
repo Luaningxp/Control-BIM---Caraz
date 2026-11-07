@@ -234,7 +234,6 @@ function inicializarGantt(tareas) {
         };
     });
 
-    // INYECTAR LA TAREA DE HOY (Para que la librería calcule la posición exacta)
     const todayStr = new Date().toISOString().split('T')[0];
     tasksData.push({
         id: 'today-line',
@@ -281,21 +280,7 @@ function inicializarGantt(tareas) {
             }
         });
 
-        // Pintar colores de las barras normales
-        setTimeout(() => {
-            const bars = document.querySelectorAll('.bar-wrapper .bar');
-            bars.forEach((bar, idx) => {
-                const t = tasksData[idx];
-                if (!t || t._isToday) return; // Omitir la de HOY
-                const color = COLORES_ESTADO[t._estado] || '#94a3b8';
-                bar.style.fill = color;
-                const progress = bar.querySelector('.bar-progress');
-                if (progress) progress.style.fill = color;
-            });
-
-            // DIBUJAR LA LÍNEA ROJA EN EL HEADER Y BODY
-            dibujarLineaHoyNativa();
-        }, 200);
+        pintarBarrasPorEstado(tareas);
 
         ganttState.currentGantt.on_click = (task) => {
             if (task.id === 'today-line') return;
@@ -306,6 +291,63 @@ function inicializarGantt(tareas) {
         console.error('Error al crear Gantt:', err);
         container.innerHTML = `<div class="text-red-500 text-sm p-4">Error: ${err.message}</div>`;
     }
+}
+
+function pintarBarrasPorEstado(tareas) {
+    const aplicar = () => {
+        const wrappers = document.querySelectorAll('#gantt-container .bar-wrapper');
+        if (wrappers.length === 0) return false;
+
+        wrappers.forEach((wrapper) => {
+            const bar = wrapper.querySelector('.bar');
+            if (!bar) return;
+
+            const labelEl = wrapper.querySelector('.bar-label');
+            const nombre = labelEl ? labelEl.textContent.trim() : '';
+            if (nombre === 'HOY') return;
+
+            const idStr = wrapper.getAttribute('data-id') || bar.getAttribute('data-id');
+            let tarea = idStr ? tareas.find(t => String(t.id) === String(idStr)) : null;
+
+            if (!tarea) {
+                const claseWrapper = wrapper.getAttribute('class') || '';
+                const match = claseWrapper.match(/gantt-bar-([a-z-]+)/);
+                if (match) {
+                    const estadoClase = match[1].replace(/-/g, ' ');
+                    tarea = tareas.find(t => t.estado.toLowerCase() === estadoClase);
+                }
+            }
+
+            const estado = tarea?.estado;
+            const color = COLORES_ESTADO[estado] || '#94a3b8';
+
+            bar.style.fill = color;
+            bar.setAttribute('fill', color);
+
+            const progress = wrapper.querySelector('.bar-progress');
+            if (progress) {
+                progress.style.fill = color;
+                progress.setAttribute('fill', color);
+            }
+
+            const handle = wrapper.querySelector('.handle');
+            if (handle) {
+                handle.style.fill = color;
+                handle.setAttribute('fill', color);
+            }
+        });
+
+        return true;
+    };
+
+    if (aplicar()) {
+        setTimeout(aplicar, 300);
+        setTimeout(aplicar, 800);
+    } else {
+        setTimeout(() => { aplicar(); setTimeout(aplicar, 300); }, 200);
+    }
+
+    setTimeout(() => dibujarLineaHoyNativa(), 900);
 }
 
 function dibujarLineaHoyNativa() {
