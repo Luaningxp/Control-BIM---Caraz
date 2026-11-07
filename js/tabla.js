@@ -379,7 +379,7 @@ export function renderTabla(container) {
                                 return `<th data-col="${col}" style="${colStyle(col)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
                             }).join('')}
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th class="p-3 text-center sticky right-0 bg-slate-50 dark:bg-slate-800 z-20 border-l border-slate-200 dark:border-slate-700 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)] w-[100px]">
+                            <th class="p-3 text-center sticky right-0 z-30 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
     Acciones
 </th>
                     </thead>
@@ -414,7 +414,7 @@ export function renderTabla(container) {
                                     }
                                     return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 dark:text-slate-400 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
                                 }).join('')}
-                                <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-l border-slate-100 dark:border-slate-700 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10 w-[100px]">
+                                <td class="p-3 text-center whitespace-nowrap sticky right-0 z-20 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
     <!-- Botones -->
 </td>
                             </tr>
