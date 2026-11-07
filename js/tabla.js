@@ -139,19 +139,19 @@ function actualizarPlanosUI() {
         const plano = (state.planosCache || []).find(p => p.id === pid);
         if (!plano) return '';
         return `
-            <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium relative z-10">
+            <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
+                <!-- BORRADO DIRECTO EN EL BOTÓN -->
                 <button type="button" 
-                        onpointerdown="event.preventDefault(); event.stopPropagation(); document.activeElement.blur(); window.quitarPlano('${pid}');" 
-                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 cursor-pointer relative z-20">
+                        onclick="this.parentElement.remove(); window.quitarPlano('${pid}');" 
+                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
                     ×
                 </button>
             </span>
         `;
     }).join('');
 }
-
 function inicializarBuscadorPlanos() {
     const input = document.getElementById('planos-search');
     const dropdown = document.getElementById('planos-dropdown');
