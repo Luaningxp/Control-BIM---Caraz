@@ -1,7 +1,11 @@
 import { state } from './db.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate } from './utils.js';
 
 export function renderDashboard(container) {
+    if (window.guardarSnapshotSemanal) {
+        window.guardarSnapshotSemanal().catch(() => {});
+    }
+
     const k = calcularKPIs();
     
     const hoy = new Date();
@@ -15,7 +19,6 @@ export function renderDashboard(container) {
     finSemana.setDate(inicioSemana.getDate() + 6);
     finSemana.setHours(23,59,59,999);
 
-    // Métricas complementarias
     const cerradasEstaSemana = state.tasksCache.filter(t => {
         if (!t.fecha_cierre) return false;
         const c = new Date(t.fecha_cierre + 'T00:00:00');
@@ -44,82 +47,20 @@ export function renderDashboard(container) {
         return suma / conAtraso.length;
     })();
 
-    // KPIs principales
     const KPI = [
-        { 
-            label: 'PPC Semanal', 
-            value: k.ppc !== null ? k.ppc + '%' : '—', 
-            sub: `${k.ppcEnPlazo}/${k.ppcTotal} cerradas a tiempo`, 
-            color: 'teal', 
-            icon: 'fa-chart-line' 
-        },
-        { 
-            label: 'Abiertas', 
-            value: k.abiertas, 
-            sub: 'en curso', 
-            color: 'slate', 
-            icon: 'fa-list-check' 
-        },
-        { 
-            label: 'Vencidas', 
-            value: k.vencidas, 
-            sub: 'fuera de plazo', 
-            color: 'red', 
-            icon: 'fa-triangle-exclamation' 
-        },
-        { 
-            label: 'Por vencer', 
-            value: k.porVencer, 
-            sub: '≤ 7 días', 
-            color: 'amber', 
-            icon: 'fa-clock' 
-        },
-        { 
-            label: 'Latencia', 
-            value: latenciaPromedio.toFixed(1) + ' d', 
-            sub: 'promedio de atraso', 
-            color: 'orange', 
-            icon: 'fa-hourglass-half' 
-        },
-        { 
-            label: 'Total', 
-            value: k.total, 
-            sub: 'actividades', 
-            color: 'sky', 
-            icon: 'fa-cubes' 
-        }
+        { label: 'PPC Semanal', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} cerradas a tiempo`, color: 'teal', icon: 'fa-chart-line' },
+        { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
+        { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
+        { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
+        { label: 'Latencia', value: latenciaPromedio.toFixed(1) + ' d', sub: 'promedio de atraso', color: 'orange', icon: 'fa-hourglass-half' },
+        { label: 'Total', value: k.total, sub: 'actividades', color: 'sky', icon: 'fa-cubes' }
     ];
 
-    // Métricas complementarias
     const COMPLEMENTARIAS = [
-        { 
-            label: 'Cerradas esta semana', 
-            value: cerradasEstaSemana.length, 
-            sub: 'todas, a tiempo o tarde', 
-            color: 'emerald', 
-            icon: 'fa-circle-check' 
-        },
-        { 
-            label: 'Reprogramadas', 
-            value: reprogramadasEstaSemana, 
-            sub: 'esta semana', 
-            color: 'violet', 
-            icon: 'fa-calendar-plus' 
-        },
-        { 
-            label: 'Vencidas sin cerrar', 
-            value: vencidasSinCerrar, 
-            sub: 'requieren acción', 
-            color: 'red', 
-            icon: 'fa-bell' 
-        },
-        { 
-            label: 'Sin fecha', 
-            value: k.sinFecha, 
-            sub: 'no vencen', 
-            color: 'slate', 
-            icon: 'fa-calendar-xmark' 
-        }
+        { label: 'Cerradas esta semana', value: cerradasEstaSemana.length, sub: 'todas, a tiempo o tarde', color: 'emerald', icon: 'fa-circle-check' },
+        { label: 'Reprogramadas', value: reprogramadasEstaSemana, sub: 'esta semana', color: 'violet', icon: 'fa-calendar-plus' },
+        { label: 'Vencidas sin cerrar', value: vencidasSinCerrar, sub: 'requieren acción', color: 'red', icon: 'fa-bell' },
+        { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
     ];
 
     container.innerHTML = `
@@ -131,7 +72,6 @@ export function renderDashboard(container) {
             <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
         </div>
 
-        <!-- KPIs PRINCIPALES -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
             ${KPI.map(x => `
                 <div class="card kpi-card p-3 border-l-4 border-${x.color}-500">
@@ -145,7 +85,6 @@ export function renderDashboard(container) {
             `).join('')}
         </div>
 
-        <!-- MÉTRICAS COMPLEMENTARIAS -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             ${COMPLEMENTARIAS.map(x => `
                 <div class="card p-3 border-l-4 border-${x.color}-500">
@@ -159,7 +98,6 @@ export function renderDashboard(container) {
             `).join('')}
         </div>
 
-        <!-- GRÁFICOS FILA 1 -->
         <div class="grid lg:grid-cols-3 gap-3 mb-4">
             <div class="card p-4 lg:col-span-2">
                 <h4 class="font-semibold text-sm text-slate-800 mb-2">Evolución del PPC (últimas 8 semanas)</h4>
@@ -171,7 +109,6 @@ export function renderDashboard(container) {
             </div>
         </div>
 
-        <!-- GRÁFICOS FILA 2 -->
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 mb-2">Carga de Trabajo (Tareas Abiertas)</h4>
@@ -183,8 +120,7 @@ export function renderDashboard(container) {
             </div>
         </div>
 
-        <!-- TABLA DE DESEMPEÑO -->
-        <div class="card overflow-x-auto">
+        <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Desempeño por Responsable</h4>
                 <p class="text-[11px] text-slate-500">PPC calculado por semana de fecha_fin programada.</p>
@@ -202,6 +138,50 @@ export function renderDashboard(container) {
                     </tr>
                 </thead>
                 <tbody id="perf-table" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+
+        <div class="card overflow-x-auto mt-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
+                <p class="text-[11px] text-slate-500">Snapshots guardados al abrir el dashboard. La semana actual se actualiza; las anteriores quedan fijas.</p>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Semana</th>
+                        <th class="p-3">Total</th>
+                        <th class="p-3">Abiertas</th>
+                        <th class="p-3">Vencidas</th>
+                        <th class="p-3">Por vencer</th>
+                        <th class="p-3">PPC</th>
+                        <th class="p-3">Horas</th>
+                        <th class="p-3">Planos WIP</th>
+                        <th class="p-3">Planos Shared</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${(state.snapshotsCache || []).slice(0, 8).map((s, i, arr) => {
+                        const prev = arr[i + 1];
+                        const delta = (val, prevVal) => {
+                            if (prevVal === undefined || prevVal === null) return '';
+                            const d = val - prevVal;
+                            if (d === 0) return '<span class="text-slate-400">=</span>';
+                            return d > 0 ? `<span class="text-red-600">▲${d}</span>` : `<span class="text-emerald-600">▼${Math.abs(d)}</span>`;
+                        };
+                        return `<tr class="hover:bg-slate-50">
+                            <td class="p-3 font-mono">${fmtDate(s.semana)}</td>
+                            <td class="p-3">${s.total_tareas}</td>
+                            <td class="p-3">${s.abiertas} ${delta(s.abiertas, prev?.abiertas)}</td>
+                            <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${s.vencidas} ${delta(s.vencidas, prev?.vencidas)}</td>
+                            <td class="p-3">${s.por_vencer} ${delta(s.por_vencer, prev?.por_vencer)}</td>
+                            <td class="p-3 font-bold">${s.ppc !== null ? s.ppc + '%' : '—'} ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
+                            <td class="p-3">${s.horas_semana?.toFixed(1) || '0.0'} h</td>
+                            <td class="p-3">${s.planos_wip}</td>
+                            <td class="p-3">${s.planos_shared}</td>
+                        </tr>`;
+                    }).join('') || '<tr><td colspan="9" class="text-center py-4 text-slate-400">Aún no hay snapshots. Se guardará uno al abrir el dashboard.</td></tr>'}
+                </tbody>
             </table>
         </div>
     `;
@@ -262,7 +242,6 @@ function renderCharts(inicioSemana, finSemana) {
     if (state.charts.carga) state.charts.carga.destroy();
     if (state.charts.vencidas) state.charts.vencidas.destroy();
 
-    // 1. Evolución del PPC
     const labelsPPC = [];
     const dataPPC = [];
     for (let i = 7; i >= 0; i--) {
@@ -317,7 +296,6 @@ function renderCharts(inicioSemana, finSemana) {
         }
     });
 
-    // 2. Distribución por Estado
     const estados = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
     const counts = estados.map(e => state.tasksCache.filter(t => t.estado === e).length);
     const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
@@ -334,7 +312,6 @@ function renderCharts(inicioSemana, finSemana) {
         }
     });
 
-    // 3. Carga por Responsable
     const cargaMap = {};
     state.tasksCache.filter(t => !isCerrado(t)).forEach(t => {
         const resp = t.responsable || 'Sin asignar';
@@ -347,24 +324,15 @@ function renderCharts(inicioSemana, finSemana) {
         type: 'bar',
         data: { 
             labels: respLabels, 
-            datasets: [{ 
-                label: 'Tareas Abiertas', 
-                data: respValues, 
-                backgroundColor: '#0284c7', 
-                borderRadius: 4 
-            }] 
+            datasets: [{ label: 'Tareas Abiertas', data: respValues, backgroundColor: '#0284c7', borderRadius: 4 }] 
         },
         options: { 
             responsive: true, maintainAspectRatio: false, 
             plugins: { legend: { display: false } }, 
-            scales: { 
-                y: { beginAtZero: true, ticks: { precision: 0 } }, 
-                x: { grid: { display: false } } 
-            } 
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
         }
     });
 
-    // 4. Vencidas por Criticidad
     const vencidas = state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Vencida');
     const critLabels = ['Muy alto', 'Alto', 'Medio', 'Bajo'];
     const critValues = critLabels.map(c => vencidas.filter(t => getCriticidad(t) === c).length);
@@ -373,20 +341,12 @@ function renderCharts(inicioSemana, finSemana) {
         type: 'bar',
         data: { 
             labels: critLabels, 
-            datasets: [{ 
-                label: 'Vencidas por Criticidad', 
-                data: critValues, 
-                backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#64748b'], 
-                borderRadius: 4 
-            }] 
+            datasets: [{ label: 'Vencidas por Criticidad', data: critValues, backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#64748b'], borderRadius: 4 }] 
         },
         options: { 
             responsive: true, maintainAspectRatio: false, 
             plugins: { legend: { display: false } }, 
-            scales: { 
-                y: { beginAtZero: true, ticks: { precision: 0 } }, 
-                x: { grid: { display: false } } 
-            } 
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
         }
     });
 }
@@ -404,7 +364,6 @@ function renderPerfTable(inicioSemana, finSemana) {
             map[r].carga += WEIGHT[getCriticidad(t)] || 1;
         }
         
-        // PPC semanal: tareas con fecha_fin en la semana
         if (t.fecha_fin) {
             const f = new Date(t.fecha_fin + 'T00:00:00');
             if (f >= inicioSemana && f <= finSemana) {
