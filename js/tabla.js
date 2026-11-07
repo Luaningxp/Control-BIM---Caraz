@@ -805,15 +805,18 @@ export function editTask(id) {
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
 
-    const estaRetrasada = t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin;
+        const estaRetrasada = t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin;
     const causasContainer = document.getElementById('causas-container');
     if (causasContainer) causasContainer.classList.toggle('hidden', !estaRetrasada);
+
     if (estaRetrasada) {
         renderCausasChips(t.id);
-        inicializarBuscadorCausas();
     } else {
         causasSeleccionadas.clear();
+        actualizarCausasUI();
     }
+
+    inicializarBuscadorCausas();
 
     aplicarBloqueoModelador();
 
