@@ -282,3 +282,28 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 #planos-dropdown {
     z-index: 30; /* El dropdown de búsqueda está por encima de los chips */
 }
+/* Forzar que la columna de acciones se quede fija a la derecha */
+th.sticky, td.sticky {
+    position: sticky !important;
+    right: 0 !important;
+}
+
+/* Asegurar que el encabezado tenga fondo sólido */
+th.sticky {
+    background-color: var(--bg-table-head) !important;
+    z-index: 30 !important; /* Más alto que las celdas */
+}
+
+/* Asegurar que las celdas tengan fondo y no sean transparentes */
+td.sticky {
+    background-color: var(--bg-card) !important;
+    z-index: 20 !important;
+}
+
+/* Para el hover en modo claro y oscuro */
+tr:hover td.sticky {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+}
+.dark tr:hover td.sticky {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
