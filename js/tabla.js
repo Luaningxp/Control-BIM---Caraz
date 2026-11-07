@@ -215,10 +215,10 @@ window.quitarPlano = function(pid) {
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-    codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
-    importancia: true, urgencia: true, criticidad: true, 
-    estado: true, inicio: true, fin: true, cierre: true, cde: true 
-},
+        codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
+        importancia: true, urgencia: true, criticidad: true, 
+        estado: true, inicio: true, fin: true, cierre: true, cde: true 
+    },
     visibleProps: {}, 
     filters: { 
         search: '', grupo: '', responsable: '', recursos: '', 
@@ -230,7 +230,7 @@ let tableState = {
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130, planos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
-        inicio: 90, fin: 90, cierre: 90, nota: 180, cde: 100,
+        inicio: 90, fin: 90, cierre: 90, cde: 100,
         acciones: 100
     }
 };
@@ -594,62 +594,16 @@ export function openModal() {
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
     
-        renderCustomProps(t.id);
-    renderRecursosChips(t.id);
-    renderPlanosChips(t.id);
+    renderCustomProps(null);
+    renderRecursosChips(null);
+    renderPlanosChips(null);
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
 
     aplicarBloqueoModelador();
 
-    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
-}
-
-function aplicarBloqueoModelador() {
-    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-
-    const camposBloqueados = [
-        'task-actividad', 'task-grupo', 'task-responsable',
-        'task-importancia', 'task-urgencia', 'task-estado',
-        'task-fecha-inicio', 'task-fecha-fin'
-    ];
-    camposBloqueados.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.disabled = soloModelador;
-        if (soloModelador) {
-            el.classList.add('opacity-60', 'cursor-not-allowed', 'bg-slate-100', 'dark:bg-slate-900');
-        } else {
-            el.classList.remove('opacity-60', 'cursor-not-allowed', 'bg-slate-100', 'dark:bg-slate-900');
-        }
-    });
-
-    // Los chips de recursos tampoco se tocan
-    const recursosSearch = document.getElementById('recursos-search');
-    if (recursosSearch) {
-        recursosSearch.disabled = soloModelador;
-        recursosSearch.classList.toggle('opacity-60', soloModelador);
-    }
-    document.querySelectorAll('#recursos-chips button').forEach(b => {
-        b.style.display = soloModelador ? 'none' : '';
-    });
-
-    // Propiedades personalizadas: tampoco
-    document.querySelectorAll('.custom-prop-input').forEach(el => {
-        el.disabled = soloModelador;
-        el.classList.toggle('opacity-60', soloModelador);
-    });
-
-    // Los tres campos permitidos: SIEMPRE editables
-    ['task-fecha-cierre', 'task-nota'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.disabled = false;
-    });
-    const planosSearch = document.getElementById('planos-search');
-    if (planosSearch) planosSearch.disabled = false;
-    document.querySelectorAll('#planos-chips button').forEach(b => {
-        b.style.display = '';
-    });
+    document.getElementById('modal-task').classList.remove('hidden');
+    document.getElementById('modal-task').classList.add('flex');
 }
 
 export function editTask(id) {
