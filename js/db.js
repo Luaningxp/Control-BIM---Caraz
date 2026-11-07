@@ -23,6 +23,9 @@ export const state = {
     causasCache: [],
     tareaCausasCache: [],
     snapshotsCache: [],
+    descansosCache: [],
+    feriadosCache: [],
+    trabajosExtraCache: [],
     currentTab: 'dashboard',
     cdeTargetId: null,
     dragId: null,
@@ -31,7 +34,7 @@ export const state = {
 
 export async function fetchAll() {
     try {
-        const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn] = await Promise.all([
+        const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
@@ -43,7 +46,10 @@ export async function fetchAll() {
             supabaseClient.from('actividad_planos').select('*'),
             supabaseClient.from('causas_incumplimiento').select('*').eq('activo', true).order('orden'),
             supabaseClient.from('tarea_causas').select('*'),
-            supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false })
+            supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false }),
+            supabaseClient.from('descansos').select('*'),
+            supabaseClient.from('feriados').select('*'),
+            supabaseClient.from('trabajos_extra').select('*')
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
@@ -52,6 +58,9 @@ export async function fetchAll() {
         if (ca.error) console.error('Error causas:', ca.error);
         if (tc.error) console.error('Error tarea_causas:', tc.error);
         if (sn.error) console.error('Error snapshots:', sn.error);
+        if (de.error) console.error('Error descansos:', de.error);
+        if (fe.error) console.error('Error feriados:', fe.error);
+        if (te.error) console.error('Error trabajos_extra:', te.error);
 
         state.tasksCache = t.data || [];
         state.gruposCache = g.data || [];
@@ -65,6 +74,9 @@ export async function fetchAll() {
         state.causasCache = ca.data || [];
         state.tareaCausasCache = tc.data || [];
         state.snapshotsCache = sn.data || [];
+        state.descansosCache = de.data || [];
+        state.feriadosCache = fe.data || [];
+        state.trabajosExtraCache = te.data || [];
 
     } catch (err) {
         console.error('Error general en fetchAll:', err);
