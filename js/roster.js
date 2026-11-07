@@ -411,4 +411,15 @@ window.deleteTrabajoExtraActual = async function() {
     if (!ok) return;
     const { error } = await supabaseClient.from('trabajos_extra').delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    window.closeTrabajoExtraModal(); await fetchAll(); window.renderView(); toast
+    window.closeTrabajoExtraModal(); await fetchAll(); window.renderView(); toast('Trabajo extra eliminado');
+};
+
+// --- HELPERS EXPORTADOS PARA OTROS MÓDULOS ---
+export function esDiaLaborable(usuarioId, fechaStr) {
+    const tipo = clasificarDia(usuarioId, fechaStr);
+    return tipo === 'T' || tipo === 'TE';
+}
+
+export function tipoDia(usuarioId, fechaStr) {
+    return clasificarDia(usuarioId, fechaStr);
+}
