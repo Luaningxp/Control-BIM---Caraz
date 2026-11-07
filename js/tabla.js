@@ -834,6 +834,21 @@ export async function saveTask(e) {
         return;
     }
 
+        const fechaFinProgramada = document.getElementById('task-fecha-fin').value;
+    const esCierreTardio = fechaCierre && fechaFinProgramada && fechaCierre > fechaFinProgramada;
+
+    if (esCierreTardio && causasSeleccionadas.size === 0) {
+        toast('El cierre es posterior al Fin Prog. Debes registrar al menos 1 causa de incumplimiento.');
+        const causasContainer = document.getElementById('causas-container');
+        if (causasContainer) {
+            causasContainer.classList.remove('hidden');
+            causasContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const causasSearch = document.getElementById('causas-search');
+        if (causasSearch) setTimeout(() => causasSearch.focus(), 300);
+        return;
+    }
+
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
     let payload;
