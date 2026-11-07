@@ -1,5 +1,6 @@
 import { state } from './db.js';
 import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
+import { esDiaLaborable } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) { return (parseFloat(pct || 0) * HORAS_POR_100) / 100; }
@@ -91,15 +92,16 @@ export function renderRecursos(container) {
 
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
-        const diasCumplidos = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
-        const diasRegistrados = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
+        const diasLaborables = diasDelMes.filter(d => esDiaLaborable(p.id, d));
+        const diasCumplidos = diasLaborables.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
+        const diasRegistrados = diasLaborables.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
         const horasTotales = registros.filter(r => r.usuario_id === p.id).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
         cumplimientoPorModelador[p.id] = {
             nombre: nombreFormateado(p),
             avatar: p.id,
             cumplidos: diasCumplidos,
             registrados: diasRegistrados,
-            totalDias: diasDelMes.length,
+            totalDias: diasLaborables.length,
             horasTotales
         };
     });
@@ -114,8 +116,12 @@ export function renderRecursos(container) {
     while (ayer.getDay() === 0) ayer.setDate(ayer.getDate() - 1);
     const ayerStr = ayer.toISOString().split('T')[0];
     const hoyStr = hoy.toISOString().split('T')[0];
-    const modeladoresPendientesHoy = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
-    const modeladoresPendientesAyer = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100).length;
+       const modeladoresPendientesHoy = modeladores.filter(p => 
+        esDiaLaborable(p.id, hoyStr) && (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100
+    ).length;
+    const modeladoresPendientesAyer = modeladores.filter(p => 
+        esDiaLaborable(p.id, ayerStr) && (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100
+    ).length;
 
     const porGrupo = {};
     registros.forEach(r => {
@@ -145,9 +151,12 @@ export function renderRecursos(container) {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
-            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4);
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 6);
             const dias = [];
-            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
+            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+                const ds = d.toISOString().split('T')[0];
+                if (esDiaLaborable(p.id, ds)) dias.push(ds);
+            }
             const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
             cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
         });
