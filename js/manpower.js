@@ -3,6 +3,7 @@ import {
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
     getIniciales, colorAvatar, confirmDelete
 } from './utils.js';
+import { esDiaLaborable, tipoDia } from './roster.js';
 
 // Conversión: 100% equivale a 9.3333 horas hombre
 const HORAS_POR_100 = 9.3333;
@@ -49,7 +50,8 @@ export function renderMiTrabajo(container) {
         m.fecha === ayerStr
     );
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    const noLlenoAyer = porcentajeAyer < 100;
+        const ayerEraLaborable = esDiaLaborable(state.currentUser.id, ayerStr);
+    const noLlenoAyer = ayerEraLaborable && porcentajeAyer < 100;
 
     container.innerHTML = `
         ${noLlenoAyer ? `
@@ -369,11 +371,8 @@ export async function saveManpower(e) {
     const fecha = document.getElementById('mp-fecha').value;
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
 
-    const { esDiaLaborable } = await import('./roster.js');
-    const usuarioId = state.currentUser.id;
-    if (!esDiaLaborable(usuarioId, fecha)) {
-        const { tipoDia } = await import('./roster.js');
-        const tipo = tipoDia(usuarioId, fecha);
+    if (!esDiaLaborable(state.currentUser.id, fecha)) {
+        const tipo = tipoDia(state.currentUser.id, fecha);
         const etiquetas = { DO: 'domingo no laborable', DE: 'descanso', FE: 'feriado' };
         toast(`No puedes registrar en un día no laborable (${etiquetas[tipo] || tipo}).`);
         return;
