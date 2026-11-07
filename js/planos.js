@@ -37,7 +37,7 @@ function normalizarCategoria(texto) {
 
 const ETIQUETA_CATEGORIA = {
     contractual: { texto: 'Contractual', clase: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200' },
-    detalle:     { texto: 'Det. Construc.', clase: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200' }
+    detalle:     { texto: 'Det. Constr.', clase: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200' }
 };
 
 // --- SISTEMA DE REDIMENSIONADO ---
@@ -179,7 +179,7 @@ export function renderLogPlanos(container) {
                     <span class="${planosState.filterCategoria === 'contractual' ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700'} rounded-full px-1.5 text-[10px]">${conteoContractual}</span>
                 </button>
                 <button onclick="window.setPlanosCategoria('detalle')" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${planosState.filterCategoria === 'detalle' ? 'bg-violet-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}">
-                    <i class="fa-solid fa-ruler-combined"></i> Det. Construc.
+                    <i class="fa-solid fa-ruler-combined"></i> Det. Constr.
                     <span class="${planosState.filterCategoria === 'detalle' ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700'} rounded-full px-1.5 text-[10px]">${conteoDetalle}</span>
                 </button>
             </div>
