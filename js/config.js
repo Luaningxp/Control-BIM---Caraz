@@ -1,10 +1,8 @@
 import { escapeHtml, toast, confirmDelete } from './utils.js';
 import { supabaseClient, state, fetchAll } from './db.js';
 
-
 export function renderConfig(container) {
     container.innerHTML = `
-        <!-- SECCIÓN DE IMPORTAR / EXPORTAR -->
         <div class="card p-4 mb-4">
             <div class="flex justify-between items-center mb-3">
                 <div>
@@ -26,7 +24,7 @@ export function renderConfig(container) {
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-3">
+        <div class="grid lg:grid-cols-4 gap-3">
             <!-- 1. GRUPOS -->
             <div class="card p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -74,28 +72,49 @@ export function renderConfig(container) {
             </div>
 
             <!-- 3. USUARIOS -->
-                <div class="card p-4">
-                    <h3 class="font-bold text-sm text-slate-800 mb-3">Usuarios</h3>
-                    <div class="overflow-y-auto max-h-64">
-                        <table class="w-full text-left text-xs">
-                            <tbody class="divide-y divide-slate-100">
-                                ${state.perfilesCache.map(p => `
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="py-2"><div class="font-semibold">${escapeHtml(p.email)}</div><div class="text-[10px] text-slate-500">${escapeHtml(p.cargo || 'Sin cargo')}</div></td>
-                                        <td class="py-2 text-right whitespace-nowrap">
-                                            <button onclick="window.openCargoModal('${p.id}')" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar cargo"><i class="fa-solid fa-pen"></i></button>
-                                            ${state.isAdmin ? `<button onclick="window.openPasswordModal('${p.id}')" class="text-amber-600 hover:text-amber-800" title="Cambiar contraseña"><i class="fa-solid fa-key"></i></button>` : ''}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+            <div class="card p-4">
+                <h3 class="font-bold text-sm text-slate-800 mb-3">Usuarios</h3>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="w-full text-left text-xs">
+                        <tbody class="divide-y divide-slate-100">
+                            ${state.perfilesCache.map(p => `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="py-2"><div class="font-semibold">${escapeHtml(p.email)}</div><div class="text-[10px] text-slate-500">${escapeHtml(p.cargo || 'Sin cargo')}</div></td>
+                                    <td class="py-2 text-right whitespace-nowrap">
+                                        <button onclick="window.openCargoModal('${p.id}')" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar cargo"><i class="fa-solid fa-pen"></i></button>
+                                        ${state.isAdmin ? `<button onclick="window.openPasswordModal('${p.id}')" class="text-amber-600 hover:text-amber-800" title="Cambiar contraseña"><i class="fa-solid fa-key"></i></button>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. CAUSAS DE INCUMPLIMIENTO -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Causas de Incumplimiento</h3>
+                    <button onclick="window.openCausaModal()" class="px-2 py-1 bg-sky-600 text-white text-xs rounded hover:bg-sky-700">+ Añadir</button>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="w-full text-left text-xs">
+                        <tbody id="causas-table" class="divide-y divide-slate-100">
+                            ${(state.causasCache || []).map(c => `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="py-2">${escapeHtml(c.nombre)}</td>
+                                    <td class="py-2 text-right">
+                                        <button onclick="window.openCausaModal(${c.id})" class="text-sky-600 mr-2 hover:text-sky-800"><i class="fa-solid fa-pen"></i></button>
+                                        <button onclick="window.deleteCausa(${c.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin causas</td></tr>'}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <!-- MODALES -->
         ${renderModales()}
     `;
 }
@@ -162,7 +181,6 @@ window.handleFileUpload = (e) => {
 
             if (colActividad === -1) { toast('No se encontró la columna "Actividad".'); return; }
 
-            // Función para formatear el correo a "Nombre Apellido"
             const formatNombre = (email) => {
                 if (!email) return '';
                 const base = email.split('@')[0];
@@ -201,15 +219,13 @@ window.handleFileUpload = (e) => {
                 const actTexto = String(row[colActividad]).trim();
                 if (!actTexto) continue;
 
-                // BÚSQUEDA DEL RESPONSABLE
                 let respId = null;
                 let respEmailReal = null;
                 const excelResp = colResp !== -1 ? String(row[colResp]).trim().toLowerCase() : '';
                 
                 if (excelResp) {
-                    // Buscar en los perfiles comparando el nombre formateado con el nombre del Excel
                     const perfil = state.perfilesCache.find(p => {
-                        const nombrePerfil = formatNombre(p.email).toLowerCase(); // "luis romero"
+                        const nombrePerfil = formatNombre(p.email).toLowerCase();
                         return nombrePerfil === excelResp || p.email.toLowerCase() === excelResp;
                     });
                     if (perfil) {
@@ -258,6 +274,7 @@ window.handleFileUpload = (e) => {
     reader.readAsArrayBuffer(file);
     e.target.value = ''; 
 };
+
 // --- RENDERIZADO DE MODALES ---
 function renderModales() {
     return `
@@ -275,28 +292,29 @@ function renderModales() {
                 </form>
             </div>
         </div>
-        <!-- MODAL PASSWORD -->
-<div id="modal-password" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
-        <h3 class="font-bold text-sm text-slate-800">Cambiar contraseña</h3>
-        <p id="password-user-email" class="text-[11px] text-slate-500"></p>
-        <form onsubmit="window.savePassword(event)" class="space-y-3 text-xs">
-            <input type="hidden" id="password-user-id">
-            <div>
-                <label class="block font-semibold text-slate-600 mb-1">Nueva contraseña</label>
-                <input type="text" id="password-new" required minlength="6" class="inp" placeholder="Mínimo 6 caracteres">
+
+        <div id="modal-password" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800">Cambiar contraseña</h3>
+                <p id="password-user-email" class="text-[11px] text-slate-500"></p>
+                <form onsubmit="window.savePassword(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="password-user-id">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Nueva contraseña</label>
+                        <input type="text" id="password-new" required minlength="6" class="inp" placeholder="Mínimo 6 caracteres">
+                    </div>
+                    <div class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
+                        <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
+                        Comparte esta contraseña con el usuario de forma privada.
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" onclick="window.closePasswordModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                        <button type="submit" class="px-4 py-1.5 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700">Actualizar contraseña</button>
+                    </div>
+                </form>
             </div>
-            <div class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
-                <i class="fa-solid fa-circle-info mr-1 text-sky-600"></i>
-                Comparte esta contraseña con el usuario de forma privada.
-            </div>
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onclick="window.closePasswordModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
-                <button type="submit" class="px-4 py-1.5 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700">Actualizar contraseña</button>
-            </div>
-        </form>
-    </div>
-</div>
+        </div>
+
         <div id="modal-prop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
             <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
                 <h3 class="font-bold text-sm text-slate-800" id="prop-modal-title">Nuevo Parámetro</h3>
@@ -319,6 +337,7 @@ function renderModales() {
                 </form>
             </div>
         </div>
+
         <div id="modal-cargo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
             <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
                 <h3 class="font-bold text-sm text-slate-800">Editar cargo</h3>
@@ -333,10 +352,24 @@ function renderModales() {
                 </form>
             </div>
         </div>
+
+        <div id="modal-causa" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800" id="causa-modal-title">Nueva causa</h3>
+                <form onsubmit="window.saveCausa(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="causa-id">
+                    <div><label class="block font-semibold text-slate-600 mb-1">Nombre *</label><input type="text" id="causa-nombre" required class="inp"></div>
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" onclick="window.closeCausaModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                        <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     `;
 }
 
-// --- FUNCIONES EXPORTADAS (Grupos, Props, Cargos) ---
+// --- FUNCIONES EXPORTADAS (Grupos, Props, Cargos, Causas) ---
 export function openGrupoModal(id) {
     const g = id ? state.gruposCache.find(x => x.id === id) : null;
     document.getElementById('grupo-modal-title').innerText = g ? 'Editar grupo' : 'Nuevo grupo';
@@ -431,6 +464,40 @@ export async function saveCargo(e) {
     if (error) { toast('Error: ' + error.message); return; }
     closeCargoModal(); await fetchAll(); window.renderView(); toast('Cargo actualizado');
 }
+export function openCausaModal(id) {
+    const c = id ? (state.causasCache || []).find(x => x.id === id) : null;
+    document.getElementById('causa-modal-title').innerText = c ? 'Editar causa' : 'Nueva causa';
+    document.getElementById('causa-id').value = c?.id || '';
+    document.getElementById('causa-nombre').value = c?.nombre || '';
+    document.getElementById('modal-causa').classList.remove('hidden');
+    document.getElementById('modal-causa').classList.add('flex');
+}
+export function closeCausaModal() { document.getElementById('modal-causa').classList.add('hidden'); document.getElementById('modal-causa').classList.remove('flex'); }
+export async function saveCausa(e) {
+    e.preventDefault();
+    const id = document.getElementById('causa-id').value;
+    const payload = { nombre: document.getElementById('causa-nombre').value.trim(), activo: true };
+    if (!payload.nombre) { toast('Nombre requerido'); return; }
+    const { error } = id
+        ? await supabaseClient.from('causas_incumplimiento').update(payload).eq('id', id)
+        : await supabaseClient.from('causas_incumplimiento').insert([payload]);
+    if (error) { toast('Error: ' + error.message); return; }
+    closeCausaModal(); await fetchAll(); window.renderView(); toast('Causa guardada');
+}
+export async function deleteCausa(id) {
+    const c = (state.causasCache || []).find(x => x.id === id);
+    if (!c) return;
+    const confirmado = await confirmDelete({ title: 'Eliminar causa', message: `Vas a eliminar "${c.nombre}". Las tareas que la usaban quedarán sin esa causa.` });
+    if (!confirmado) return;
+    const { error } = await supabaseClient.from('causas_incumplimiento').delete().eq('id', id);
+    if (error) { toast('Error: ' + error.message); return; }
+    await fetchAll(); window.renderView(); toast('Causa eliminada');
+}
+window.openCausaModal = openCausaModal;
+window.closeCausaModal = closeCausaModal;
+window.saveCausa = saveCausa;
+window.deleteCausa = deleteCausa;
+
 // --- CAMBIO DE CONTRASEÑA (solo admin) ---
 window.openPasswordModal = function(userId) {
     if (!state.isAdmin) { toast('Solo el administrador puede cambiar contraseñas.'); return; }
@@ -460,7 +527,6 @@ window.savePassword = async function(e) {
         return;
     }
     
-    // Llamar a la función RPC que crearemos en Supabase
     const { data, error } = await supabaseClient.rpc('admin_update_password', {
         target_user_id: userId,
         new_password: newPassword
