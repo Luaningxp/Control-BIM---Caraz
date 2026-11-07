@@ -142,16 +142,40 @@ function actualizarPlanosUI() {
             <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <!-- BORRADO DIRECTO EN EL BOTÓN -->
-                <button type="button" 
-                        onclick="this.parentElement.remove(); window.quitarPlano('${pid}');" 
-                        class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
+                <button type="button" onclick="window.removerPlanoVisual('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
                     ×
                 </button>
             </span>
         `;
     }).join('');
 }
+
+window.removerPlanoVisual = function(pid) {
+    // 1. Borra el plano del Set
+    planosSeleccionados.delete(pid);
+    
+    // 2. Fuerza el redibujado del HTML inmediatamente
+    const box = document.getElementById('planos-chips');
+    if (box) {
+        if (planosSeleccionados.size === 0) {
+            box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin planos vinculados</span>';
+        } else {
+            box.innerHTML = Array.from(planosSeleccionados).map(id => {
+                const plano = (state.planosCache || []).find(p => p.id === id);
+                if (!plano) return '';
+                return `
+                    <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                        <i class="fa-solid fa-file-pdf text-[10px]"></i>
+                        ${escapeHtml(plano.codigo)}
+                        <button type="button" onclick="window.removerPlanoVisual('${id}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
+                            ×
+                        </button>
+                    </span>
+                `;
+            }).join('');
+        }
+    }
+};
 function inicializarBuscadorPlanos() {
     const input = document.getElementById('planos-search');
     const dropdown = document.getElementById('planos-dropdown');
