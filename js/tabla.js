@@ -233,7 +233,8 @@ let tableState = {
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130, planos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
-        inicio: 90, fin: 90, cierre: 90, nota: 180, cde: 100
+        inicio: 90, fin: 90, cierre: 90, nota: 180, cde: 100,
+        acciones: 100
     }
 };
 
@@ -371,77 +372,58 @@ export function renderTabla(container) {
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
                 <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1500px;">
                     <thead class="sticky top-0 z-10 shadow-sm">
-                        <tr class="bg-slate-50 dark:bg-slate-800">
-                            ${Object.keys(tableState.visibleCols).map(col => {
-                                if (!tableState.visibleCols[col]) return '';
-                                let title = col.replace('_', ' ');
-                                if (col === 'cde') title = 'CDE ISO';
-                                return `<th data-col="${col}" style="${colStyle(col)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
-                            }).join('')}
-                            ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th class="p-3 text-center sticky right-0 z-30 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
-    Acciones
-</th>
-                    </thead>
+    <tr class="bg-slate-50 dark:bg-slate-800">
+        ${Object.keys(tableState.visibleCols).map(col => {
+            if (!tableState.visibleCols[col]) return '';
+            let title = col.replace('_', ' ');
+            if (col === 'cde') title = 'CDE ISO';
+            return `<th data-col="${col}" style="${colStyle(col)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
+        }).join('')}
+        ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
+        <th data-col="acciones" style="width:100px;min-width:100px;max-width:100px;"
+            class="p-3 text-center sticky right-0 z-30 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
+            Acciones
+        </th>
+    </tr>
+</thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                        ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
-                        ${tasks.map(t => {
-                            const crit = getCriticidad(t); 
-                            return `
-                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
-                                ${tableState.visibleCols.codigo ? `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate" style="${colStyle('codigo')}">${t.codigo_contenedor || '–'}</td>` : ''}
-                                ${tableState.visibleCols.actividad ? `<td data-col="actividad" class="p-3 truncate" style="${colStyle('actividad')}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px]">${escapeHtml(t.actividad)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>` : ''}
-                                ${tableState.visibleCols.grupo ? `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
-                                ${tableState.visibleCols.responsable ? `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
-                                ${tableState.visibleCols.recursos ? `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>` : ''}
-                                ${tableState.visibleCols.planos ? `<td data-col="planos" class="p-3 truncate" style="${colStyle('planos')}"><div class="flex flex-wrap gap-1">${(state.actividadPlanosCache||[]).filter(ap => ap.pendiente_id === t.id).map(ap => { const plano = (state.planosCache||[]).find(p => p.id === ap.plano_id); return plano ? `<span class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 rounded text-[10px] font-medium" title="${escapeHtml(plano.titulo)}">${escapeHtml(plano.codigo.split('-').pop())}</span>` : ''; }).join('') || '<span class="text-slate-300 text-[10px]">-</span>'}</div></td>` : ''}
-                                ${tableState.visibleCols.importancia ? `<td data-col="importancia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.urgencia ? `<td data-col="urgencia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.criticidad ? `<td data-col="criticidad" class="p-3 font-semibold ${critColor(crit)} truncate" style="${colStyle('criticidad')}">${crit}</td>` : ''}
-                                ${tableState.visibleCols.estado ? `<td data-col="estado" class="p-3 truncate" style="${colStyle('estado')}"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 dark:text-slate-300 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
-                                ${tableState.visibleCols.inicio ? `<td data-col="inicio" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('inicio')}">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.fin ? `<td data-col="fin" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('fin')}">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cierre ? `<td data-col="cierre" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('cierre')}">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cde ? `<td data-col="cde" class="p-3 truncate" style="${colStyle('cde')}">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
-                                ${visiblePropDefs.map(pd => {
-                                    const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
-                                    let displayVal = '-';
-                                    if (pv) {
-                                        if (pd.tipo === 'numero') displayVal = pv.valor_numero ?? '-';
-                                        else if (pd.tipo === 'fecha') displayVal = pv.valor_fecha ? fmtDate(pv.valor_fecha) : '-';
-                                        else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? '<i class="fa-solid fa-check text-teal-600"></i>' : '<i class="fa-solid fa-xmark text-slate-300"></i>';
-                                        else displayVal = pv.valor_texto || '-';
-                                    }
-                                    return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 dark:text-slate-400 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
-                                }).join('')}
-                               <td class="p-3 text-center whitespace-nowrap sticky right-0 z-20 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
-    <div class="flex items-center justify-center gap-1">
-        ${canEdit(t) ? `
-            <button onclick="event.stopPropagation(); window.editTask(${t.id})" 
-                    class="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition" 
-                    title="Editar">
-                <i class="fa-solid fa-pen text-xs"></i>
-            </button>
-        ` : ''}
-        ${canTransition() ? `
-            <button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" 
-                    class="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition" 
-                    title="Transición CDE">
-                <i class="fa-solid fa-arrows-rotate text-xs"></i>
-            </button>
-        ` : ''}
-        ${canDelete() ? `
-            <button onclick="event.stopPropagation(); window.deleteTask(${t.id})" 
-                    class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" 
-                    title="Eliminar">
-                <i class="fa-solid fa-trash text-xs"></i>
-            </button>
-        ` : ''}
-    </div>
-</td>
-                            </tr>
-                        `}).join('')}
-                    </tbody>
+    ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
+    ${tasks.map(t => {
+        const crit = getCriticidad(t); 
+        return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
+            ${tableState.visibleCols.codigo ? `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate" style="${colStyle('codigo')}">${t.codigo_contenedor || '–'}</td>` : ''}
+            ${tableState.visibleCols.actividad ? `<td data-col="actividad" class="p-3 truncate" style="${colStyle('actividad')}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px]">${escapeHtml(t.actividad)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>` : ''}
+            ${tableState.visibleCols.grupo ? `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
+            ${tableState.visibleCols.responsable ? `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
+            ${tableState.visibleCols.recursos ? `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>` : ''}
+            ${tableState.visibleCols.planos ? `<td data-col="planos" class="p-3 truncate" style="${colStyle('planos')}"><div class="flex flex-wrap gap-1">${(state.actividadPlanosCache||[]).filter(ap => ap.pendiente_id === t.id).map(ap => { const plano = (state.planosCache||[]).find(p => p.id === ap.plano_id); return plano ? `<span class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 rounded text-[10px] font-medium" title="${escapeHtml(plano.titulo)}">${escapeHtml(plano.codigo.split('-').pop())}</span>` : ''; }).join('') || '<span class="text-slate-300 text-[10px]">-</span>'}</div></td>` : ''}
+            ${tableState.visibleCols.importancia ? `<td data-col="importancia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>` : ''}
+            ${tableState.visibleCols.urgencia ? `<td data-col="urgencia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>` : ''}
+            ${tableState.visibleCols.criticidad ? `<td data-col="criticidad" class="p-3 font-semibold ${critColor(crit)} truncate" style="${colStyle('criticidad')}">${crit}</td>` : ''}
+            ${tableState.visibleCols.estado ? `<td data-col="estado" class="p-3 truncate" style="${colStyle('estado')}"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 dark:text-slate-300 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
+            ${tableState.visibleCols.inicio ? `<td data-col="inicio" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('inicio')}">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
+            ${tableState.visibleCols.fin ? `<td data-col="fin" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('fin')}">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
+            ${tableState.visibleCols.cierre ? `<td data-col="cierre" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('cierre')}">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
+            ${tableState.visibleCols.cde ? `<td data-col="cde" class="p-3 truncate" style="${colStyle('cde')}">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
+            ${visiblePropDefs.map(pd => {
+                const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
+                let displayVal = '-';
+                if (pv) {
+                    if (pd.tipo === 'numero') displayVal = pv.valor_numero ?? '-';
+                    else if (pd.tipo === 'fecha') displayVal = pv.valor_fecha ? fmtDate(pv.valor_fecha) : '-';
+                    else if (pd.tipo === 'booleano') displayVal = pv.valor_booleano ? '<i class="fa-solid fa-check text-teal-600"></i>' : '<i class="fa-solid fa-xmark text-slate-300"></i>';
+                    else displayVal = pv.valor_texto || '-';
+                }
+                return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 dark:text-slate-400 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
+            }).join('')}
+            <td data-col="acciones" style="width:100px;min-width:100px;max-width:100px;"
+                class="p-3 text-center whitespace-nowrap sticky right-0 z-20 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
+                <!-- botones -->
+            </td>
+        </tr>
+    `}).join('')}
+</tbody>
                 </table>
             </div>
         </div>
