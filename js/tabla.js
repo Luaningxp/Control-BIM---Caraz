@@ -367,7 +367,7 @@ export function renderTabla(container) {
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
-                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1500px;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed;">
                     <thead class="sticky top-0 z-20 shadow-sm">
                         <tr class="bg-slate-50 dark:bg-slate-800">
                             ${Object.keys(tableState.visibleCols).map(col => {
@@ -377,10 +377,14 @@ export function renderTabla(container) {
                                 return `<th data-col="${col}" style="${colStyle(col)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
                             }).join('')}
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th data-col="acciones" style="width:100px !important;min-width:100px !important;max-width:100px !important;"
-                                class="p-3 text-center sticky right-0 z-30 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
-                                Acciones
-                            </th>
+                            <td data-col="acciones" style="width:100px !important;min-width:100px !important;max-width:100px !important;"
+    class="p-3 text-center whitespace-nowrap sticky right-0 z-10 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
+    <div class="flex items-center justify-center gap-0.5">
+        ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
+        ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition" title="Transición CDE"><i class="fa-solid fa-arrows-rotate text-[11px]"></i></button>` : ''}
+        ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" title="Eliminar"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
+    </div>
+</td>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
