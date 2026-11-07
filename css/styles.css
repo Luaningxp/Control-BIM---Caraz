@@ -293,3 +293,105 @@ tr:hover td.sticky {
 .dark tr:hover td.sticky {
     background-color: #334155 !important;
 }
+/* =========================================
+   GANTT · MODO OSCURO
+   ========================================= */
+#gantt-container {
+    background: var(--bg-card) !important;
+    color: var(--text-body) !important;
+}
+
+.dark .gantt {
+    background: #1e293b !important;
+}
+
+.dark .gantt .grid-header {
+    fill: #0f172a !important;
+    stroke: #334155 !important;
+}
+
+.dark .gantt .grid-row {
+    fill: #1e293b !important;
+}
+
+.dark .gantt .grid-row:nth-child(even) {
+    fill: #172033 !important;
+}
+
+.dark .gantt .row-line {
+    stroke: #334155 !important;
+}
+
+.dark .gantt .tick {
+    stroke: #334155 !important;
+    stroke-width: 0.4 !important;
+}
+
+.dark .gantt .tick.thick {
+    stroke: #475569 !important;
+    stroke-width: 0.8 !important;
+}
+
+.dark .gantt .today-highlight {
+    fill: rgba(56, 189, 248, 0.1) !important;
+}
+
+.dark .gantt .arrow {
+    stroke: #94a3b8 !important;
+}
+
+.dark .gantt .bar {
+    fill: #0284c7 !important;
+    stroke: #1e293b !important;
+}
+
+.dark .gantt .bar-progress {
+    fill: #0ea5e9 !important;
+}
+
+.dark .gantt .bar-label {
+    fill: #f1f5f9 !important;
+    font-weight: 600 !important;
+}
+
+.dark .gantt .bar-label.big {
+    fill: #f1f5f9 !important;
+}
+
+.dark .gantt .lower-text,
+.dark .gantt .upper-text {
+    fill: #cbd5e1 !important;
+}
+
+.dark .gantt .upper-text {
+    font-weight: 700 !important;
+}
+
+.dark .gantt-container .popup-wrapper {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+.dark .gantt .handle {
+    fill: #0284c7 !important;
+}
+
+.dark .gantt .bar-wrapper:hover .bar {
+    fill: #0ea5e9 !important;
+}
+
+.dark .gantt .bar-wrapper.active .bar {
+    fill: #0ea5e9 !important;
+}
+
+.dark .gantt .side-header {
+    background: #0f172a !important;
+    color: #cbd5e1 !important;
+    border-color: #334155 !important;
+}
+
+.dark .gantt .date-highlight {
+    background: #0284c7 !important;
+    color: #fff !important;
+}
