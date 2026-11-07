@@ -215,10 +215,10 @@ window.quitarPlano = function(pid) {
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
     visibleCols: { 
-        codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
-        importancia: true, urgencia: true, criticidad: true, 
-        estado: true, inicio: true, fin: true, cierre: true, nota: true, cde: true 
-    },
+    codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
+    importancia: true, urgencia: true, criticidad: true, 
+    estado: true, inicio: true, fin: true, cierre: true, cde: true 
+},
     visibleProps: {}, 
     filters: { 
         search: '', grupo: '', responsable: '', recursos: '', 
