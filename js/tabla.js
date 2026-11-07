@@ -33,12 +33,16 @@ function actualizarChipsUI() {
         box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin recursos asignados</span>';
         return;
     }
+    const { carga } = calcularCargaModeladores();
     box.innerHTML = Array.from(recursosSeleccionados).map(uid => {
         const p = state.perfilesCache.find(x => x.id === uid);
         if (!p) return '';
         const nombre = nombreFormateado(p);
+        const info = carga[p.id];
+        const punto = info ? `<span class="w-1.5 h-1.5 rounded-full ${info.color === 'red' ? 'bg-red-500' : info.color === 'amber' ? 'bg-amber-500' : 'bg-emerald-500'}"></span>` : '';
         return `
             <span class="inline-flex items-center gap-1 bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                ${punto}
                 <div class="w-4 h-4 rounded-full ${colorAvatar(p.id)} text-white text-[8px] font-bold flex items-center justify-center">
                     ${getIniciales(nombre).toUpperCase()}
                 </div>
@@ -48,7 +52,6 @@ function actualizarChipsUI() {
         `;
     }).join('');
 }
-
 function inicializarBuscadorRecursos() {
     const input = document.getElementById('recursos-search');
     const dropdown = document.getElementById('recursos-dropdown');
@@ -81,16 +84,20 @@ function inicializarBuscadorRecursos() {
         if (disponibles.length === 0) {
             dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
         } else {
+            const { carga } = calcularCargaModeladores();
             dropdown.innerHTML = disponibles.map(p => {
                 const nombre = nombreFormateado(p);
+                const info = carga[p.id];
+                const sem = info ? SEMAFORO[info.color].emoji : '';
+                const textoCarga = info ? ` — ${textoCargaCorto(info)}` : '';
                 return `
                     <div onclick="window.agregarRecurso('${p.id}')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
                         <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[10px] font-bold flex items-center justify-center">
                             ${getIniciales(nombre).toUpperCase()}
                         </div>
-                        <div>
-                            <p class="text-xs font-medium text-slate-800 dark:text-slate-200">${escapeHtml(nombre)}</p>
-                            <p class="text-[10px] text-slate-500 dark:text-slate-400">${escapeHtml(p.cargo || 'Operador')}</p>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">${sem} ${escapeHtml(nombre)}</p>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate">${escapeHtml(p.cargo || 'Operador')}${textoCarga}</p>
                         </div>
                     </div>
                 `;
@@ -99,7 +106,6 @@ function inicializarBuscadorRecursos() {
         dropdown.classList.remove('hidden');
     }
 }
-
 window.agregarRecurso = function(uid) {
     recursosSeleccionados.add(uid);
     actualizarChipsUI();
@@ -652,7 +658,66 @@ window.clearTableFilters = function() {
     };
     window.renderView();
 };
+function calcularCargaModeladores() {
+    const CAPACIDAD_SEMANAL_H = 40;
+    const PESO_IMPORTANCIA = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
+    const hoyStr = new Date().toISOString().split('T')[0];
 
+    const modeladores = state.perfilesCache.filter(p =>
+        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
+    );
+
+    const carga = {};
+    modeladores.forEach(p => {
+        carga[p.id] = { tareas: 0, horasEstimadas: 0, semanas: 0, color: 'green' };
+    });
+
+    state.tasksCache.filter(t => t.estado !== 'Cerrado').forEach(t => {
+        const asignados = new Set();
+        if (t.responsable_id) asignados.add(t.responsable_id);
+        (state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).forEach(r => asignados.add(r.usuario_id));
+        asignados.forEach(uid => {
+            if (!carga[uid]) return;
+            carga[uid].tareas += 1;
+            let dias = 0;
+            if (t.fecha_fin) {
+                const fin = new Date(t.fecha_fin + 'T00:00:00');
+                const hoyD = new Date(hoyStr + 'T00:00:00');
+                dias = Math.max(0, Math.ceil((fin - hoyD) / 86400000));
+            }
+            const peso = PESO_IMPORTANCIA[t.importancia] || 1;
+            carga[uid].horasEstimadas += dias * 8 * peso;
+        });
+    });
+
+    let maxSemanas = 0;
+    let maxTareas = 0;
+    Object.values(carga).forEach(c => {
+        c.semanas = c.horasEstimadas / CAPACIDAD_SEMANAL_H;
+        if (c.semanas > maxSemanas) { maxSemanas = c.semanas; maxTareas = c.tareas; }
+    });
+
+    Object.values(carga).forEach(c => {
+        if (maxSemanas <= 0) { c.color = 'green'; return; }
+        const ratio = c.semanas / maxSemanas;
+        const esMaximo = c.semanas === maxSemanas;
+        if (esMaximo && maxTareas >= 3) c.color = 'red';
+        else if (ratio >= 0.6) c.color = 'amber';
+        else c.color = 'green';
+    });
+
+    return { carga, maxSemanas, maxTareas };
+}
+
+const SEMAFORO = {
+    green: { emoji: '🟢', clase: 'text-emerald-600 dark:text-emerald-400' },
+    amber: { emoji: '🟡', clase: 'text-amber-600 dark:text-amber-400' },
+    red:   { emoji: '🔴', clase: 'text-red-600 dark:text-red-400' }
+};
+
+function textoCargaCorto(info) {
+    return `${info.tareas} tarea${info.tareas === 1 ? '' : 's'} · ${info.semanas.toFixed(1)} sem`;
+}
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
@@ -672,7 +737,15 @@ export function openModal() {
     if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
     
     const rsSel = document.getElementById('task-responsable'); 
-    if (rsSel) rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join('');
+    if (rsSel) {
+        const { carga } = calcularCargaModeladores();
+        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => {
+            const info = carga[p.id];
+            const sem = info ? `${SEMAFORO[info.color].emoji} ` : '';
+            const extra = info ? ` — ${textoCargaCorto(info)}` : '';
+            return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
+        }).join('');
+    }
     
     renderCustomProps(null);
     renderRecursosChips(null);
@@ -711,7 +784,16 @@ export function editTask(id) {
     if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
     
     const rsSel = document.getElementById('task-responsable'); 
-    if (rsSel) { rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => `<option value="${p.id}">${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}</option>`).join(''); rsSel.value = t.responsable_id || ''; }
+    if (rsSel) {
+        const { carga } = calcularCargaModeladores();
+        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => {
+            const info = carga[p.id];
+            const sem = info ? `${SEMAFORO[info.color].emoji} ` : '';
+            const extra = info ? ` — ${textoCargaCorto(info)}` : '';
+            return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
+        }).join('');
+        rsSel.value = t.responsable_id || '';
+    }
     
     renderCustomProps(t.id);
     renderRecursosChips(t.id);
