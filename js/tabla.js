@@ -379,8 +379,9 @@ export function renderTabla(container) {
                                 return `<th data-col="${col}" style="${colStyle(col)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
                             }).join('')}
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
-                            <th class="p-3 text-center sticky right-0 bg-slate-50 dark:bg-slate-800 z-20 border-l border-slate-200 dark:border-slate-700 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)] w-[100px]">Acciones</th>
-                        </tr>
+                            <th class="p-3 text-center sticky right-0 bg-slate-50 dark:bg-slate-800 z-20 border-l border-slate-200 dark:border-slate-700 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)] w-[100px]">
+    Acciones
+</th>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
                         ${tasks.length === 0 ? '<tr><td colspan="15" class="text-center text-slate-400 py-8">No hay resultados con los filtros actuales</td></tr>' : ''}
@@ -414,10 +415,8 @@ export function renderTabla(container) {
                                     return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 dark:text-slate-400 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
                                 }).join('')}
                                 <td class="p-3 text-center whitespace-nowrap sticky right-0 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-l border-slate-100 dark:border-slate-700 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] z-10 w-[100px]">
-                                    ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-200 mr-2" title="Editar"><i class="fa-solid fa-pen"></i></button>` : ''}
-                                    ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-200 mr-2" title="Transición CDE"><i class="fa-solid fa-arrow-right-arrow-left"></i></button>` : ''}
-                                    ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" title="Eliminar"><i class="fa-solid fa-trash"></i></button>` : ''}
-                                </td>
+    <!-- Botones -->
+</td>
                             </tr>
                         `}).join('')}
                     </tbody>
