@@ -211,6 +211,85 @@ window.quitarPlano = function(pid) {
     actualizarPlanosUI();
 };
 
+let causasSeleccionadas = new Set();
+
+function renderCausasChips(pendienteId) {
+    causasSeleccionadas.clear();
+    if (pendienteId) {
+        const existentes = (state.tareaCausasCache || [])
+            .filter(tc => Number(tc.pendiente_id) === Number(pendienteId))
+            .map(tc => Number(tc.causa_id));
+        existentes.forEach(id => causasSeleccionadas.add(id));
+    }
+    actualizarCausasUI();
+}
+
+function actualizarCausasUI() {
+    const box = document.getElementById('causas-chips');
+    if (!box) return;
+    if (causasSeleccionadas.size === 0) {
+        box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin causas seleccionadas</span>';
+        return;
+    }
+    box.innerHTML = Array.from(causasSeleccionadas).map(cid => {
+        const c = (state.causasCache || []).find(x => Number(x.id) === Number(cid));
+        if (!c) return '';
+        return `
+            <span class="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                ${escapeHtml(c.nombre)}
+                <button type="button" onclick="window.quitarCausa('${cid}')" class="text-rose-600 hover:text-rose-900 dark:text-rose-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">×</button>
+            </span>
+        `;
+    }).join('');
+}
+
+function inicializarBuscadorCausas() {
+    const input = document.getElementById('causas-search');
+    const dropdown = document.getElementById('causas-dropdown');
+    if (!input || !dropdown) return;
+
+    const nuevoInput = input.cloneNode(true);
+    input.parentNode.replaceChild(nuevoInput, input);
+
+    nuevoInput.addEventListener('click', (e) => { e.stopPropagation(); mostrarDropdownCausas(nuevoInput.value); });
+    nuevoInput.addEventListener('input', (e) => mostrarDropdownCausas(e.target.value));
+    dropdown.addEventListener('mousedown', (e) => e.preventDefault());
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
+    });
+
+    function mostrarDropdownCausas(query) {
+        const q = (query || '').toLowerCase();
+        const disponibles = (state.causasCache || []).filter(c => {
+            if (causasSeleccionadas.has(Number(c.id))) return false;
+            if (causasSeleccionadas.size >= 5) return false;
+            return !q || c.nombre.toLowerCase().includes(q);
+        });
+        if (disponibles.length === 0) {
+            dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados o límite de 5 alcanzado</div>';
+        } else {
+            dropdown.innerHTML = disponibles.map(c => `
+                <div onclick="window.agregarCausa(${c.id})" class="px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs text-slate-700 dark:text-slate-200">
+                    ${escapeHtml(c.nombre)}
+                </div>
+            `).join('');
+        }
+        dropdown.classList.remove('hidden');
+    }
+}
+
+window.agregarCausa = function(cid) {
+    if (causasSeleccionadas.size >= 5) { toast('Máximo 5 causas por tarea'); return; }
+    causasSeleccionadas.add(Number(cid));
+    actualizarCausasUI();
+    const input = document.getElementById('causas-search'); if (input) input.value = '';
+    const dd = document.getElementById('causas-dropdown'); if (dd) dd.classList.add('hidden');
+};
+window.quitarCausa = function(cid) {
+    causasSeleccionadas.delete(Number(cid));
+    actualizarCausasUI();
+};
+
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
