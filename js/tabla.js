@@ -683,7 +683,8 @@ export function editTask(id) {
 
     aplicarBloqueoModelador();
 
-    document.getElementById('modal-task').classList.remove('hidden'); document.getElementById('modal-task').classList.add('flex');
+    document.getElementById('modal-task').classList.remove('hidden');
+    document.getElementById('modal-task').classList.add('flex');
 }
 
 function aplicarBloqueoModelador() {
