@@ -121,8 +121,8 @@ function renderPlanosChips(pendienteId) {
     planosSeleccionados.clear();
     if (pendienteId) {
         const existentes = (state.actividadPlanosCache || [])
-            .filter(ap => ap.pendiente_id === pendienteId)
-            .map(ap => ap.plano_id);
+            .filter(ap => Number(ap.pendiente_id) === Number(pendienteId))
+            .map(ap => Number(ap.plano_id)); // Forzamos a número
         existentes.forEach(id => planosSeleccionados.add(id));
     }
     actualizarPlanosUI();
@@ -136,13 +136,14 @@ function actualizarPlanosUI() {
         return;
     }
     box.innerHTML = Array.from(planosSeleccionados).map(pid => {
-        const plano = (state.planosCache || []).find(p => p.id === pid);
+        // Buscamos con Number() en ambos lados
+        const plano = (state.planosCache || []).find(p => Number(p.id) === Number(pid));
         if (!plano) return '';
         return `
             <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
                 <i class="fa-solid fa-file-pdf text-[10px]"></i>
                 ${escapeHtml(plano.codigo)}
-                <button type="button" onclick="window.removerPlanoVisual('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
+                <button type="button" onclick="window.quitarPlano('${pid}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
                     ×
                 </button>
             </span>
@@ -150,32 +151,6 @@ function actualizarPlanosUI() {
     }).join('');
 }
 
-window.removerPlanoVisual = function(pid) {
-    // 1. Borra el plano del Set
-    planosSeleccionados.delete(pid);
-    
-    // 2. Fuerza el redibujado del HTML inmediatamente
-    const box = document.getElementById('planos-chips');
-    if (box) {
-        if (planosSeleccionados.size === 0) {
-            box.innerHTML = '<span class="text-[10px] text-slate-400 italic">Sin planos vinculados</span>';
-        } else {
-            box.innerHTML = Array.from(planosSeleccionados).map(id => {
-                const plano = (state.planosCache || []).find(p => p.id === id);
-                if (!plano) return '';
-                return `
-                    <span class="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
-                        <i class="fa-solid fa-file-pdf text-[10px]"></i>
-                        ${escapeHtml(plano.codigo)}
-                        <button type="button" onclick="window.removerPlanoVisual('${id}')" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-white ml-1 font-bold text-sm leading-none cursor-pointer">
-                            ×
-                        </button>
-                    </span>
-                `;
-            }).join('');
-        }
-    }
-};
 function inicializarBuscadorPlanos() {
     const input = document.getElementById('planos-search');
     const dropdown = document.getElementById('planos-dropdown');
@@ -191,9 +166,6 @@ function inicializarBuscadorPlanos() {
     nuevoInput.addEventListener('input', (e) => mostrarDropdownPlanos(e.target.value));
     
     dropdown.addEventListener('mousedown', (e) => e.preventDefault());
-    
-    // ESTO ES CLAVE: Quitar el foco del input cuando se hace clic en el dropdown
-    dropdown.addEventListener('click', () => document.activeElement.blur());
 
     document.addEventListener('click', (e) => {
         if (!dropdown.contains(e.target) && e.target !== nuevoInput) dropdown.classList.add('hidden');
@@ -202,7 +174,8 @@ function inicializarBuscadorPlanos() {
     function mostrarDropdownPlanos(query) {
         const q = (query || '').toLowerCase();
         const disponibles = (state.planosCache || []).filter(p => {
-            if (planosSeleccionados.has(p.id)) return false;
+            // Verificamos si ya está seleccionado usando Number()
+            if (planosSeleccionados.has(Number(p.id))) return false;
             const text = `${p.codigo} ${p.titulo || ''}`.toLowerCase();
             return text.includes(q);
         }).slice(0, 30);
@@ -211,7 +184,7 @@ function inicializarBuscadorPlanos() {
             dropdown.innerHTML = '<div class="p-2 text-[11px] text-slate-400 text-center">Sin resultados</div>';
         } else {
             dropdown.innerHTML = disponibles.map(p => `
-                <div onclick="window.agregarPlano('${p.id}')" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0">
+                <div onclick="window.agregarPlano(${p.id})" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 last:border-0">
                     <div class="flex-shrink-0 w-6 h-6 bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded flex items-center justify-center">
                         <i class="fa-solid fa-file-pdf text-[10px]"></i>
                     </div>
@@ -227,7 +200,8 @@ function inicializarBuscadorPlanos() {
 }
 
 window.agregarPlano = function(pid) {
-    planosSeleccionados.add(pid);
+    // Forzamos a número al agregar
+    planosSeleccionados.add(Number(pid));
     actualizarPlanosUI();
     const input = document.getElementById('planos-search');
     if (input) input.value = '';
@@ -236,7 +210,8 @@ window.agregarPlano = function(pid) {
 };
 
 window.quitarPlano = function(pid) {
-    planosSeleccionados.delete(pid);
+    // Forzamos a número al eliminar
+    planosSeleccionados.delete(Number(pid));
     actualizarPlanosUI();
 };
 // --- ESTADO LOCAL DE LA TABLA ---
