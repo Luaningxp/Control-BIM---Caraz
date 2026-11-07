@@ -31,7 +31,7 @@ function normalizarCategoria(texto) {
     if (!texto) return null;
     const s = String(texto).trim().toLowerCase();
     if (s.includes('contractual')) return 'contractual';
-    if (s.includes('detalle')) return 'detalle';
+    if (s.includes('detalle') || s.includes('constr') || s.includes('det.')) return 'detalle';
     return null;
 }
 
