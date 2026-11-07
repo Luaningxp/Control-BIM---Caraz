@@ -71,7 +71,6 @@ td {
     color: var(--text-body);
 }
 
-/* Si usas hover en tablas, esto lo hace suave en ambos modos */
 tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 .dark tr:hover { background-color: rgba(255, 255, 255, 0.03); }
 
@@ -111,7 +110,6 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 
 .chart-box { position: relative; height: 280px; }
 
-/* Personalización del Scrollbar para que se vea bien en oscuro */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-body); }
 ::-webkit-scrollbar-thumb { background: var(--border-input); border-radius: 4px; }
@@ -121,7 +119,7 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 .login-page {
     position: fixed; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    background-image: url('../assets/fondo.jpeg'); /* Asegúrate que tu archivo se llame fondo.jpeg */
+    background-image: url('../assets/fondo.jpeg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -129,15 +127,14 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 .login-page::before {
     content: ''; position: absolute; inset: 0;
-    /* Fondo oscuro semitransparente para dar contraste */
     background: linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(2,132,199,0.7) 100%);
-    backdrop-filter: blur(5px); /* Desenfoque pro */
+    backdrop-filter: blur(5px);
     z-index: -1;
 }
 
 .login-box {
     background: rgba(255, 255, 255, 0.98); 
-    width: 100%; max-width: 420px; /* Un poco más ancho */
+    width: 100%; max-width: 420px;
     border-radius: 1rem; 
     box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
     overflow: hidden; 
@@ -151,11 +148,11 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 
 .login-logos {
     display: flex; align-items: center; justify-content: center;
-    gap: 1.5rem; margin-bottom: 1.25rem; height: 50px; /* Más alto */
+    gap: 1.5rem; margin-bottom: 1.25rem; height: 50px;
 }
 
 .login-logos img {
-    height: 50px !important; /* Imágenes más grandes */
+    height: 50px !important;
     width: auto !important;
     max-width: 140px !important;
     object-fit: contain;
@@ -174,133 +171,122 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     padding: 0.5rem; border-radius: 0.5rem; font-size: 0.75rem;
     text-align: center; margin-bottom: 1rem; display: none;
 }
+
 /* =========================================
    MAGIA PARA EL MODO OSCURO
    ========================================= */
-
-/* Cuando el modo oscuro está activo, forzamos a que los textos oscuros se vuelvan claros */
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
 .dark .text-slate-900, 
 .dark .text-slate-800,
 .dark .text-slate-700 {
-    color: #f8fafc !important; /* Texto casi blanco */
+    color: #f8fafc !important;
 }
 
-/* Los textos secundarios o sutiles se vuelven grises claros para que se lean */
 .dark .text-slate-600,
 .dark .text-slate-500,
 .dark .text-slate-400 {
-    color: #cbd5e1 !important; /* Gris claro */
+    color: #cbd5e1 !important;
 }
 
-/* Fondos blancos de tablas o modales pasan a gris oscuro */
 .dark .bg-white {
     background-color: #1e293b !important;
 }
 
-/* Fondos grises claros pasan a un gris un poco más oscuro */
 .dark .bg-slate-50,
 .dark .bg-slate-100 {
     background-color: #0f172a !important;
 }
 
-/* Si las tarjetas tienen bordes blancos, los oscurecemos */
 .dark .border-slate-200,
 .dark .border-slate-100 {
     border-color: #334155 !important;
 }
 
-/* Arreglar el dashboard donde algunos textos de los títulos están directamente en el HTML */
 .dark .card p, 
 .dark .card h4, 
 .dark .card h3 {
-    color: inherit; /* Toma el color del contenedor padre (que ya forzamos a claro) */
+    color: inherit;
 }
+
 /* =========================================
    ARREGLO DE LA MATRIZ EISENHOWER EN OSCURO
    ========================================= */
-
-/* Forzar a que los títulos de los cuadrantes sean claros y brillantes */
 .dark .eis-q h4 {
     color: #ffffff !important;
 }
 
-/* Cambiar el fondo de los cuadrantes a un tono oscuro (semitransparente para que se vea pro) */
 .dark .eis-q.bg-red-50 { background-color: rgba(220, 38, 38, 0.15) !important; border-color: rgba(220, 38, 38, 0.4) !important; }
 .dark .eis-q.bg-sky-50 { background-color: rgba(2, 132, 199, 0.15) !important; border-color: rgba(2, 132, 199, 0.4) !important; }
 .dark .eis-q.bg-amber-50 { background-color: rgba(245, 158, 11, 0.15) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
 .dark .eis-q.bg-slate-50 { background-color: rgba(100, 116, 139, 0.15) !important; border-color: rgba(100, 116, 139, 0.4) !important; }
 
-/* Ajustar el color del contador (el circulito blanco) y su texto */
 .dark .eis-q span.bg-white {
     background-color: rgba(255, 255, 255, 0.1) !important;
     color: #ffffff !important;
     border-color: transparent !important;
 }
 
-/* Arreglar las tarjetas blancas dentro de los cuadrantes */
 .dark .eis-q .bg-white {
-    background-color: #1e293b !important; /* Fondo de tarjeta oscuro */
+    background-color: #1e293b !important;
     border-color: #334155 !important;
 }
 .dark .eis-q .bg-white p {
-    color: #e2e8f0 !important; /* Texto claro */
+    color: #e2e8f0 !important;
 }
 .dark .eis-q .bg-white .text-slate-500 {
-    color: #94a3b8 !important; /* Subtítulos claros */
+    color: #94a3b8 !important;
 }
+
 /* Chips de Planos */
 .plano-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    background-color: #e0e7ff; /* indigo-100 */
-    color: #3730a3; /* indigo-800 */
+    background-color: #e0e7ff;
+    color: #3730a3;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
     font-size: 11px;
     font-weight: 500;
 }
 .dark .plano-chip {
-    background-color: rgba(49, 46, 129, 0.5); /* indigo-900/50 */
-    color: #c7d2fe; /* indigo-200 */
+    background-color: rgba(49, 46, 129, 0.5);
+    color: #c7d2fe;
 }
+
 /* =========================================
    FIX PARA CHIPS DE PLANOS
    ========================================= */
 #planos-chips {
     position: relative;
-    z-index: 10; /* Capa normal, no flota sobre todo */
+    z-index: 10;
 }
 
 #planos-chips button {
     position: relative;
-    z-index: 20; /* El botón está sobre el chip */
+    z-index: 20;
     cursor: pointer !important;
 }
 
 #planos-dropdown {
-    z-index: 30; /* El dropdown de búsqueda está por encima de los chips */
+    z-index: 30;
 }
-/* Forzar que la columna de acciones se quede fija a la derecha */
+
+/* =========================================
+   COLUMNA DE ACCIONES STICKY
+   ========================================= */
 th.sticky, td.sticky {
     position: sticky !important;
     right: 0 !important;
 }
-
-/* Asegurar que el encabezado tenga fondo sólido */
 th.sticky {
     background-color: var(--bg-table-head) !important;
-    z-index: 30 !important; /* Más alto que las celdas */
+    z-index: 30 !important;
 }
-
-/* Asegurar que las celdas tengan fondo y no sean transparentes */
 td.sticky {
     background-color: var(--bg-card) !important;
-    z-index: 20 !important;
+    z-index: 10 !important;
 }
-
-/* Para el hover en modo claro y oscuro */
 tr:hover td.sticky {
     background-color: rgba(0, 0, 0, 0.02) !important;
 }
