@@ -20,6 +20,9 @@ export const state = {
     actividadRecursosCache: [],
     planosCache: [],             // <-- ESTO
     actividadPlanosCache: [],    // <-- ESTO
+    causasCache: [],
+    tareaCausasCache: [],
+    snapshotsCache: [],
     currentTab: 'dashboard',
     cdeTargetId: null,
     dragId: null,
@@ -35,6 +38,9 @@ export async function fetchAll() {
             supabaseClient.from('propiedades_valores').select('*'),
             supabaseClient.from('manpower_registros').select('*').order('fecha', { ascending: false }),
             supabaseClient.from('actividad_recursos').select('*'),
+            supabaseClient.from('causas_incumplimiento').select('*').eq('activo', true).order('orden'),
+            supabaseClient.from('tarea_causas').select('*'),
+            supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false })
             supabaseClient.from('planos').select('*').order('codigo'),           // <-- NUEVO
             supabaseClient.from('actividad_planos').select('*')                  // <-- NUEVO
         ]);
@@ -51,6 +57,9 @@ export async function fetchAll() {
         state.propValsCache = pv.data || [];
         state.manpowerCache = m.data || [];
         state.actividadRecursosCache = ar.data || [];
+        state.causasCache = causasRes.data || [];
+        state.tareaCausasCache = tcRes.data || [];
+        state.snapshotsCache = snapRes.data || [];
         state.planosCache = pl.data || [];               // <-- ASIGNACIÓN
         state.actividadPlanosCache = ap.data || [];      // <-- ASIGNACIÓN
 
