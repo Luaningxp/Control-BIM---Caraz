@@ -211,6 +211,7 @@ window.quitarPlano = function(pid) {
     actualizarPlanosUI();
 };
 
+// --- HELPERS DE CAUSAS ---
 let causasSeleccionadas = new Set();
 
 function renderCausasChips(pendienteId) {
@@ -679,6 +680,10 @@ export function openModal() {
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
 
+    const causasContainer = document.getElementById('causas-container');
+    if (causasContainer) causasContainer.classList.add('hidden');
+    causasSeleccionadas.clear();
+
     aplicarBloqueoModelador();
 
     document.getElementById('modal-task').classList.remove('hidden');
@@ -713,6 +718,16 @@ export function editTask(id) {
     renderPlanosChips(t.id);
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
+
+    const estaRetrasada = t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin;
+    const causasContainer = document.getElementById('causas-container');
+    if (causasContainer) causasContainer.classList.toggle('hidden', !estaRetrasada);
+    if (estaRetrasada) {
+        renderCausasChips(t.id);
+        inicializarBuscadorCausas();
+    } else {
+        causasSeleccionadas.clear();
+    }
 
     aplicarBloqueoModelador();
 
@@ -757,6 +772,12 @@ function aplicarBloqueoModelador() {
     const planosSearch = document.getElementById('planos-search');
     if (planosSearch) planosSearch.disabled = false;
     document.querySelectorAll('#planos-chips button').forEach(b => {
+        b.style.display = '';
+    });
+
+    const causasSearch = document.getElementById('causas-search');
+    if (causasSearch) causasSearch.disabled = false;
+    document.querySelectorAll('#causas-chips button').forEach(b => {
         b.style.display = '';
     });
 }
@@ -875,6 +896,13 @@ export async function saveTask(e) {
         const planosData = Array.from(planosSeleccionados).map(pid => ({ pendiente_id: parseInt(taskId), plano_id: pid }));
         const { error: errPlanos } = await supabaseClient.from('actividad_planos').insert(planosData);
         if (errPlanos) { toast('Error al guardar planos: ' + errPlanos.message); }
+    }
+
+    await supabaseClient.from('tarea_causas').delete().eq('pendiente_id', parseInt(taskId));
+    if (causasSeleccionadas.size > 0) {
+        const causasData = Array.from(causasSeleccionadas).map(cid => ({ pendiente_id: parseInt(taskId), causa_id: cid }));
+        const { error: errCausas } = await supabaseClient.from('tarea_causas').insert(causasData);
+        if (errCausas) { toast('Error al guardar causas: ' + errCausas.message); }
     }
 
     closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
