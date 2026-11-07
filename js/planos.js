@@ -9,22 +9,38 @@ let planosState = {
     filterRevision: '',
     filterEstado: '',
     filterAconex: '',
+    filterCategoria: '',
     showColMenu: false,
-    sortBy: 'codigo', // Ordenar por defecto por código
+    sortBy: 'codigo',
     sortDir: 'asc',
     visibleCols: {
-        codigo: true, titulo: true, disciplina: true, clasificacion: true, 
-        revision: true, fecha: true, estado: true, aconex: true, 
-        responsable: true, estatus_bim: true, modelo_bim: true, actividades: true
+        codigo: true, titulo: true, disciplina: true, clasificacion: true,
+        revision: true, fecha: true, estado: true, aconex: true,
+        responsable: true, estatus_bim: true, modelo_bim: true,
+        agrupacion: true, actividades: true
     },
     colWidths: {
-        codigo: 150, titulo: 250, disciplina: 120, clasificacion: 120, 
-        revision: 80, fecha: 100, estado: 100, aconex: 120, 
-        responsable: 150, estatus_bim: 120, modelo_bim: 150, actividades: 100
+        codigo: 150, titulo: 250, disciplina: 120, clasificacion: 120,
+        revision: 80, fecha: 100, estado: 100, aconex: 120,
+        responsable: 150, estatus_bim: 120, modelo_bim: 150,
+        agrupacion: 160, actividades: 100
     }
 };
 
-// --- SISTEMA DE REDIMENSIONADO (ANTI-CLIC FANTASMA) ---
+function normalizarCategoria(texto) {
+    if (!texto) return null;
+    const s = String(texto).trim().toLowerCase();
+    if (s.includes('contractual')) return 'contractual';
+    if (s.includes('detalle')) return 'detalle';
+    return null;
+}
+
+const ETIQUETA_CATEGORIA = {
+    contractual: { texto: 'Contractual', clase: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200' },
+    detalle:     { texto: 'Detalle Constructivo', clase: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200' }
+};
+
+// --- SISTEMA DE REDIMENSIONADO ---
 let isResizing = false, currentCol = null, startX = 0, startWidth = 0;
 
 function initResize(e, colKey) {
@@ -34,7 +50,6 @@ function initResize(e, colKey) {
     startWidth = planosState.colWidths[colKey] || 100;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    // Desactivar clics en los th mientras se redimensiona
     document.querySelectorAll('th').forEach(th => { th.style.pointerEvents = 'none'; });
     document.addEventListener('mousemove', doResize);
     document.addEventListener('mouseup', stopResize);
@@ -63,7 +78,6 @@ function stopResize(e) {
     e.preventDefault(); e.stopPropagation();
 }
 
-// --- FUNCIÓN DE ORDENAMIENTO ---
 function toggleSort(col) {
     if (planosState.sortBy === col) {
         planosState.sortDir = planosState.sortDir === 'asc' ? 'desc' : 'asc';
@@ -94,7 +108,7 @@ export function renderLogPlanos(container) {
     const revisiones = [...new Set(planos.map(p => p.revision).filter(Boolean))].sort();
     const estados = [...new Set(planos.map(p => p.estado).filter(Boolean))].sort();
 
-    let planosFiltrados = planos.filter(p => {
+    const baseFiltrada = planos.filter(p => {
         const matchSearch = !planosState.search || 
             (p.codigo || '').toLowerCase().includes(planosState.search.toLowerCase()) ||
             (p.titulo || '').toLowerCase().includes(planosState.search.toLowerCase());
@@ -107,25 +121,29 @@ export function renderLogPlanos(container) {
         return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx;
     });
 
-    // LÓGICA DE ORDENAMIENTO
+    const conteoContractual = baseFiltrada.filter(p => p.categoria === 'contractual').length;
+    const conteoDetalle = baseFiltrada.filter(p => p.categoria === 'detalle').length;
+
+    let planosFiltrados = baseFiltrada.filter(p => {
+        if (!planosState.filterCategoria) return true;
+        return p.categoria === planosState.filterCategoria;
+    });
+
     planosFiltrados.sort((a, b) => {
         let valA = a[planosState.sortBy] || '';
         let valB = b[planosState.sortBy] || '';
         
-        // Manejo especial si es "actividades"
         if (planosState.sortBy === 'actividades') {
             valA = conteoVinculados[a.id] || 0;
             valB = conteoVinculados[b.id] || 0;
         }
 
-        // Si son números o fechas
         if (planosState.sortBy === 'fecha') {
             valA = valA ? new Date(valA).getTime() : 0;
             valB = valB ? new Date(valB).getTime() : 0;
         } else if (typeof valA === 'number') {
             // Numérico directo
         } else {
-            // Texto (A-Z)
             valA = String(valA).toLowerCase();
             valB = String(valB).toLowerCase();
         }
@@ -137,7 +155,7 @@ export function renderLogPlanos(container) {
 
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
     const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
-        if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir'].includes(k)) return false;
+        if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir', 'filterCategoria'].includes(k)) return false;
         return v !== '';
     }).length;
 
@@ -155,6 +173,14 @@ export function renderLogPlanos(container) {
                 <button onclick="window.togglePlanosFilterDrawer()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
+                <button onclick="window.setPlanosCategoria('contractual')" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${planosState.filterCategoria === 'contractual' ? 'bg-sky-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}">
+                    <i class="fa-solid fa-file-contract"></i> Contractual
+                    <span class="${planosState.filterCategoria === 'contractual' ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700'} rounded-full px-1.5 text-[10px]">${conteoContractual}</span>
+                </button>
+                <button onclick="window.setPlanosCategoria('detalle')" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${planosState.filterCategoria === 'detalle' ? 'bg-violet-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}">
+                    <i class="fa-solid fa-ruler-combined"></i> Detalle Constructivo
+                    <span class="${planosState.filterCategoria === 'detalle' ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-700'} rounded-full px-1.5 text-[10px]">${conteoDetalle}</span>
                 </button>
             </div>
             
@@ -193,7 +219,7 @@ export function renderLogPlanos(container) {
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
             <div class="overflow-x-auto overflow-y-auto max-h-[75vh] custom-scrollbar">
-                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1400px;">
+                <table class="w-full text-left text-xs" style="table-layout: fixed; min-width: 1500px;">
                     <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold sticky top-0 z-10 shadow-sm select-none">
                         <tr>
                             ${planosState.visibleCols.codigo ? `<th data-col="codigo" style="${colStyle('codigo')}" class="${thClass}" onclick="window.togglePlanosSort('codigo')">Código ${getSortIcon('codigo')} ${resizer('codigo')}</th>` : ''}
@@ -207,11 +233,12 @@ export function renderLogPlanos(container) {
                             ${planosState.visibleCols.responsable ? `<th data-col="responsable" style="${colStyle('responsable')}" class="${thClass}" onclick="window.togglePlanosSort('responsable')">Responsable ${getSortIcon('responsable')} ${resizer('responsable')}</th>` : ''}
                             ${planosState.visibleCols.estatus_bim ? `<th data-col="estatus_bim" style="${colStyle('estatus_bim')}" class="${thClass}" onclick="window.togglePlanosSort('estatus_bim')">Estatus BIM ${getSortIcon('estatus_bim')} ${resizer('estatus_bim')}</th>` : ''}
                             ${planosState.visibleCols.modelo_bim ? `<th data-col="modelo_bim" style="${colStyle('modelo_bim')}" class="${thClass}" onclick="window.togglePlanosSort('modelo_bim')">Modelo BIM ${getSortIcon('modelo_bim')} ${resizer('modelo_bim')}</th>` : ''}
+                            ${planosState.visibleCols.agrupacion ? `<th data-col="agrupacion" style="${colStyle('agrupacion')}" class="${thClass}" onclick="window.togglePlanosSort('agrupacion')">Agrupación ${getSortIcon('agrupacion')} ${resizer('agrupacion')}</th>` : ''}
                             ${planosState.visibleCols.actividades ? `<th data-col="actividades" style="${colStyle('actividades')}" class="${thClass} text-center" onclick="window.togglePlanosSort('actividades')">Actividades ${getSortIcon('actividades')} ${resizer('actividades')}</th>` : ''}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                        ${planosFiltrados.length === 0 ? `<tr><td colspan="12" class="text-center py-8 text-slate-400">No hay planos que coincidan.</td></tr>` : ''}
+                        ${planosFiltrados.length === 0 ? `<tr><td colspan="13" class="text-center py-8 text-slate-400">No hay planos que coincidan.</td></tr>` : ''}
                         ${planosFiltrados.map(p => `
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                                 ${planosState.visibleCols.codigo ? `<td data-col="codigo" style="${colStyle('codigo')}" class="p-3 font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate" title="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</td>` : ''}
@@ -225,6 +252,11 @@ export function renderLogPlanos(container) {
                                 ${planosState.visibleCols.responsable ? `<td data-col="responsable" style="${colStyle('responsable')}" class="p-3 text-slate-600 dark:text-slate-400 truncate">${escapeHtml(p.responsable || '-')}</td>` : ''}
                                 ${planosState.visibleCols.estatus_bim ? `<td data-col="estatus_bim" style="${colStyle('estatus_bim')}" class="p-3 truncate">${p.estatus_bim ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">${escapeHtml(p.estatus_bim)}</span>` : '-'}</td>` : ''}
                                 ${planosState.visibleCols.modelo_bim ? `<td data-col="modelo_bim" style="${colStyle('modelo_bim')}" class="p-3 text-slate-600 dark:text-slate-400 truncate">${escapeHtml(p.modelo_bim || '-')}</td>` : ''}
+                                ${planosState.visibleCols.agrupacion ? `<td data-col="agrupacion" style="${colStyle('agrupacion')}" class="p-3 truncate" title="${escapeHtml(p.agrupacion || '')}">${(() => {
+                                    const cat = ETIQUETA_CATEGORIA[p.categoria];
+                                    if (cat) return `<span class="px-2 py-0.5 rounded text-[10px] font-semibold ${cat.clase}">${cat.texto}</span>`;
+                                    return p.agrupacion ? `<span class="text-slate-600 dark:text-slate-400">${escapeHtml(p.agrupacion)}</span>` : '<span class="text-slate-300">-</span>';
+                                })()}</td>` : ''}
                                 ${planosState.visibleCols.actividades ? `<td data-col="actividades" style="${colStyle('actividades')}" class="p-3 text-center truncate">${conteoVinculados[p.id] ? `<span class="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">${conteoVinculados[p.id]}</span>` : '<span class="text-slate-300">0</span>'}</td>` : ''}
                             </tr>
                         `).join('')}
@@ -303,7 +335,6 @@ export function renderLogPlanos(container) {
     });
 }
 
-// Exportar funciones
 window.togglePlanosSort = toggleSort;
 window.togglePlanosFilterDrawer = function() {
     const drawer = document.getElementById('planos-filter-drawer');
@@ -330,6 +361,7 @@ window.clearPlanosFilters = function() {
     planosState.filterRevision = '';
     planosState.filterEstado = '';
     planosState.filterAconex = '';
+    planosState.filterCategoria = '';
     window.renderView();
 };
 window.togglePlanosColMenu = function() {
@@ -348,6 +380,11 @@ window.toggleTodasPlanosCols = function(estado) {
 };
 window.initResizePlanos = initResize;
 
+window.setPlanosCategoria = function(cat) {
+    planosState.filterCategoria = planosState.filterCategoria === cat ? '' : cat;
+    window.renderView();
+};
+
 window.handlePlanosUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -357,11 +394,18 @@ window.handlePlanosUpload = (e) => {
         try {
             const data = new Uint8Array(event.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            const nombreHoja = workbook.SheetNames.find(n => n.trim().toUpperCase() === 'IMPORTAR');
+            if (!nombreHoja) {
+                toast('No se encontró la hoja "IMPORTAR" en el archivo.');
+                return;
+            }
+            
+            const worksheet = workbook.Sheets[nombreHoja];
             const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
             
-            if (json.length === 0) { toast('El archivo está vacío.'); return; }
-            if (!confirm(`Se procesarán ${json.length} filas. Los planos con el mismo Código y Revisión ya existentes serán ignorados. ¿Continuar?`)) return;
+            if (json.length === 0) { toast('La hoja "IMPORTAR" está vacía.'); return; }
+            if (!confirm(`Se procesarán ${json.length} filas de la hoja "IMPORTAR".\n\nLas filas con igual Código + Revisión serán sobrescritas. Las nuevas serán añadidas.\n\n¿Continuar?`)) return;
 
             const inserts = json.map(row => {
                 const getVal = (keys) => {
@@ -369,8 +413,13 @@ window.handlePlanosUpload = (e) => {
                     return null;
                 };
 
+                const codigo = getVal(['Codigo de entregable', 'Código de entregable', 'codigo']);
+                if (!codigo) return null;
+
+                const agrupacionTexto = getVal(['AGRUPACIÓN', 'Agrupación', 'AGRUPACION', 'Agrupacion', 'agrupacion']);
+
                 return {
-                    codigo: getVal(['Codigo de entregable', 'Código de entregable', 'codigo']),
+                    codigo: codigo,
                     revision: getVal(['Revision', 'Revisión', 'revision']) || 'C01',
                     titulo: getVal(['Titulo de entregable', 'Título de entregable', 'titulo']),
                     disciplina: getVal(['Disciplina']),
@@ -380,27 +429,37 @@ window.handlePlanosUpload = (e) => {
                     aconex: getVal(['Aconex']),
                     responsable: getVal(['Responsable']),
                     estatus_bim: getVal(['ESTATUS (BIM)', 'Estatus BIM']),
-                    modelo_bim: getVal(['MODELO BIM', 'Modelo BIM'])
+                    modelo_bim: getVal(['MODELO BIM', 'Modelo BIM']),
+                    agrupacion: agrupacionTexto,
+                    categoria: normalizarCategoria(agrupacionTexto)
                 };
-            }).filter(p => p.codigo);
+            }).filter(Boolean);
 
             if (inserts.length === 0) { toast('No se encontraron filas con código válido.'); return; }
 
-            let importados = 0;
+            const codigosPrevios = new Set((state.planosCache || []).map(p => `${p.codigo}|${p.revision}`));
+            const actualizados = inserts.filter(p => codigosPrevios.has(`${p.codigo}|${p.revision}`)).length;
+            const nuevos = inserts.length - actualizados;
+
+            const errores = [];
             for (let i = 0; i < inserts.length; i += 100) {
                 const batch = inserts.slice(i, i + 100);
-                const { data, error } = await supabaseClient
+                const { error } = await supabaseClient
                     .from('planos')
-                    .upsert(batch, { onConflict: 'codigo,revision', ignoreDuplicates: true })
+                    .upsert(batch, { onConflict: 'codigo,revision', ignoreDuplicates: false })
                     .select();
                 
-                if (error) throw error;
-                if (data) importados += data.length;
+                if (error) errores.push(error.message);
             }
 
             await fetchAll();
             window.renderView();
-            toast(`¡${importados} planos nuevos importados! (Los duplicados fueron ignorados).`);
+
+            if (errores.length > 0) {
+                toast(`Errores: ${errores[0]}`);
+            } else {
+                toast(`Importación completa: ${nuevos} nuevos, ${actualizados} sobrescritos.`);
+            }
 
         } catch (err) {
             console.error(err);
