@@ -4,6 +4,52 @@ import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar } from
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) { return (parseFloat(pct || 0) * HORAS_POR_100) / 100; }
 
+function semanaKey(fechaStr) {
+    const d = new Date(fechaStr + 'T00:00:00');
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const lunes = new Date(d.setDate(diff));
+    return lunes.toISOString().split('T')[0];
+}
+
+function semanasEntre(desde, hasta) {
+    const out = [];
+    const cur = new Date(desde + 'T00:00:00');
+    const end = new Date(hasta + 'T00:00:00');
+    while (cur <= end) {
+        out.push(cur.toISOString().split('T')[0]);
+        cur.setDate(cur.getDate() + 7);
+    }
+    return out;
+}
+
+const PALETA = ['#0284c7', '#0d9488', '#f59e0b', '#7c3aed', '#dc2626', '#64748b', '#ec4899', '#22c55e', '#eab308', '#06b6d4'];
+
+function buildSeries(registros, semanas, keyFn) {
+    const map = {};
+    registros.forEach(r => {
+        if (!r.fecha) return;
+        const sk = semanaKey(r.fecha);
+        const k = keyFn(r) || 'Sin clasificar';
+        if (!map[k]) map[k] = {};
+        map[k][sk] = (map[k][sk] || 0) + pctAHoras(r.porcentaje_dia);
+    });
+    const keys = Object.keys(map).sort();
+    return {
+        labels: semanas.map(s => { const d = new Date(s + 'T00:00:00'); return `Sem ${d.getDate()}/${d.getMonth() + 1}`; }),
+        datasets: keys.map((k, i) => ({
+            label: k,
+            data: semanas.map(s => +(map[k][s] || 0).toFixed(2)),
+            borderColor: PALETA[i % PALETA.length],
+            backgroundColor: PALETA[i % PALETA.length] + '20',
+            tension: 0.3,
+            fill: false,
+            pointRadius: 3,
+            pointBackgroundColor: PALETA[i % PALETA.length]
+        }))
+    };
+}
+
 export function renderRecursos(container) {
     const registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
@@ -18,22 +64,21 @@ export function renderRecursos(container) {
     }
 
     const hoy = new Date();
-    hoy.setHours(0,0,0,0);
+    hoy.setHours(0, 0, 0, 0);
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0,0,0,0);
+    inicioSemana.setHours(0, 0, 0, 0);
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
     const pctPorUsuarioDia = {};
     registros.forEach(r => {
         const key = `${r.usuario_id}|${r.fecha}`;
-        if (!pctPorUsuarioDia[key]) pctPorUsuarioDia[key] = 0;
-        pctPorUsuarioDia[key] += parseFloat(r.porcentaje_dia || 0);
+        pctPorUsuarioDia[key] = (pctPorUsuarioDia[key] || 0) + parseFloat(r.porcentaje_dia || 0);
     });
 
-    const modeladores = state.perfilesCache.filter(p => 
+    const modeladores = state.perfilesCache.filter(p =>
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
 
@@ -76,22 +121,54 @@ export function renderRecursos(container) {
     registros.forEach(r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         const grupo = t ? t.grupo || 'Sin grupo' : 'General';
-        if (!porGrupo[grupo]) porGrupo[grupo] = 0;
-        porGrupo[grupo] += pctAHoras(r.porcentaje_dia);
+        porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
     });
 
-    const semanas = {};
-    registros.forEach(r => {
-        if (!r.fecha) return;
-        const d = new Date(r.fecha + 'T00:00:00');
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        const lunes = new Date(d.setDate(diff));
-        const key = lunes.toISOString().split('T')[0];
-        if (!semanas[key]) semanas[key] = 0;
-        semanas[key] += pctAHoras(r.porcentaje_dia);
+    // Rango de semanas para los gráficos de líneas
+    const fechas = registros.map(r => r.fecha).filter(Boolean).sort();
+    const primera = fechas[0];
+    const ultima = fechas[fechas.length - 1];
+    const semanas = semanasEntre(semanaKey(primera), semanaKey(ultima));
+
+    // Series por grupo, cargo, importancia
+    const serieGrupo = buildSeries(registros, semanas, r => {
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        return t ? (t.grupo || 'Sin grupo') : 'General';
     });
-    const semanasOrdenadas = Object.keys(semanas).sort().slice(-8);
+    const serieCargo = buildSeries(registros, semanas, r => {
+        const p = state.perfilesCache.find(x => x.id === r.usuario_id);
+        return p ? (p.cargo || 'Sin cargo') : 'Sin cargo';
+    });
+    const serieNivel = buildSeries(registros, semanas, r => {
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        return t ? (t.importancia || 'Medio') : 'Sin tarea';
+    });
+
+    // Cumplimiento semanal del 100% por modelador (nuevo dashboard)
+    const semanasRecientes = semanas.slice(-6);
+    const cumplimientoSemanal = {};
+    modeladores.forEach(p => {
+        cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
+        semanasRecientes.forEach(s => {
+            const inicio = new Date(s + 'T00:00:00');
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4); // lunes a viernes
+            const dias = [];
+            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
+            const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
+            cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
+        });
+    });
+
+    // Horas vs tareas cerradas por grupo (nuevo dashboard)
+    const porGrupoTareas = {};
+    Object.keys(porGrupo).forEach(g => {
+        const tareasGrupo = state.tasksCache.filter(t => (t.grupo || 'Sin grupo') === g);
+        porGrupoTareas[g] = {
+            horas: porGrupo[g],
+            cerradas: tareasGrupo.filter(t => t.estado === 'Cerrado').length,
+            abiertas: tareasGrupo.filter(t => t.estado !== 'Cerrado').length
+        };
+    });
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
@@ -125,20 +202,88 @@ export function renderRecursos(container) {
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-3 mb-4">
-            <div class="card p-4 lg:col-span-2">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana (últimas 8)</h4>
-                <div class="chart-box" style="height: 240px;"><canvas id="chart-horas-semana"></canvas></div>
+        <div class="grid lg:grid-cols-2 gap-3 mb-4">
+            <div class="card p-4">
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Grupo</h4>
+                <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-grupo"></canvas></div>
             </div>
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por Grupo</h4>
-                <div class="chart-box" style="height: 240px;"><canvas id="chart-grupos"></canvas></div>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Cargo / Especialidad</h4>
+                <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-cargo"></canvas></div>
             </div>
+            <div class="card p-4">
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Nivel (importancia)</h4>
+                <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-nivel"></canvas></div>
+            </div>
+            <div class="card p-4">
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por Grupo (acumulado)</h4>
+                <div class="chart-box" style="height: 260px;"><canvas id="chart-grupos"></canvas></div>
+            </div>
+        </div>
+
+        <div class="card overflow-x-auto mb-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento semanal del 100%</h4>
+                <p class="text-[11px] text-slate-500">% de días hábiles (lun-vie) con 100% registrado, por modelador y semana.</p>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Modelador</th>
+                        ${semanasRecientes.map(s => { const d = new Date(s + 'T00:00:00'); return `<th class="p-3 text-center">Sem ${d.getDate()}/${d.getMonth() + 1}</th>`; }).join('')}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${Object.values(cumplimientoSemanal).map(m => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
+                                <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
+                            </td>
+                            ${semanasRecientes.map(s => {
+                                const v = m.semanas[s];
+                                const color = v >= 80 ? 'text-emerald-700' : v >= 50 ? 'text-amber-700' : 'text-red-700';
+                                return `<td class="p-3 text-center font-bold ${color}">${v}%</td>`;
+                            }).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card overflow-x-auto mb-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Horas vs. Tareas Cerradas por Grupo</h4>
+                <p class="text-[11px] text-slate-500">Detecta grupos que consumen horas sin cerrar tareas.</p>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Grupo</th>
+                        <th class="p-3">Horas</th>
+                        <th class="p-3">Cerradas</th>
+                        <th class="p-3">Abiertas</th>
+                        <th class="p-3">h / cerrada</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${Object.entries(porGrupoTareas).sort((a, b) => b[1].horas - a[1].horas).map(([g, d]) => {
+                        const ratio = d.cerradas > 0 ? (d.horas / d.cerradas).toFixed(1) : '—';
+                        return `<tr class="hover:bg-slate-50">
+                            <td class="p-3 text-slate-700">${escapeHtml(g)}</td>
+                            <td class="p-3 font-bold text-sky-700">${d.horas.toFixed(1)} h</td>
+                            <td class="p-3">${d.cerradas}</td>
+                            <td class="p-3">${d.abiertas}</td>
+                            <td class="p-3 font-semibold ${d.cerradas > 0 && d.horas / d.cerradas > 20 ? 'text-red-700' : 'text-slate-700'}">${ratio}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
         </div>
 
         <div class="card overflow-x-auto">
             <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento y horas por modelador</h4>
+                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento y horas por modelador (mes)</h4>
                 <p class="text-[11px] text-slate-500">Días al 100% del mes y horas totales acumuladas.</p>
             </div>
             <table class="w-full text-left text-xs">
@@ -153,14 +298,12 @@ export function renderRecursos(container) {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    ${Object.values(cumplimientoPorModelador).sort((a,b) => b.horasTotales - a.horasTotales).map(m => {
+                    ${Object.values(cumplimientoPorModelador).sort((a, b) => b.horasTotales - a.horasTotales).map(m => {
                         const pct = m.totalDias > 0 ? Math.round((m.cumplidos / m.totalDias) * 100) : 0;
                         const color = pct >= 80 ? 'text-emerald-700' : pct >= 50 ? 'text-amber-700' : 'text-red-700';
                         return `<tr class="hover:bg-slate-50">
                             <td class="p-3 flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar || m.nombre)} text-white text-[9px] font-bold flex items-center justify-center">
-                                    ${getIniciales(m.nombre).toUpperCase()}
-                                </div>
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar || m.nombre)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
                                 <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
                             </td>
                             <td class="p-3 font-bold ${color}">${m.cumplidos}</td>
@@ -180,52 +323,30 @@ export function renderRecursos(container) {
                 </tbody>
             </table>
         </div>
-
-        <div class="card overflow-x-auto mt-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Horas por Grupo</h4>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Grupo</th>
-                        <th class="p-3">Horas Totales</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    ${Object.entries(porGrupo).sort((a,b) => b[1] - a[1]).map(([g, h]) => `
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-3 text-slate-700">${escapeHtml(g)}</td>
-                            <td class="p-3 font-bold text-sky-700">${h.toFixed(1)} h</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
     `;
 
-    if (state.charts.horasSemana) state.charts.horasSemana.destroy();
-    if (state.charts.grupos) state.charts.grupos.destroy();
+    ['horasSemana', 'grupos', 'lineaGrupo', 'lineaCargo', 'lineaNivel'].forEach(k => {
+        if (state.charts[k]) { state.charts[k].destroy(); state.charts[k] = null; }
+    });
 
-    state.charts.horasSemana = new Chart(document.getElementById('chart-horas-semana'), {
-        type: 'bar',
-        data: {
-            labels: semanasOrdenadas.map(s => {
-                const d = new Date(s + 'T00:00:00');
-                return `Sem ${d.getDate()}/${d.getMonth()+1}`;
-            }),
-            datasets: [{
-                label: 'Horas',
-                data: semanasOrdenadas.map(s => semanas[s].toFixed(1)),
-                backgroundColor: '#0284c7',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' h' } }, x: { grid: { display: false } } }
+    const optsLinea = {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+        scales: {
+            y: { beginAtZero: true, ticks: { callback: v => v + ' h' } },
+            x: { grid: { display: false } }
         }
+    };
+
+    state.charts.lineaGrupo = new Chart(document.getElementById('chart-linea-grupo'), {
+        type: 'line', data: serieGrupo, options: optsLinea
+    });
+    state.charts.lineaCargo = new Chart(document.getElementById('chart-linea-cargo'), {
+        type: 'line', data: serieCargo, options: optsLinea
+    });
+    state.charts.lineaNivel = new Chart(document.getElementById('chart-linea-nivel'), {
+        type: 'line', data: serieNivel, options: optsLinea
     });
 
     const gruposLabels = Object.keys(porGrupo);
@@ -235,13 +356,10 @@ export function renderRecursos(container) {
             labels: gruposLabels,
             datasets: [{
                 data: gruposLabels.map(g => porGrupo[g].toFixed(1)),
-                backgroundColor: ['#0284c7', '#0d9488', '#f59e0b', '#7c3aed', '#dc2626', '#64748b', '#ec4899', '#22c55e'],
+                backgroundColor: PALETA,
                 borderWidth: 2, borderColor: '#fff'
             }]
         },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
-        }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
     });
 }
