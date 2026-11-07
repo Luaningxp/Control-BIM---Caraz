@@ -135,10 +135,7 @@ export function renderRecursos(container) {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         return t ? (t.grupo || 'Sin grupo') : 'General';
     });
-    const serieCargo = buildSeries(registros, semanas, r => {
-        const p = state.perfilesCache.find(x => x.id === r.usuario_id);
-        return p ? (p.cargo || 'Sin cargo') : 'Sin cargo';
-    });
+   
     const serieNivel = buildSeries(registros, semanas, r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         return t ? (t.importancia || 'Medio') : 'Sin tarea';
@@ -207,10 +204,7 @@ export function renderRecursos(container) {
                 <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Grupo</h4>
                 <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-grupo"></canvas></div>
             </div>
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Cargo / Especialidad</h4>
-                <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-cargo"></canvas></div>
-            </div>
+            
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Nivel (importancia)</h4>
                 <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-nivel"></canvas></div>
@@ -342,9 +336,7 @@ export function renderRecursos(container) {
     state.charts.lineaGrupo = new Chart(document.getElementById('chart-linea-grupo'), {
         type: 'line', data: serieGrupo, options: optsLinea
     });
-    state.charts.lineaCargo = new Chart(document.getElementById('chart-linea-cargo'), {
-        type: 'line', data: serieCargo, options: optsLinea
-    });
+   
     state.charts.lineaNivel = new Chart(document.getElementById('chart-linea-nivel'), {
         type: 'line', data: serieNivel, options: optsLinea
     });
