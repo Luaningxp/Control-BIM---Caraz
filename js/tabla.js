@@ -414,8 +414,30 @@ export function renderTabla(container) {
                                     }
                                     return `<td data-col="prop_${pd.id}" class="p-3 text-slate-600 dark:text-slate-400 text-[11px] truncate" style="${colStyle('prop_'+pd.id)}">${displayVal}</td>`;
                                 }).join('')}
-                                <td class="p-3 text-center whitespace-nowrap sticky right-0 z-20 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
-    <!-- Botones -->
+                               <td class="p-3 text-center whitespace-nowrap sticky right-0 z-20 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)] w-[100px]">
+    <div class="flex items-center justify-center gap-1">
+        ${canEdit(t) ? `
+            <button onclick="event.stopPropagation(); window.editTask(${t.id})" 
+                    class="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition" 
+                    title="Editar">
+                <i class="fa-solid fa-pen text-xs"></i>
+            </button>
+        ` : ''}
+        ${canTransition() ? `
+            <button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" 
+                    class="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition" 
+                    title="Transición CDE">
+                <i class="fa-solid fa-arrows-rotate text-xs"></i>
+            </button>
+        ` : ''}
+        ${canDelete() ? `
+            <button onclick="event.stopPropagation(); window.deleteTask(${t.id})" 
+                    class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" 
+                    title="Eliminar">
+                <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+        ` : ''}
+    </div>
 </td>
                             </tr>
                         `}).join('')}
