@@ -368,6 +368,16 @@ export async function saveManpower(e) {
     e.preventDefault();
     const fecha = document.getElementById('mp-fecha').value;
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
+
+    const { esDiaLaborable } = await import('./roster.js');
+    const usuarioId = state.currentUser.id;
+    if (!esDiaLaborable(usuarioId, fecha)) {
+        const { tipoDia } = await import('./roster.js');
+        const tipo = tipoDia(usuarioId, fecha);
+        const etiquetas = { DO: 'domingo no laborable', DE: 'descanso', FE: 'feriado' };
+        toast(`No puedes registrar en un día no laborable (${etiquetas[tipo] || tipo}).`);
+        return;
+    }
     
     const totalDia = state.manpowerCache
         .filter(m => m.usuario_id === state.currentUser.id && m.fecha === fecha)
