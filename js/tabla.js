@@ -447,6 +447,125 @@ window.toggleProp = toggleProp;
 window.toggleColMenu = toggleColMenu;
 window.initResize = initResize;
 
+window.toggleFilterDrawer = function() {
+    if (!document.getElementById('table-filter-drawer')) {
+        const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
+        const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
+        const recursosOpts = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
+        const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+        const drawerHtml = `
+            <div id="table-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleFilterDrawer()"></div>
+            <div id="table-filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
+                <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white">Filtros de Actividades</h3>
+                    <button onclick="window.toggleFilterDrawer()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-4 space-y-4 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Grupo</label>
+                        <select class="inp" onchange="window.applyTableFilter('grupo', this.value)">
+                            <option value="">Todos</option>
+                            ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Responsable</label>
+                        <select class="inp" onchange="window.applyTableFilter('responsable', this.value)">
+                            <option value="">Todos</option>
+                            ${respOpts.map(r => `<option value="${r.id}" ${tableState.filters.responsable === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Recursos</label>
+                        <select class="inp" onchange="window.applyTableFilter('recursos', this.value)">
+                            <option value="">Todos</option>
+                            ${recursosOpts.map(p => `<option value="${p.id}" ${tableState.filters.recursos === p.id ? 'selected' : ''}>${escapeHtml(nombreFormateado(p))}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-2">Ocultar estados</label>
+                        <div class="space-y-1.5 bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                            ${estadosOpts.map(e => `
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" class="rounded text-red-600" ${tableState.filters.estadosOcultos.includes(e) ? 'checked' : ''} onchange="window.toggleTableEstadoOculto('${e}', this.checked)">
+                                    <span class="text-slate-700 dark:text-slate-300">${e}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2">Fecha Inicio Prog.</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" class="inp" value="${tableState.filters.iniDesde || ''}" onchange="window.applyTableFilter('iniDesde', this.value)">
+                            <input type="date" class="inp" value="${tableState.filters.iniHasta || ''}" onchange="window.applyTableFilter('iniHasta', this.value)">
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2">Fecha Fin Prog.</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" class="inp" value="${tableState.filters.finDesde || ''}" onchange="window.applyTableFilter('finDesde', this.value)">
+                            <input type="date" class="inp" value="${tableState.filters.finHasta || ''}" onchange="window.applyTableFilter('finHasta', this.value)">
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2">Fecha Cierre Real</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" class="inp" value="${tableState.filters.cierreDesde || ''}" onchange="window.applyTableFilter('cierreDesde', this.value)">
+                            <input type="date" class="inp" value="${tableState.filters.cierreHasta || ''}" onchange="window.applyTableFilter('cierreHasta', this.value)">
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-300 mb-2">Semáforo</h4>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${tableState.filters.soloVencidas ? 'checked' : ''} onchange="window.applyTableFilter('soloVencidas', this.checked)"> Solo vencidas</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${tableState.filters.soloPorVencer ? 'checked' : ''} onchange="window.applyTableFilter('soloPorVencer', this.checked)"> Solo por vencer (≤ 7 días)</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="rounded text-sky-600" ${tableState.filters.soloSinFecha ? 'checked' : ''} onchange="window.applyTableFilter('soloSinFecha', this.checked)"> Solo sin fecha</label>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <button onclick="window.clearTableFilters()" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-eraser mr-1"></i> Limpiar filtros</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', drawerHtml);
+    }
+
+    const drawer = document.getElementById('table-filter-drawer');
+    const overlay = document.getElementById('table-filter-drawer-overlay');
+    const isOpen = !drawer.classList.contains('translate-x-full');
+    if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+    } else {
+        drawer.classList.remove('translate-x-full');
+        overlay.classList.remove('hidden');
+    }
+};
+
+window.applyTableFilter = function(key, value) {
+    tableState.filters[key] = value;
+    window.renderView();
+};
+
+window.toggleTableEstadoOculto = function(estado, checked) {
+    if (checked) {
+        if (!tableState.filters.estadosOcultos.includes(estado)) tableState.filters.estadosOcultos.push(estado);
+    } else {
+        tableState.filters.estadosOcultos = tableState.filters.estadosOcultos.filter(e => e !== estado);
+    }
+    window.renderView();
+};
+
+window.clearTableFilters = function() {
+    tableState.filters = {
+        search: '', grupo: '', responsable: '', recursos: '',
+        estadosOcultos: [],
+        iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
+        cierreDesde: '', cierreHasta: '',
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+    };
+    window.renderView();
+};
+
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
