@@ -54,6 +54,11 @@ export function renderRoster(container) {
 
     const fechas = [];
     for (let d = 1; d <= diasDelMes; d++) fechas.push(isoDate(year, month, d));
+    const hoyReal = new Date();
+    const hoyStrRoster = isoDate(hoyReal.getFullYear(), hoyReal.getMonth(), hoyReal.getDate());
+    const hoyIdxRoster = fechas.indexOf(hoyStrRoster);
+    const hoyEnRangoRoster = hoyIdxRoster !== -1;
+    
 
     const resumen = {};
     usuarios.forEach(u => {
@@ -97,9 +102,15 @@ export function renderRoster(container) {
                             ${fechas.map((f, i) => {
                                 const d = new Date(f + 'T00:00:00');
                                 const esDom = d.getDay() === 0;
-                                return `<th class="p-1 text-center ${esDom ? 'bg-slate-200 dark:bg-slate-800' : ''}" style="width: 34px; min-width: 34px;">
-                                    <div class="text-[9px] leading-tight">${DIAS_SEMANA[d.getDay()]}</div>
-                                    <div class="text-[10px] font-bold">${i + 1}</div>
+                                const esHoy = i === hoyIdxRoster;
+                                const claseFondo = esHoy
+                                    ? 'bg-sky-200 dark:bg-sky-900/60 ring-1 ring-inset ring-sky-500'
+                                    : esDom
+                                        ? 'bg-slate-200 dark:bg-slate-800'
+                                        : '';
+                                return `<th class="p-1 text-center ${claseFondo}" style="width: 34px; min-width: 34px;">
+                                    <div class="text-[9px] leading-tight ${esHoy ? 'text-sky-800 dark:text-sky-200 font-bold' : ''}">${DIAS_SEMANA[d.getDay()]}</div>
+                                    <div class="text-[10px] font-bold ${esHoy ? 'text-sky-900 dark:text-white' : ''}">${i + 1}</div>
                                 </th>`;
                             }).join('')}
                         </tr>
@@ -119,6 +130,7 @@ export function renderRoster(container) {
                                 ${fechas.map(f => {
                                     const tipo = clasificarDia(u.id, f);
                                     const est = ESTILO_DIA[tipo];
+                                    const esHoy = f === hoyStrRoster;
                                     let titulo = est.label;
                                     if (tipo === 'DE') {
                                         const d = (state.descansosCache || []).find(x => x.usuario_id === u.id && f >= x.fecha_inicio && f <= x.fecha_fin);
@@ -131,8 +143,8 @@ export function renderRoster(container) {
                                         if (te) titulo += ` · ${te.motivo || 'sin motivo'}`;
                                     }
                                     const clickHandler = esAdmin ? `onclick="window.rosterCellClick('${u.id}', '${f}', '${tipo}')"` : '';
-                                    return `<td class="p-0.5 text-center" style="width: 34px; min-width: 34px;" ${clickHandler}>
-                                        <div class="w-full py-1 rounded text-[10px] font-bold ${est.clase} ${esAdmin ? 'cursor-pointer hover:opacity-80' : ''}" title="${escapeHtml(titulo)}">${est.letra}</div>
+                                    return `<td class="p-0.5 text-center ${esHoy ? 'bg-sky-100 dark:bg-sky-900/30' : ''}" style="width: 34px; min-width: 34px;" ${clickHandler}>
+                                        <div class="w-full py-1 rounded text-[10px] font-bold ${est.clase} ${esHoy ? 'ring-2 ring-sky-500 ring-inset' : ''} ${esAdmin ? 'cursor-pointer hover:opacity-80' : ''}" title="${escapeHtml(titulo)}">${est.letra}</div>
                                     </td>`;
                                 }).join('')}
                             </tr>
