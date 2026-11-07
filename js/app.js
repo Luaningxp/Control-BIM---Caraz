@@ -9,6 +9,7 @@ import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal,
 import { renderRecursos } from './recursos.js';
 import { renderGantt } from './gantt.js';
 import { renderLogPlanos } from './planos.js';
+import { renderRoster } from './roster.js';
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -83,7 +84,7 @@ async function initApp(user) {
 
 window.switchTab = function(tab) {
     state.currentTab = tab;
-    ['mitrabajo', 'dashboard', 'tabla', 'kanban', 'eisenhower', 'gantt', 'manpower', 'recursos','log-planos', 'config'].forEach(t => {
+    ['mitrabajo', 'dashboard', 'tabla', 'roster', 'kanban', 'eisenhower', 'gantt', 'manpower', 'recursos','log-planos', 'config'].forEach(t => {
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if(btn) btn.classList.toggle('tab-active', t === tab);
     });
@@ -97,6 +98,7 @@ window.renderView = function() {
     if (state.currentTab === 'mitrabajo') renderMiTrabajo(container);
     else if (state.currentTab === 'dashboard') renderDashboard(container);
     else if (state.currentTab === 'tabla') renderTabla(container);
+    else if (state.currentTab === 'roster') renderRoster(container);
     else if (state.currentTab === 'kanban') renderKanban(container);
     else if (state.currentTab === 'eisenhower') renderEisenhower(container);
     else if (state.currentTab === 'gantt') renderGantt(container);
@@ -105,7 +107,6 @@ window.renderView = function() {
     else if (state.currentTab === 'recursos') renderRecursos(container);
     else if (state.currentTab === 'config') renderConfig(container);
 }
-
 window.openModal = openModal; window.closeModal = closeModal; window.saveTask = saveTask; window.editTask = editTask; window.deleteTask = deleteTask;
 window.openModalCDE = openModalCDE; window.closeModalCDE = closeModalCDE; window.confirmarTransicion = confirmarTransicion;
 window.onDragStart = onDragStart; window.onDragEnd = onDragEnd; window.onDragOver = onDragOver; window.onDragLeave = onDragLeave; window.onDrop = onDrop;
