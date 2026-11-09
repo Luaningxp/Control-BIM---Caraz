@@ -92,16 +92,15 @@ export function renderRecursos(container) {
 
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
-        const diasLaborables = diasDelMes.filter(d => esDiaLaborable(p.id, d));
-        const diasCumplidos = diasLaborables.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
-        const diasRegistrados = diasLaborables.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
+        const diasCumplidos = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
+        const diasRegistrados = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
         const horasTotales = registros.filter(r => r.usuario_id === p.id).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
         cumplimientoPorModelador[p.id] = {
             nombre: nombreFormateado(p),
             avatar: p.id,
             cumplidos: diasCumplidos,
             registrados: diasRegistrados,
-            totalDias: diasLaborables.length,
+            totalDias: diasDelMes.length,
             horasTotales
         };
     });
@@ -116,12 +115,8 @@ export function renderRecursos(container) {
     while (ayer.getDay() === 0) ayer.setDate(ayer.getDate() - 1);
     const ayerStr = ayer.toISOString().split('T')[0];
     const hoyStr = hoy.toISOString().split('T')[0];
-       const modeladoresPendientesHoy = modeladores.filter(p => 
-        esDiaLaborable(p.id, hoyStr) && (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100
-    ).length;
-    const modeladoresPendientesAyer = modeladores.filter(p => 
-        esDiaLaborable(p.id, ayerStr) && (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100
-    ).length;
+    const modeladoresPendientesHoy = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
+    const modeladoresPendientesAyer = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100).length;
 
     const porGrupo = {};
     registros.forEach(r => {
@@ -151,12 +146,9 @@ export function renderRecursos(container) {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
-            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 6);
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4);
             const dias = [];
-            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
-                const ds = d.toISOString().split('T')[0];
-                if (esDiaLaborable(p.id, ds)) dias.push(ds);
-            }
+            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
             const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
             cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
         });
@@ -219,6 +211,48 @@ export function renderRecursos(container) {
         return { ...m, semanasEquivalentes, estado, color };
     }).sort((a, b) => b.semanasEquivalentes - a.semanasEquivalentes);
     // === FIN SOBRECARGA ===
+
+    // === CONCENTRACIÓN DE RIESGO ===
+    const PESO_CRITICO = { 'Muy alto': 3, 'Alto': 2 };
+    const hoyStrRiesgo = new Date().toISOString().split('T')[0];
+
+    const cargaCriticaPorModelador = {};
+    state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador').forEach(p => {
+        cargaCriticaPorModelador[p.id] = { nombre: nombreFormateado(p), avatar: p.id, horasCriticas: 0, tareasCriticas: 0 };
+    });
+
+    state.tasksCache.filter(t => t.estado !== 'Cerrado' && PESO_CRITICO[t.importancia]).forEach(t => {
+        const asignados = new Set();
+        if (t.responsable_id) asignados.add(t.responsable_id);
+        (state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).forEach(r => asignados.add(r.usuario_id));
+        asignados.forEach(uid => {
+            if (!cargaCriticaPorModelador[uid]) return;
+            let dias = 0;
+            if (t.fecha_fin) {
+                const fin = new Date(t.fecha_fin + 'T00:00:00');
+                const hoyD = new Date(hoyStrRiesgo + 'T00:00:00');
+                dias = Math.max(0, Math.ceil((fin - hoyD) / 86400000));
+            }
+            cargaCriticaPorModelador[uid].horasCriticas += dias * 8 * PESO_CRITICO[t.importancia];
+            cargaCriticaPorModelador[uid].tareasCriticas += 1;
+        });
+    });
+
+    const totalHorasCriticas = Object.values(cargaCriticaPorModelador).reduce((s, m) => s + m.horasCriticas, 0);
+
+    const concentracionRiesgo = Object.values(cargaCriticaPorModelador).map(m => {
+        const pct = totalHorasCriticas > 0 ? (m.horasCriticas / totalHorasCriticas) * 100 : 0;
+        let nivel, color;
+        if (pct >= 40) { nivel = 'Crítico'; color = 'text-red-700'; }
+        else if (pct >= 25) { nivel = 'Alto'; color = 'text-amber-700'; }
+        else if (pct >= 10) { nivel = 'Medio'; color = 'text-sky-700'; }
+        else { nivel = 'Bajo'; color = 'text-slate-500'; }
+        return { ...m, pct, nivel, color };
+    }).sort((a, b) => b.horasCriticas - a.horasCriticas);
+
+    const concentracionTop1 = concentracionRiesgo[0]?.pct || 0;
+    const concentracionTop2 = (concentracionRiesgo[0]?.pct || 0) + (concentracionRiesgo[1]?.pct || 0);
+    // === FIN CONCENTRACIÓN DE RIESGO ===
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
@@ -308,6 +342,7 @@ export function renderRecursos(container) {
                     <tr>
                         <th class="p-3">Grupo</th>
                         <th class="p-3">Horas</th>
+                        <th class="p-3">% del total</th>
                         <th class="p-3">Cerradas</th>
                         <th class="p-3">Abiertas</th>
                         <th class="p-3">h / cerrada</th>
@@ -316,9 +351,18 @@ export function renderRecursos(container) {
                 <tbody class="divide-y divide-slate-100">
                     ${Object.entries(porGrupoTareas).sort((a, b) => b[1].horas - a[1].horas).map(([g, d]) => {
                         const ratio = d.cerradas > 0 ? (d.horas / d.cerradas).toFixed(1) : '—';
+                        const pct = totalHoras > 0 ? (d.horas / totalHoras) * 100 : 0;
                         return `<tr class="hover:bg-slate-50">
                             <td class="p-3 text-slate-700">${escapeHtml(g)}</td>
                             <td class="p-3 font-bold text-sky-700">${d.horas.toFixed(1)} h</td>
+                            <td class="p-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-sky-500" style="width: ${Math.min(pct, 100)}%"></div>
+                                    </div>
+                                    <span class="font-semibold text-slate-700">${pct.toFixed(1)}%</span>
+                                </div>
+                            </td>
                             <td class="p-3">${d.cerradas}</td>
                             <td class="p-3">${d.abiertas}</td>
                             <td class="p-3 font-semibold ${d.cerradas > 0 && d.horas / d.cerradas > 20 ? 'text-red-700' : 'text-slate-700'}">${ratio}</td>
@@ -362,6 +406,62 @@ export function renderRecursos(container) {
                     `).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>'}
                 </tbody>
             </table>
+        </div>
+
+        <div class="card overflow-x-auto mt-4">
+            <div class="p-4 pb-2">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                    <div>
+                        <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Concentración de Riesgo</h4>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Horas críticas (importancia Muy alto / Alto) por modelador. Dependencia operativa del equipo.</p>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="text-slate-500 dark:text-slate-400">Top 1: <b class="${concentracionTop1 >= 40 ? 'text-red-700' : concentracionTop1 >= 25 ? 'text-amber-700' : 'text-emerald-700'}">${concentracionTop1.toFixed(1)}%</b></span>
+                        <span class="text-slate-500 dark:text-slate-400">Top 2: <b class="${concentracionTop2 >= 70 ? 'text-red-700' : concentracionTop2 >= 50 ? 'text-amber-700' : 'text-emerald-700'}">${concentracionTop2.toFixed(1)}%</b></span>
+                    </div>
+                </div>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Modelador</th>
+                        <th class="p-3">Tareas críticas</th>
+                        <th class="p-3">Horas críticas</th>
+                        <th class="p-3">% del total crítico</th>
+                        <th class="p-3">Nivel de riesgo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    ${concentracionRiesgo.map(m => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                            <td class="p-3 flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(m.nombre)}</span>
+                            </td>
+                            <td class="p-3 text-slate-600 dark:text-slate-400">${m.tareasCriticas}</td>
+                            <td class="p-3 font-bold text-sky-700 dark:text-sky-400">${m.horasCriticas.toFixed(0)} h</td>
+                            <td class="p-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div class="h-full ${m.pct >= 40 ? 'bg-red-500' : m.pct >= 25 ? 'bg-amber-500' : m.pct >= 10 ? 'bg-sky-500' : 'bg-slate-400'}" style="width: ${Math.min(m.pct, 100)}%"></div>
+                                    </div>
+                                    <span class="font-bold ${m.color}">${m.pct.toFixed(1)}%</span>
+                                </div>
+                            </td>
+                            <td class="p-3 font-bold ${m.color}">${m.nivel}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="5" class="text-center py-4 text-slate-400">Sin carga crítica asignada</td></tr>'}
+                </tbody>
+            </table>
+            ${concentracionTop1 >= 40 ? `
+                <div class="p-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+                    <p class="text-[11px] text-red-800 dark:text-red-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Un solo modelador concentra más del 40% de la carga crítica. Riesgo de dependencia operativa.</p>
+                </div>
+            ` : concentracionTop2 >= 70 ? `
+                <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200 dark:border-amber-800">
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300"><i class="fa-solid fa-circle-exclamation mr-1"></i> Los dos modeladores principales concentran más del 70% de la carga crítica. Considera redistribuir.</p>
+                </div>
+            ` : ''}
         </div>
 
         <div class="card overflow-x-auto">
