@@ -604,6 +604,7 @@ window.toggleSort = toggleSort;
 window.toggleCol = toggleCol; 
 window.toggleProp = toggleProp; 
 window.toggleColMenu = toggleColMenu;
+window.duplicateTask = duplicateTask;
 window.initResize = initResize;
 
 window.toggleFilterDrawer = function() {
