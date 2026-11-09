@@ -116,9 +116,17 @@ export function renderKanban(container) {
                                     canDrag = true;
                                 }
 
+                                let canEditCard = false;
+                                if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
+                                    canEditCard = true;
+                                } else if (state.isModelador && participa && !esArchivada && t.estado_cde === 'WIP') {
+                                    canEditCard = true;
+                                }
+
                                 return `
                                 <div class="kb-card bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'opacity-70 cursor-not-allowed'}" 
                                      draggable="${canDrag}" 
+                                     ${canEditCard ? `ondblclick="window.editTask(${t.id})"` : ''}
                                      ondragstart="window.onDragStart(event, ${t.id})" 
                                      ondragend="window.onDragEnd(event)">
                                     <div class="flex justify-between items-start mb-2">
@@ -153,7 +161,6 @@ export function renderKanban(container) {
         </div>
     `;
 
-    // Drawer de filtros del Kanban
     if (!document.getElementById('kanban-filter-drawer')) {
         const drawerHtml = `
             <div id="kanban-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleKanbanFilterDrawer()"></div>
