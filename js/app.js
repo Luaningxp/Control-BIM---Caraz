@@ -4,7 +4,7 @@ import { renderDashboard } from './dashboard.js';
 import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
 import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop } from './kanban.js';
 import { renderEisenhower } from './eisenhower.js';
-import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa } from './config.js';
+import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa, openSubcontrataModal, closeSubcontrataModal, saveSubcontrata, deleteSubcontrata } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
 import { renderRecursos } from './recursos.js';
 import { renderGantt } from './gantt.js';
@@ -117,6 +117,7 @@ window.openCausaModal = openCausaModal; window.closeCausaModal = closeCausaModal
 window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
 window.fetchAll = fetchAll;
 window.duplicateTask = duplicateTask;
+window.openSubcontrataModal = openSubcontrataModal; window.closeSubcontrataModal = closeSubcontrataModal; window.saveSubcontrata = saveSubcontrata; window.deleteSubcontrata = deleteSubcontrata;
 window.guardarSnapshotSemanal = guardarSnapshotSemanal;
 
 window.addEventListener('DOMContentLoaded', async () => {
