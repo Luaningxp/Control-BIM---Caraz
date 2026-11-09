@@ -806,11 +806,12 @@ export function editTask(id) {
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
-    const subEl = document.getElementById('task-subcontrata');
-    if (subEl) subEl.value = t.subcontrata || '';
     
     const grSel = document.getElementById('task-grupo'); 
-    if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
+    if (grSel) { 
+        grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
+        grSel.value = t.grupo || ''; 
+    }
     
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) {
@@ -825,6 +826,12 @@ export function editTask(id) {
             return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
         }).join('');
         rsSel.value = t.responsable_id || '';
+    }
+    
+    const subSel = document.getElementById('task-subcontrata');
+    if (subSel) {
+        subSel.innerHTML = '<option value="">— Sin subcontrata —</option>' + (state.subcontratasCache || []).map(s => `<option value="${escapeHtml(s.nombre)}">${escapeHtml(s.nombre)}</option>`).join('');
+        subSel.value = t.subcontrata || '';
     }
     
     renderCustomProps(t.id);
@@ -875,8 +882,6 @@ export function duplicateTask(id) {
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = '';
     document.getElementById('task-nota').value = t.nota || '';
-    const subEl = document.getElementById('task-subcontrata');
-    if (subEl) subEl.value = t.subcontrata || '';
 
     const grSel = document.getElementById('task-grupo');
     if (grSel) {
@@ -897,6 +902,12 @@ export function duplicateTask(id) {
             return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
         }).join('');
         rsSel.value = t.responsable_id || '';
+    }
+
+    const subSel = document.getElementById('task-subcontrata');
+    if (subSel) {
+        subSel.innerHTML = '<option value="">— Sin subcontrata —</option>' + (state.subcontratasCache || []).map(s => `<option value="${escapeHtml(s.nombre)}">${escapeHtml(s.nombre)}</option>`).join('');
+        subSel.value = t.subcontrata || '';
     }
 
     renderCustomProps(null);
