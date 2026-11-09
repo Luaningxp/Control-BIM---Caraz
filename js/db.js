@@ -25,6 +25,7 @@ export const state = {
     snapshotsCache: [],
     descansosCache: [],
     feriadosCache: [],
+    subcontratasCache: [],
     trabajosExtraCache: [],
     currentTab: 'dashboard',
     cdeTargetId: null,
@@ -49,6 +50,7 @@ export async function fetchAll() {
             supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false }),
             supabaseClient.from('descansos').select('*'),
             supabaseClient.from('feriados').select('*'),
+            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
             supabaseClient.from('trabajos_extra').select('*')
         ]);
 
@@ -76,6 +78,7 @@ export async function fetchAll() {
         state.snapshotsCache = sn.data || [];
         state.descansosCache = de.data || [];
         state.feriadosCache = fe.data || [];
+        state.subcontratasCache = subRes.data || [];
         state.trabajosExtraCache = te.data || [];
 
     } catch (err) {
