@@ -351,38 +351,36 @@ function pintarBarrasPorEstado(tareas) {
 }
 
 function dibujarLineaHoyNativa() {
-    const container = document.getElementById('gantt-container');
-    if (!container) return;
+    const wrapper = document.getElementById('gantt-container');
+    if (!wrapper) return;
 
-    const oldLine = document.getElementById('today-red-line');
+    const scroller = wrapper.querySelector('.gantt-container') || wrapper;
+    if (!scroller) return;
+
+    const oldLine = scroller.querySelector('#today-red-line');
     if (oldLine) oldLine.remove();
 
-    // Buscar el elemento de la tarea "HOY" que dibujó Frappe
-    const todayElements = container.querySelectorAll('.bar-wrapper');
+    const todayElements = scroller.querySelectorAll('.bar-wrapper');
     let todayBar = null;
-
     todayElements.forEach(el => {
-        if (el.querySelector('.bar-label') && el.querySelector('.bar-label').textContent === 'HOY') {
-            todayBar = el;
-        }
+        const label = el.querySelector('.bar-label');
+        if (label && label.textContent.trim() === 'HOY') todayBar = el;
     });
-
     if (!todayBar) return;
 
-    // Obtener la posición exacta de esa barra
     const rectBar = todayBar.getBoundingClientRect();
-    const rectContainer = container.getBoundingClientRect();
-    
-    // Calcular la distancia desde la izquierda del contenedor
-    const leftPos = rectBar.left - rectContainer.left;
+    const rectScroller = scroller.getBoundingClientRect();
+    const leftPos = rectBar.left - rectScroller.left + scroller.scrollLeft;
 
-    // Crear la línea roja
+    if (!scroller.style.position || scroller.style.position === 'static') {
+        scroller.style.position = 'relative';
+    }
+
     const line = document.createElement('div');
     line.id = 'today-red-line';
-    
     line.style.cssText = `
         position: absolute;
-        top: 50px; /* Debajo del encabezado */
+        top: 50px;
         bottom: 0;
         left: ${leftPos}px;
         width: 2px;
@@ -390,7 +388,6 @@ function dibujarLineaHoyNativa() {
         z-index: 9999;
         pointer-events: none;
     `;
-    
     line.innerHTML = `
         <div style="
             position: absolute;
@@ -408,13 +405,8 @@ function dibujarLineaHoyNativa() {
         ">HOY</div>
     `;
 
-    // Hacer que el contenedor principal sea el punto de referencia
-    container.style.position = 'relative';
-    
-    // Inyectar la línea directamente en el contenedor principal
-    container.appendChild(line);
+    scroller.appendChild(line);
 }
-
 window.setGanttView = function(mode) {
     ganttState.viewMode = mode;
     if (ganttState.currentGantt) {
