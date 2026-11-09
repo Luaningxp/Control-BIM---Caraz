@@ -941,7 +941,7 @@ function aplicarBloqueoModelador() {
 
     const camposBloqueados = [
         'task-actividad', 'task-grupo', 'task-responsable',
-        'task-importancia', 'task-urgencia', 'task-estado',
+        'task-importancia', 'task-urgencia',
         'task-fecha-inicio', 'task-fecha-fin'
     ];
     camposBloqueados.forEach(id => {
@@ -966,10 +966,14 @@ function aplicarBloqueoModelador() {
         el.classList.toggle('opacity-60', soloModelador);
     });
 
-    ['task-fecha-cierre', 'task-nota'].forEach(id => {
+    ['task-fecha-cierre', 'task-nota', 'task-estado'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = false;
     });
+
+    const subSel = document.getElementById('task-subcontrata');
+    if (subSel) subSel.disabled = soloModelador;
+
     const planosSearch = document.getElementById('planos-search');
     if (planosSearch) planosSearch.disabled = false;
     document.querySelectorAll('#planos-chips button').forEach(b => {
@@ -1054,6 +1058,7 @@ export async function saveTask(e) {
     let payload;
     if (soloModelador && id) {
         payload = {
+            estado: estado,
             fecha_cierre: fechaCierre || null,
             nota: document.getElementById('task-nota').value
         };
