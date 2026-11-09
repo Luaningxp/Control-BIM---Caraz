@@ -128,7 +128,7 @@ export function renderDashboard(container) {
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                     <tr>
-                        <th class="p-3">Responsable</th>
+                        <th class="p-3">Responsable · Cargo</th>
                         <th class="p-3">Abiertas</th>
                         <th class="p-3">Vencidas</th>
                         <th class="p-3">% Venc.</th>
@@ -429,34 +429,59 @@ function renderCharts(inicioSemana, finSemana) {
 
 function renderPerfTable(inicioSemana, finSemana) {
     const map = {};
-    state.tasksCache.forEach(t => {
-        const r = t.responsable || 'Sin asignar';
-        if (!map[r]) map[r] = { a: 0, v: 0, c: 0, carga: 0, semanaTareas: 0, semanaCumplidas: 0 };
-        if (isCerrado(t)) {
-            map[r].c++;
-        } else {
-            map[r].a++;
-            if (semaforo(t) === 'Vencida') map[r].v++;
-            map[r].carga += WEIGHT[getCriticidad(t)] || 1;
+
+    const nombreDe = (t) => {
+        if (t.responsable_id) {
+            const p = state.perfilesCache.find(x => x.id === t.responsable_id);
+            if (p) return { nombre: nombreFormateado(p), cargo: p.cargo || '', id: p.id };
         }
-        
+        return { nombre: t.responsable || 'Sin asignar', cargo: '', id: null };
+    };
+
+    const esBimManager = (t) => {
+        if (!t.responsable_id) return false;
+        const p = state.perfilesCache.find(x => x.id === t.responsable_id);
+        if (!p) return false;
+        const cargo = (p.cargo || '').toLowerCase();
+        return cargo.includes('bim manager');
+    };
+
+    state.tasksCache.forEach(t => {
+        if (esBimManager(t)) return;
+
+        const info = nombreDe(t);
+        const key = info.id || info.nombre;
+        if (!map[key]) {
+            map[key] = { nombre: info.nombre, cargo: info.cargo, a: 0, v: 0, c: 0, carga: 0, semanaTareas: 0, semanaCumplidas: 0 };
+        }
+
+        if (isCerrado(t)) {
+            map[key].c++;
+        } else {
+            map[key].a++;
+            if (semaforo(t) === 'Vencida') map[key].v++;
+            map[key].carga += WEIGHT[getCriticidad(t)] || 1;
+        }
+
         if (t.fecha_fin) {
             const f = new Date(t.fecha_fin + 'T00:00:00');
             if (f >= inicioSemana && f <= finSemana) {
-                map[r].semanaTareas++;
+                map[key].semanaTareas++;
                 if (t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= finSemana) {
-                    map[r].semanaCumplidas++;
+                    map[key].semanaCumplidas++;
                 }
             }
         }
     });
 
-    document.getElementById('perf-table').innerHTML = Object.keys(map).sort().map(r => {
-        const m = map[r];
+    document.getElementById('perf-table').innerHTML = Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre)).map(m => {
         const pv = m.a ? Math.round((m.v / m.a) * 100) : 0;
         const ppc = m.semanaTareas > 0 ? Math.round((m.semanaCumplidas / m.semanaTareas) * 100) : null;
         return `<tr class="hover:bg-slate-50">
-            <td class="p-3 font-semibold">${escapeHtml(r)}</td>
+            <td class="p-3">
+                <div class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(m.cargo || 'Sin cargo')}</div>
+            </td>
             <td class="p-3">${m.a}</td>
             <td class="p-3 ${m.v ? 'text-red-600 font-bold' : ''}">${m.v}</td>
             <td class="p-3 ${pv >= 50 ? 'text-red-600' : pv > 0 ? 'text-amber-600' : ''}">${pv}%</td>
