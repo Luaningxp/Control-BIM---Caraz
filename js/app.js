@@ -1,7 +1,7 @@
 import { supabaseClient, state, fetchAll, guardarSnapshotSemanal } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
-import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
+import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
 import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop } from './kanban.js';
 import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa } from './config.js';
@@ -116,6 +116,7 @@ window.openPropModal = openPropModal; window.closePropModal = closePropModal; wi
 window.openCausaModal = openCausaModal; window.closeCausaModal = closeCausaModal; window.saveCausa = saveCausa; window.deleteCausa = deleteCausa;
 window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeManpowerModal; window.saveManpower = saveManpower;
 window.fetchAll = fetchAll;
+window.duplicateTask = duplicateTask;
 window.guardarSnapshotSemanal = guardarSnapshotSemanal;
 
 window.addEventListener('DOMContentLoaded', async () => {
