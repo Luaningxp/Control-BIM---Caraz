@@ -267,7 +267,7 @@ function renderCharts(inicioSemana, finSemana) {
         dataPPC.push(tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null);
     }
 
-        state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
+            state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
         type: 'line',
         data: {
             labels: labelsPPC,
@@ -281,7 +281,10 @@ function renderCharts(inicioSemana, finSemana) {
                     tension: 0.3,
                     spanGaps: true,
                     pointBackgroundColor: '#0d9488',
-                    pointRadius: 4,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
                     order: 1
                 },
                 {
@@ -300,6 +303,7 @@ function renderCharts(inicioSemana, finSemana) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            layout: { padding: { top: 10 } },
             plugins: {
                 legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
                 tooltip: {
@@ -312,7 +316,20 @@ function renderCharts(inicioSemana, finSemana) {
                 }
             },
             scales: { 
-                y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }, 
+                y: { 
+                    beginAtZero: true, 
+                    max: 105, 
+                    ticks: { 
+                        stepSize: 20,
+                        callback: v => v > 100 ? '' : v + '%'
+                    },
+                    grid: {
+                        color: (ctx) => {
+                            if (ctx.tick && ctx.tick.value === 80) return 'rgba(220,38,38,0.3)';
+                            return 'rgba(0,0,0,0.05)';
+                        }
+                    }
+                }, 
                 x: { grid: { display: false } } 
             }
         }
