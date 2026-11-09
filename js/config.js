@@ -24,7 +24,7 @@ export function renderConfig(container) {
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-4 gap-3">
+        <div class="grid lg:grid-cols-5 gap-3">
             <!-- 1. GRUPOS -->
             <div class="card p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -540,3 +540,36 @@ window.savePassword = async function(e) {
 };
 window.handleFileUpload = handleFileUpload;
 window.exportToExcel = exportToExcel;
+export function openSubcontrataModal(id) {
+    const s = id ? (state.subcontratasCache || []).find(x => x.id === id) : null;
+    document.getElementById('subcontrata-modal-title').innerText = s ? 'Editar subcontrata' : 'Nueva subcontrata';
+    document.getElementById('subcontrata-id').value = s?.id || '';
+    document.getElementById('subcontrata-nombre').value = s?.nombre || '';
+    document.getElementById('modal-subcontrata').classList.remove('hidden');
+    document.getElementById('modal-subcontrata').classList.add('flex');
+}
+export function closeSubcontrataModal() { document.getElementById('modal-subcontrata').classList.add('hidden'); document.getElementById('modal-subcontrata').classList.remove('flex'); }
+export async function saveSubcontrata(e) {
+    e.preventDefault();
+    const id = document.getElementById('subcontrata-id').value;
+    const payload = { nombre: document.getElementById('subcontrata-nombre').value.trim(), activo: true };
+    if (!payload.nombre) { toast('Nombre requerido'); return; }
+    const { error } = id
+        ? await supabaseClient.from('subcontratas').update(payload).eq('id', id)
+        : await supabaseClient.from('subcontratas').insert([payload]);
+    if (error) { toast('Error: ' + error.message); return; }
+    closeSubcontrataModal(); await fetchAll(); window.renderView(); toast('Subcontrata guardada');
+}
+export async function deleteSubcontrata(id) {
+    const s = (state.subcontratasCache || []).find(x => x.id === id);
+    if (!s) return;
+    const confirmado = await confirmDelete({ title: 'Eliminar subcontrata', message: `Vas a eliminar "${s.nombre}". Las tareas que la usaban quedarán sin subcontrata.` });
+    if (!confirmado) return;
+    const { error } = await supabaseClient.from('subcontratas').delete().eq('id', id);
+    if (error) { toast('Error: ' + error.message); return; }
+    await fetchAll(); window.renderView(); toast('Subcontrata eliminada');
+}
+window.openSubcontrataModal = openSubcontrataModal;
+window.closeSubcontrataModal = closeSubcontrataModal;
+window.saveSubcontrata = saveSubcontrata;
+window.deleteSubcontrata = deleteSubcontrata;
