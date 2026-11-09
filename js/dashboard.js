@@ -1,5 +1,5 @@
 import { state } from './db.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado } from './utils.js';
 
 export function renderDashboard(container) {
     if (window.guardarSnapshotSemanal) {
