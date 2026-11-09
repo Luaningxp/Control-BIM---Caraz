@@ -611,7 +611,10 @@ window.initResize = initResize;
 window.toggleFilterDrawer = function() {
     if (!document.getElementById('table-filter-drawer')) {
         const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-        const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
+        const respOpts = state.perfilesCache
+            .filter(esResponsableValido)
+            .map(p => ({ id: p.id, name: nombreFormateado(p) }))
+            .sort((a, b) => a.name.localeCompare(b.name));
         const recursosOpts = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
         const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
         const drawerHtml = `
