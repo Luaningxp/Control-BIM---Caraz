@@ -113,6 +113,29 @@ export function renderConfig(container) {
                     </table>
                 </div>
             </div>
+
+            <!-- 5. SUBCONTRATAS -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Subcontratas</h3>
+                    <button onclick="window.openSubcontrataModal()" class="px-2 py-1 bg-sky-600 text-white text-xs rounded hover:bg-sky-700">+ Añadir</button>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="w-full text-left text-xs">
+                        <tbody class="divide-y divide-slate-100">
+                            ${(state.subcontratasCache || []).map(s => `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="py-2">${escapeHtml(s.nombre)}</td>
+                                    <td class="py-2 text-right">
+                                        <button onclick="window.openSubcontrataModal(${s.id})" class="text-sky-600 mr-2 hover:text-sky-800"><i class="fa-solid fa-pen"></i></button>
+                                        <button onclick="window.deleteSubcontrata(${s.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin subcontratas</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         ${renderModales()}
@@ -275,7 +298,6 @@ window.handleFileUpload = (e) => {
     e.target.value = ''; 
 };
 
-// --- RENDERIZADO DE MODALES ---
 function renderModales() {
     return `
         <div id="modal-grupo" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
@@ -361,6 +383,20 @@ function renderModales() {
                     <div><label class="block font-semibold text-slate-600 mb-1">Nombre *</label><input type="text" id="causa-nombre" required class="inp"></div>
                     <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                         <button type="button" onclick="window.closeCausaModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                        <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="modal-subcontrata" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800" id="subcontrata-modal-title">Nueva subcontrata</h3>
+                <form onsubmit="window.saveSubcontrata(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="subcontrata-id">
+                    <div><label class="block font-semibold text-slate-600 mb-1">Nombre *</label><input type="text" id="subcontrata-nombre" required class="inp" placeholder="Ej: MEP Ingenieros S.A.C."></div>
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" onclick="window.closeSubcontrataModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
                         <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
                     </div>
                 </form>
