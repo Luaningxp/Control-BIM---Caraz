@@ -487,7 +487,10 @@ function stopResize(e) {
 export function renderTabla(container) {
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreResponsable({ responsable_id: p.id }, state.perfilesCache) }));
+            const respOpts = state.perfilesCache
+            .filter(esResponsableValido)
+            .map(p => ({ id: p.id, name: nombreFormateado(p) }))
+            .sort((a, b) => a.name.localeCompare(b.name));
     const recursosOpts = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
@@ -722,13 +725,19 @@ window.clearTableFilters = function() {
     window.renderView();
 };
 
+function esResponsableValido(p) {
+    if (!p) return false;
+    const cargo = (p.cargo || '').toLowerCase();
+    return cargo.includes('supervisor') || cargo.includes('coordinador') || cargo.includes('bim manager');
+}
+
 // --- FUNCIONES DE LOS MODALES ---
 
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return;
     document.getElementById('modal-title').innerText = "Nueva Actividad";
     
-    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
+    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota','task-subcontrata'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -743,7 +752,10 @@ export function openModal() {
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) {
         const { carga } = calcularCargaModeladores();
-        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => {
+        const responsables = state.perfilesCache
+            .filter(esResponsableValido)
+            .sort((a, b) => nombreFormateado(a).localeCompare(nombreFormateado(b)));
+        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + responsables.map(p => {
             const info = carga[p.id];
             const sem = info ? `${SEMAFORO[info.color].emoji} ` : '';
             const extra = info ? ` — ${textoCargaCorto(info)}` : '';
@@ -783,6 +795,8 @@ export function editTask(id) {
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
+    const subEl = document.getElementById('task-subcontrata');
+    if (subEl) subEl.value = t.subcontrata || '';
     
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) { grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); grSel.value = t.grupo || ''; }
@@ -790,7 +804,10 @@ export function editTask(id) {
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) {
         const { carga } = calcularCargaModeladores();
-        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + state.perfilesCache.map(p => {
+        const responsables = state.perfilesCache
+            .filter(esResponsableValido)
+            .sort((a, b) => nombreFormateado(a).localeCompare(nombreFormateado(b)));
+        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + responsables.map(p => {
             const info = carga[p.id];
             const sem = info ? `${SEMAFORO[info.color].emoji} ` : '';
             const extra = info ? ` — ${textoCargaCorto(info)}` : '';
@@ -805,7 +822,7 @@ export function editTask(id) {
     inicializarBuscadorRecursos();
     inicializarBuscadorPlanos();
 
-        const estaRetrasada = t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin;
+    const estaRetrasada = t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin;
     const causasContainer = document.getElementById('causas-container');
     if (causasContainer) causasContainer.classList.toggle('hidden', !estaRetrasada);
 
@@ -817,6 +834,79 @@ export function editTask(id) {
     }
 
     inicializarBuscadorCausas();
+
+    aplicarBloqueoModelador();
+
+    document.getElementById('modal-task').classList.remove('hidden');
+    document.getElementById('modal-task').classList.add('flex');
+}
+
+export function duplicateTask(id) {
+    const t = state.tasksCache.find(x => x.id === id);
+    if (!t) return;
+    if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) {
+        toast('Solo admin, coordinador o supervisor pueden duplicar actividades.');
+        return;
+    }
+
+    document.getElementById('modal-title').innerText = "Duplicar Actividad";
+    document.getElementById('task-id').value = '';
+    document.getElementById('task-actividad').value = `${t.actividad} (copia)`;
+
+    const impEl = document.getElementById('task-importancia');
+    if (impEl) impEl.value = t.importancia || 'Medio';
+    const urgEl = document.getElementById('task-urgencia');
+    if (urgEl) urgEl.value = t.urgencia || 'Medio';
+    const iniEl = document.getElementById('task-fecha-inicio');
+    if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
+
+    document.getElementById('task-estado').value = 'No iniciado';
+    document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
+    document.getElementById('task-fecha-cierre').value = '';
+    document.getElementById('task-nota').value = t.nota || '';
+    const subEl = document.getElementById('task-subcontrata');
+    if (subEl) subEl.value = t.subcontrata || '';
+
+    const grSel = document.getElementById('task-grupo');
+    if (grSel) {
+        grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g => g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+        grSel.value = t.grupo || '';
+    }
+
+    const rsSel = document.getElementById('task-responsable');
+    if (rsSel) {
+        const { carga } = calcularCargaModeladores();
+        const responsables = state.perfilesCache
+            .filter(esResponsableValido)
+            .sort((a, b) => nombreFormateado(a).localeCompare(nombreFormateado(b)));
+        rsSel.innerHTML = '<option value="">— Sin asignar —</option>' + responsables.map(p => {
+            const info = carga[p.id];
+            const sem = info ? `${SEMAFORO[info.color].emoji} ` : '';
+            const extra = info ? ` — ${textoCargaCorto(info)}` : '';
+            return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
+        }).join('');
+        rsSel.value = t.responsable_id || '';
+    }
+
+    renderCustomProps(null);
+
+    recursosSeleccionados.clear();
+    (state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).forEach(r => recursosSeleccionados.add(r.usuario_id));
+    actualizarChipsUI();
+
+    planosSeleccionados.clear();
+    (state.actividadPlanosCache || []).filter(ap => Number(ap.pendiente_id) === Number(t.id)).forEach(ap => planosSeleccionados.add(Number(ap.plano_id)));
+    actualizarPlanosUI();
+
+    causasSeleccionadas.clear();
+    actualizarCausasUI();
+
+    inicializarBuscadorRecursos();
+    inicializarBuscadorPlanos();
+    inicializarBuscadorCausas();
+
+    const causasContainer = document.getElementById('causas-container');
+    if (causasContainer) causasContainer.classList.add('hidden');
 
     aplicarBloqueoModelador();
 
@@ -957,7 +1047,8 @@ export async function saveTask(e) {
             fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
             fecha_fin: fechaFinProgramada || null,
             fecha_cierre: fechaCierre || null,
-            nota: document.getElementById('task-nota').value
+            nota: document.getElementById('task-nota').value,
+            subcontrata: document.getElementById('task-subcontrata')?.value || null
         };
     }
     let taskId = id;
