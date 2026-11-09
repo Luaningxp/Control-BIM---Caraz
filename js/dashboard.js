@@ -315,17 +315,18 @@ function renderCharts(inicioSemana, finSemana) {
                     }
                 }
             },
-            scales: { 
+                        scales: { 
                 y: { 
                     beginAtZero: true, 
-                    max: 105, 
+                    max: 110, 
                     ticks: { 
-                        stepSize: 20,
+                        stepSize: 10,
                         callback: v => v > 100 ? '' : v + '%'
                     },
                     grid: {
                         color: (ctx) => {
-                            if (ctx.tick && ctx.tick.value === 80) return 'rgba(220,38,38,0.3)';
+                            if (ctx.tick && ctx.tick.value === 80) return 'rgba(220,38,38,0.4)';
+                            if (ctx.tick && ctx.tick.value > 100) return 'rgba(0,0,0,0.02)';
                             return 'rgba(0,0,0,0.05)';
                         }
                     }
