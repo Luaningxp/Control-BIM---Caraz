@@ -340,15 +340,6 @@ tr:hover td.sticky {
     stroke: #94a3b8 !important;
 }
 
-.dark .gantt .bar {
-    fill: #0284c7 !important;
-    stroke: #1e293b !important;
-}
-
-.dark .gantt .bar-progress {
-    fill: #0ea5e9 !important;
-}
-
 .dark .gantt .bar-label {
     fill: #f1f5f9 !important;
     font-weight: 600 !important;
@@ -371,18 +362,6 @@ tr:hover td.sticky {
     background: #1e293b !important;
     border-color: #334155 !important;
     color: #f1f5f9 !important;
-}
-
-.dark .gantt .handle {
-    fill: #0284c7 !important;
-}
-
-.dark .gantt .bar-wrapper:hover .bar {
-    fill: #0ea5e9 !important;
-}
-
-.dark .gantt .bar-wrapper.active .bar {
-    fill: #0ea5e9 !important;
 }
 
 .dark .gantt .side-header {
