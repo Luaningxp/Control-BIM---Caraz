@@ -742,7 +742,7 @@ export function openModal() {
     if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return;
     document.getElementById('modal-title').innerText = "Nueva Actividad";
     
-    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota','task-subcontrata'].forEach(id => {
+    ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -750,6 +750,7 @@ export function openModal() {
     const impEl = document.getElementById('task-importancia'); if (impEl) impEl.value = 'Medio';
     const urgEl = document.getElementById('task-urgencia'); if (urgEl) urgEl.value = 'Medio'; 
     const estEl = document.getElementById('task-estado'); if (estEl) estEl.value = 'No iniciado';
+    const subSel = document.getElementById('task-subcontrata'); if (subSel) subSel.value = '';
     
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
@@ -766,6 +767,11 @@ export function openModal() {
             const extra = info ? ` — ${textoCargaCorto(info)}` : '';
             return `<option value="${p.id}">${sem}${escapeHtml(nombreFormateado(p))}${p.cargo ? ' · ' + escapeHtml(p.cargo) : ''}${extra}</option>`;
         }).join('');
+    }
+    
+    const subSelect = document.getElementById('task-subcontrata');
+    if (subSelect) {
+        subSelect.innerHTML = '<option value="">— Sin subcontrata —</option>' + (state.subcontratasCache || []).map(s => `<option value="${escapeHtml(s.nombre)}">${escapeHtml(s.nombre)}</option>`).join('');
     }
     
     renderCustomProps(null);
