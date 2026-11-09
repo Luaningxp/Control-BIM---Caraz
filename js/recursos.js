@@ -530,7 +530,9 @@ export function renderRecursos(container) {
         type: 'line', data: serieNivel, options: optsLinea
     });
 
-    const gruposLabels = Object.keys(porGrupo);
+        const gruposLabels = Object.keys(porGrupo);
+    const totalGrupos = gruposLabels.reduce((s, g) => s + porGrupo[g], 0);
+
     state.charts.grupos = new Chart(document.getElementById('chart-grupos'), {
         type: 'doughnut',
         data: {
@@ -541,6 +543,42 @@ export function renderRecursos(container) {
                 borderWidth: 2, borderColor: '#fff'
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 10,
+                        font: { size: 10 },
+                        generateLabels: (chart) => {
+                            const data = chart.data;
+                            return data.labels.map((label, i) => {
+                                const valor = parseFloat(data.datasets[0].data[i]);
+                                const pct = totalGrupos > 0 ? ((valor / totalGrupos) * 100).toFixed(1) : '0.0';
+                                return {
+                                    text: `${label} · ${pct}%`,
+                                    fillStyle: data.datasets[0].backgroundColor[i],
+                                    strokeStyle: data.datasets[0].backgroundColor[i],
+                                    lineWidth: 0,
+                                    hidden: false,
+                                    index: i
+                                };
+                            });
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const valor = parseFloat(ctx.parsed);
+                            const pct = totalGrupos > 0 ? ((valor / totalGrupos) * 100).toFixed(1) : '0.0';
+                            return `${ctx.label}: ${valor.toFixed(1)} h (${pct}%)`;
+                        }
+                    }
+                }
+            }
+        }
     });
 }
