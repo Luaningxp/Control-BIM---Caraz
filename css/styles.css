@@ -374,3 +374,28 @@ tr:hover td.sticky {
     background: #0284c7 !important;
     color: #fff !important;
 }
+/* =========================================
+   INPUT DATE · MODO OSCURO
+   ========================================= */
+.dark input[type="date"] {
+    color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.8;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
