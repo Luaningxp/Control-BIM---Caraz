@@ -35,7 +35,7 @@ export const state = {
 
 export async function fetchAll() {
     try {
-        const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te] = await Promise.all([
+                const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
@@ -50,8 +50,8 @@ export async function fetchAll() {
             supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false }),
             supabaseClient.from('descansos').select('*'),
             supabaseClient.from('feriados').select('*'),
-            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
-            supabaseClient.from('trabajos_extra').select('*')
+            supabaseClient.from('trabajos_extra').select('*'),
+            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre')
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
@@ -78,7 +78,7 @@ export async function fetchAll() {
         state.snapshotsCache = sn.data || [];
         state.descansosCache = de.data || [];
         state.feriadosCache = fe.data || [];
-        state.subcontratasCache = subRes.data || [];
+        state.subcontratasCache = sub.data || [];
         state.trabajosExtraCache = te.data || [];
 
     } catch (err) {
