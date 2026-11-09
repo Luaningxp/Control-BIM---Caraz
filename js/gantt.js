@@ -134,7 +134,7 @@ export function renderGantt(container) {
                     <p class="text-[11px] text-slate-400">Mostrando ${tareas.length} de ${state.tasksCache.length}</p>
                 </div>
 
-                <div id="gantt-wrapper" class="relative w-full">
+                <div id="gantt-wrapper" class="relative w-full z-0">
                     <div id="gantt-container" class="relative"></div>
                 </div>
             </div>
@@ -385,7 +385,7 @@ function dibujarLineaHoyNativa() {
         left: ${leftPos}px;
         width: 2px;
         background-color: #ef4444;
-        z-index: 9999;
+        z-index: 5;
         pointer-events: none;
     `;
     line.innerHTML = `
