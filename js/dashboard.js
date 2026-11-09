@@ -267,27 +267,49 @@ function renderCharts(inicioSemana, finSemana) {
         dataPPC.push(tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null);
     }
 
-    state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
+        state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
         type: 'line',
         data: {
             labels: labelsPPC,
-            datasets: [{
-                label: 'PPC %',
-                data: dataPPC,
-                borderColor: '#0d9488',
-                backgroundColor: 'rgba(13,148,136,.1)',
-                fill: true,
-                tension: 0.3,
-                spanGaps: true,
-                pointBackgroundColor: '#0d9488',
-                pointRadius: 4
-            }]
+            datasets: [
+                {
+                    label: 'PPC %',
+                    data: dataPPC,
+                    borderColor: '#0d9488',
+                    backgroundColor: 'rgba(13,148,136,.1)',
+                    fill: true,
+                    tension: 0.3,
+                    spanGaps: true,
+                    pointBackgroundColor: '#0d9488',
+                    pointRadius: 4,
+                    order: 1
+                },
+                {
+                    label: 'Mínimo 80%',
+                    data: labelsPPC.map(() => 80),
+                    borderColor: '#dc2626',
+                    borderDash: [6, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 2
+                }
+            ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: c => c.parsed.y !== null ? c.parsed.y + '%' : 'Sin datos' } }
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    callbacks: {
+                        label: c => {
+                            if (c.datasetIndex === 1) return 'Mínimo: 80%';
+                            return c.parsed.y !== null ? `PPC: ${c.parsed.y}%` : 'Sin datos';
+                        }
+                    }
+                }
             },
             scales: { 
                 y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }, 
@@ -296,9 +318,10 @@ function renderCharts(inicioSemana, finSemana) {
         }
     });
 
-    const estados = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+        const estados = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
     const counts = estados.map(e => state.tasksCache.filter(t => t.estado === e).length);
     const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
+    const totalEstados = counts.reduce((s, v) => s + v, 0);
 
     state.charts.estados = new Chart(document.getElementById('chart-estados'), {
         type: 'doughnut',
@@ -308,17 +331,29 @@ function renderCharts(inicioSemana, finSemana) {
         },
         options: { 
             responsive: true, maintainAspectRatio: false, 
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } 
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const v = ctx.parsed;
+                            const pct = totalEstados > 0 ? ((v / totalEstados) * 100).toFixed(1) : '0.0';
+                            return `${ctx.label}: ${v} (${pct}%)`;
+                        }
+                    }
+                }
+            }
         }
     });
 
-    const cargaMap = {};
+        const cargaMap = {};
     state.tasksCache.filter(t => !isCerrado(t)).forEach(t => {
         const resp = t.responsable || 'Sin asignar';
         cargaMap[resp] = (cargaMap[resp] || 0) + 1;
     });
     const respLabels = Object.keys(cargaMap).sort();
     const respValues = respLabels.map(r => cargaMap[r]);
+    const totalCarga = respValues.reduce((s, v) => s + v, 0);
 
     state.charts.carga = new Chart(document.getElementById('chart-carga'), {
         type: 'bar',
@@ -328,14 +363,26 @@ function renderCharts(inicioSemana, finSemana) {
         },
         options: { 
             responsive: true, maintainAspectRatio: false, 
-            plugins: { legend: { display: false } }, 
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const v = ctx.parsed.y;
+                            const pct = totalCarga > 0 ? ((v / totalCarga) * 100).toFixed(1) : '0.0';
+                            return `${v} tarea${v === 1 ? '' : 's'} (${pct}%)`;
+                        }
+                    }
+                }
+            }, 
             scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
         }
     });
 
-    const vencidas = state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Vencida');
+        const vencidas = state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Vencida');
     const critLabels = ['Muy alto', 'Alto', 'Medio', 'Bajo'];
     const critValues = critLabels.map(c => vencidas.filter(t => getCriticidad(t) === c).length);
+    const totalCrit = critValues.reduce((s, v) => s + v, 0);
 
     state.charts.vencidas = new Chart(document.getElementById('chart-vencidas'), {
         type: 'bar',
@@ -345,7 +392,18 @@ function renderCharts(inicioSemana, finSemana) {
         },
         options: { 
             responsive: true, maintainAspectRatio: false, 
-            plugins: { legend: { display: false } }, 
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const v = ctx.parsed.y;
+                            const pct = totalCrit > 0 ? ((v / totalCrit) * 100).toFixed(1) : '0.0';
+                            return `${v} vencida${v === 1 ? '' : 's'} (${pct}%)`;
+                        }
+                    }
+                }
+            }, 
             scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
         }
     });
