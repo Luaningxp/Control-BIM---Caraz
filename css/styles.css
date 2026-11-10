@@ -375,15 +375,15 @@ tr:hover td.sticky {
     color: #fff !important;
 }
 /* =========================================
-   INPUT DATE · MODO OSCURO
+   INPUT DATE · ÍCONO CALENDARIO
    ========================================= */
-.dark input[type="date"] {
-    color-scheme: dark;
+input[type="date"] {
+    color-scheme: light;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
-    opacity: 0.6;
+    opacity: 0.7;
     transition: opacity 0.2s;
 }
 
@@ -391,11 +391,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
 }
 
+/* Modo oscuro: ícono en celeste claro, legible sobre azul y gris oscuro */
+.dark input[type="date"] {
+    color-scheme: dark;
+}
+
 .dark input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.8;
+    filter: brightness(0) saturate(100%) invert(78%) sepia(18%) saturate(1200%) hue-rotate(170deg) brightness(95%) contrast(90%);
+    opacity: 0.9;
 }
 
 .dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
+    filter: brightness(0) saturate(100%) invert(90%) sepia(10%) saturate(800%) hue-rotate(170deg) brightness(105%) contrast(95%);
 }
