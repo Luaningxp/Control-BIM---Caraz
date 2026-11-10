@@ -329,6 +329,12 @@ export async function onDrop(e, nuevoEstado) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || t.estado === nuevoEstado) return;
 
+    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+    if (soloModelador && nuevoEstado === 'Cerrado') {
+        toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
+        return;
+    }
+
     // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
         toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
