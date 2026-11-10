@@ -374,7 +374,8 @@ let tableState = {
         estadosOcultos: [], 
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         cierreDesde: '', cierreHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
+        soloAsignadosAMi: true
     },
     colWidths: {
         codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130, planos: 130,
@@ -742,7 +743,7 @@ window.clearTableFilters = function() {
         estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         cierreDesde: '', cierreHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false, soloAsignadosAMi: true
     };
     window.renderView();
 };
