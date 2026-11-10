@@ -36,7 +36,7 @@ export const state = {
 
 export async function fetchAll() {
     try {
-                const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub] = await Promise.all([
+        const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
@@ -50,10 +50,10 @@ export async function fetchAll() {
             supabaseClient.from('tarea_causas').select('*'),
             supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false }),
             supabaseClient.from('descansos').select('*'),
-            supabaseClient.from('descansos_medicos').select('*'),
             supabaseClient.from('feriados').select('*'),
             supabaseClient.from('trabajos_extra').select('*'),
-            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre')
+            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
+            supabaseClient.from('descansos_medicos').select('*')
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
