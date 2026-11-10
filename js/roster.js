@@ -479,17 +479,18 @@ export function tipoDia(usuarioId, fechaStr) {
 
 window.openDescansoMedicoModal = function(id, fechaPredefinida) {
     if (!state.isAdmin) return;
-    asegurarModales(); // Reutiliza la función que ya tienes
+    asegurarModales();
     const d = id ? (state.descansosMedicosCache || []).find(x => x.id === id) : null;
-    // Usamos el mismo modal de descanso pero cambiando el ID del form y título
+    
     document.getElementById('descanso-title').innerText = d ? 'Editar descanso médico' : 'Nuevo descanso médico';
     document.getElementById('descanso-id').value = d?.id || '';
     llenarUsuarios('descanso-usuario', d?.usuario_id);
     document.getElementById('descanso-inicio').value = d?.fecha_inicio || fechaPredefinida || '';
     document.getElementById('descanso-fin').value = d?.fecha_fin || '';
     document.getElementById('descanso-motivo').value = d?.motivo || '';
-    
-    // Cambiamos el evento submit temporalmente o usamos una bandera
+
+    document.getElementById('descanso-btn-eliminar').classList.toggle('hidden', !d);
+
     window._isDM = true; 
     document.getElementById('modal-descanso').classList.remove('hidden');
     document.getElementById('modal-descanso').classList.add('flex');
