@@ -52,7 +52,8 @@ export function renderMiTrabajo(container) {
     );
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
         const ayerEraLaborable = esDiaLaborable(state.currentUser.id, ayerStr);
-    const noLlenoAyer = ayerEraLaborable && porcentajeAyer < 100;
+    const esModeladorPuro = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+    const noLlenoAyer = esModeladorPuro && porcentajeAyer < 100;
 
     container.innerHTML = `
         ${noLlenoAyer ? `
@@ -145,7 +146,10 @@ export function renderManpower(container) {
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
 
-    const filtrosActivos = Object.values(manpowerState).filter(v => v !== '').length;
+    const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
+        if (['search', 'soloRegistradosPorMi'].includes(k)) return false;
+        return v !== '';
+    }).length;
     const totalHoras = registros.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
 
     container.innerHTML = `
