@@ -17,7 +17,8 @@ let kanbanState = {
     finHasta: '',
     soloVencidas: false, 
     soloPorVencer: false, 
-    soloSinFecha: false
+    soloSinFecha: false,
+    soloAsignadosAMi: true
 };
 
 export function renderKanban(container) {
@@ -57,9 +58,15 @@ export function renderKanban(container) {
         const matchVencidas = !kanbanState.soloVencidas || semaforo(t) === 'Vencida';
         const matchPorVencer = !kanbanState.soloPorVencer || semaforo(t) === 'Por vencer';
         const matchSinFecha = !kanbanState.soloSinFecha || semaforo(t) === 'Sin fecha';
+        const matchAsignados = !kanbanState.soloAsignadosAMi || (() => {
+        const uid = state.currentUser?.id;
+            if (!uid) return false;
+            if (t.responsable_id === uid) return true;
+            return state.actividadRecursosCache.some(r => r.pendiente_id === t.id && r.usuario_id === uid);
+        })();
         return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
                matchIniDesde && matchIniHasta && matchFinDesde && matchFinHasta &&
-               matchVencidas && matchPorVencer && matchSinFecha;
+               matchVencidas && matchPorVencer && matchSinFecha && matchAsignados;
     });
 
     container.innerHTML = `
@@ -72,6 +79,9 @@ export function renderKanban(container) {
                 <button onclick="window.toggleKanbanFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
+                <button onclick="window.toggleKanbanSoloAsignadosAMi()" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${kanbanState.soloAsignadosAMi ? 'bg-sky-600 text-white' : 'border border-slate-300 text-slate-600 hover:bg-slate-50'}">
+                    <i class="fa-solid fa-user-check"></i> Asignados a mí
                 </button>
             </div>
             <div class="flex items-center gap-2">
@@ -283,13 +293,17 @@ window.applyKanbanFilter = function(key, value) {
     kanbanState[key] = value;
     window.renderView();
 };
-
+window.toggleKanbanSoloAsignadosAMi = function() {
+    kanbanState.soloAsignadosAMi = !kanbanState.soloAsignadosAMi;
+    window.renderView();
+};
 window.clearKanbanFilters = function() {
     kanbanState = { 
         search: '', filterGrupo: '', filterResp: '', filterRecursos: '',
         estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
+        soloAsignadosAMi: true
     };
     window.renderView();
 };
