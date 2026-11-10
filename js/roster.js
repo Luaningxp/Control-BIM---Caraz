@@ -70,7 +70,7 @@ export function renderRoster(container) {
 
     const resumen = {};
     usuarios.forEach(u => {
-        resumen[u.id] = { T: 0, TE: 0, DO: 0, DE: 0, FE: 0 };
+        resumen[u.id] = { T: 0, TE: 0, DO: 0, DE: 0, DM: 0, FE: 0 };
     });
     usuarios.forEach(u => {
         fechas.forEach(f => {
@@ -186,7 +186,7 @@ export function renderRoster(container) {
                         ${usuarios.map(u => {
                             const r = resumen[u.id];
                             const laborables = r.T + r.TE;
-                            const noLaborables = r.DO + r.DE + r.FE;
+                            const noLaborables = r.DO + r.DE + r.FE + r.DM;
                             return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                 <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(nombreFormateado(u))}</td>
                                 <td class="p-3 text-center text-emerald-700 dark:text-emerald-400 font-bold">${r.T}</td>
@@ -337,21 +337,47 @@ window.saveDescanso = async function(e) {
         fecha_fin: document.getElementById('descanso-fin').value,
         motivo: document.getElementById('descanso-motivo').value || null
     };
-    if (payload.fecha_fin < payload.fecha_inicio) { toast('La fecha fin no puede ser anterior al inicio'); return; }
+    
+    if (payload.fecha_fin < payload.fecha_inicio) { 
+        toast('La fecha fin no puede ser anterior al inicio'); 
+        return; 
+    }
+
+    // Evaluamos si es descanso médico o normal
+    const tabla = window._isDM ? 'descansos_medicos' : 'descansos';
+    const nombre = window._isDM ? 'Descanso médico' : 'Descanso';
+
     const { error } = id
-        ? await supabaseClient.from('descansos').update(payload).eq('id', id)
-        : await supabaseClient.from('descansos').insert([payload]);
+        ? await supabaseClient.from(tabla).update(payload).eq('id', id)
+        : await supabaseClient.from(tabla).insert([payload]);
+        
     if (error) { toast('Error: ' + error.message); return; }
-    window.closeDescansoModal(); await fetchAll(); window.renderView(); toast('Descanso guardado');
+    
+    window._isDM = false; // Reseteamos la bandera
+    window.closeDescansoModal(); 
+    await fetchAll(); 
+    window.renderView(); 
+    toast(nombre + ' guardado');
 };
+
 window.deleteDescansoActual = async function() {
     const id = document.getElementById('descanso-id').value;
     if (!id) return;
-    const ok = await confirmDelete({ title: 'Eliminar descanso', message: 'Se eliminará este período de descanso. Los días volverán a su clasificación automática.' });
+
+    const tabla = window._isDM ? 'descansos_medicos' : 'descansos';
+    const nombre = window._isDM ? 'descanso médico' : 'descanso';
+
+    const ok = await confirmDelete({ title: 'Eliminar ' + nombre, message: 'Se eliminará este período. Los días volverán a su clasificación automática.' });
     if (!ok) return;
-    const { error } = await supabaseClient.from('descansos').delete().eq('id', id);
+    
+    const { error } = await supabaseClient.from(tabla).delete().eq('id', id);
     if (error) { toast('Error: ' + error.message); return; }
-    window.closeDescansoModal(); await fetchAll(); window.renderView(); toast('Descanso eliminado');
+    
+    window._isDM = false; // Reseteamos la bandera
+    window.closeDescansoModal(); 
+    await fetchAll(); 
+    window.renderView(); 
+    toast(nombre.charAt(0).toUpperCase() + nombre.slice(1) + ' eliminado');
 };
 
 window.openFeriadoModal = function(id, fechaPredefinida) {
