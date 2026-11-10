@@ -486,10 +486,19 @@ window.clearManpowerFilters = function() {
         filterGrupo: '', 
         iniDesde: '', 
         iniHasta: '',
-        soloRegistradosPorMi: true // <--- Añadir aquí
+        soloRegistradosPorMi: true
     };
+
+    // ▼ Añadir esta línea ▼
+    const drawer = document.getElementById('manpower-filter-drawer');
+    if (drawer) drawer.remove();
+    const overlay = document.getElementById('manpower-filter-drawer-overlay');
+    if (overlay) overlay.remove();
+    // ▲ Añadir esta línea ▲
+
     window.renderView();
 };
+
 window.toggleManpowerSoloMios = function() {
     manpowerState.soloRegistradosPorMi = !manpowerState.soloRegistradosPorMi;
     window.renderView();
