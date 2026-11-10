@@ -305,9 +305,16 @@ window.clearKanbanFilters = function() {
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
         soloAsignadosAMi: true
     };
+
+    // ▼ Añadir esta línea ▼
+    const drawer = document.getElementById('kanban-filter-drawer');
+    if (drawer) drawer.remove();
+    const overlay = document.getElementById('kanban-filter-drawer-overlay');
+    if (overlay) overlay.remove();
+    // ▲ Añadir esta línea ▲
+
     window.renderView();
 };
-
 export function onDragStart(e, id) {
     if (e.currentTarget.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
     state.dragId = id;
