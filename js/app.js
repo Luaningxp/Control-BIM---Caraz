@@ -71,15 +71,13 @@ async function initApp(user) {
         document.getElementById('tab-config-btn').classList.remove('hidden');
     }
     
-    if (!state.isAdmin && !state.isCoordinador) {
-        document.querySelector('[data-tab="mitrabajo"]').classList.remove('hidden');
-    }
+    document.querySelector('[data-tab="mitrabajo"]').classList.remove('hidden');
     if (!state.isAdmin) {
         document.getElementById('tab-config-btn').classList.add('hidden');
     }
 
     await fetchAll();
-    window.switchTab(state.isAdmin || state.isCoordinador ? 'dashboard' : 'mitrabajo');
+    window.switchTab
 }
 
 window.switchTab = function(tab) {
