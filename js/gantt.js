@@ -457,6 +457,14 @@ window.clearGanttFilters = function() {
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
         viewMode: ganttState.viewMode, currentGantt: ganttState.currentGantt
     };
+
+    // ▼ Añadir esta línea ▼
+    const drawer = document.getElementById('gantt-filter-drawer');
+    if (drawer) drawer.remove();
+    const overlay = document.getElementById('gantt-filter-drawer-overlay');
+    if (overlay) overlay.remove();
+    // ▲ Añadir esta línea ▲
+
     window.renderView();
 };
 function rangoOcupacion() {
