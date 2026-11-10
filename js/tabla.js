@@ -399,6 +399,13 @@ export function canEdit(t) {
 export function canDelete() { return state.isAdmin; }
 export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 
+function esMia(t) {
+    const uid = state.currentUser?.id;
+    if (!uid) return false;
+    if (t.responsable_id === uid) return true;
+    return (state.actividadRecursosCache || []).some(r => r.pendiente_id === t.id && r.usuario_id === uid);
+}
+
 function getProcessedTasks() {
     let result = [...state.tasksCache];
     if (tableState.filters.search) {
@@ -424,6 +431,9 @@ function getProcessedTasks() {
     if (tableState.filters.cierreHasta) result = result.filter(t => t.fecha_cierre && t.fecha_cierre <= tableState.filters.cierreHasta);
 
     if (tableState.filters.soloVencidas) result = result.filter(t => semaforo(t) === 'Vencida');
+    if (tableState.filters.soloAsignadosAMi) {
+        result = result.filter(esMia);
+    }
     if (tableState.filters.soloPorVencer) result = result.filter(t => semaforo(t) === 'Por vencer');
     if (tableState.filters.soloSinFecha) result = result.filter(t => semaforo(t) === 'Sin fecha');
 
@@ -506,10 +516,13 @@ export function renderTabla(container) {
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="tbl-search" placeholder="Buscar actividad..." value="${tableState.filters.search}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
-                </div>
+            </div>
                 <button onclick="window.toggleFilterDrawer()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
+                <button onclick="window.toggleSoloAsignadosAMi()" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${tableState.filters.soloAsignadosAMi ? 'bg-sky-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}">
+                    <i class="fa-solid fa-user-check"></i> Asignados a mí
                 </button>
             </div>
             <div class="flex items-center gap-2">
@@ -607,6 +620,10 @@ window.toggleProp = toggleProp;
 window.toggleColMenu = toggleColMenu;
 window.duplicateTask = duplicateTask;
 window.initResize = initResize;
+window.toggleSoloAsignadosAMi = function() {
+    tableState.filters.soloAsignadosAMi = !tableState.filters.soloAsignadosAMi;
+    window.renderView();
+};
 
 window.toggleFilterDrawer = function() {
     if (!document.getElementById('table-filter-drawer')) {
