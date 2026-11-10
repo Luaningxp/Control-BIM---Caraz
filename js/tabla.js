@@ -803,6 +803,12 @@ export function editTask(id) {
     const iniEl = document.getElementById('task-fecha-inicio'); if (iniEl) iniEl.value = t.fecha_inicio_programado || '';
 
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
+    const estadoSel = document.getElementById('task-estado');
+    if (estadoSel) {
+    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+        estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option>' + (soloModelador ? '' : '<option>Cerrado</option>');
+        estadoSel.value = t.estado || 'No iniciado';
+    }
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
@@ -1054,6 +1060,11 @@ export async function saveTask(e) {
     }
 
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+
+    if (soloModelador && estado === 'Cerrado') {
+        toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
+        return;
+    }
 
     let payload;
     if (soloModelador && id) {
