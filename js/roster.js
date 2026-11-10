@@ -27,11 +27,18 @@ function esTrabajoExtra(usuarioId, fechaStr) {
     return (state.trabajosExtraCache || []).some(t => t.usuario_id === usuarioId && t.fecha === fechaStr);
 }
 
+function esDescansoMedico(usuarioId, fechaStr) {
+    return (state.descansosMedicosCache || []).some(d => 
+        d.usuario_id === usuarioId && fechaStr >= d.fecha_inicio && fechaStr <= d.fecha_fin
+    );
+}
+
 function clasificarDia(usuarioId, fechaStr) {
     const fecha = new Date(fechaStr + 'T00:00:00');
     const esDomingo = fecha.getDay() === 0;
 
     if (esTrabajoExtra(usuarioId, fechaStr)) return 'TE';
+    if (esDescansoMedico(usuarioId, fechaStr)) return 'DM';
     if (estaEnDescanso(usuarioId, fechaStr)) return 'DE';
     if (esFeriado(fechaStr)) return 'FE';
     if (esDomingo) return 'DO';
@@ -43,6 +50,7 @@ const ESTILO_DIA = {
     TE: { letra: 'TE', clase: 'bg-teal-500 text-white', label: 'Trabajo extra' },
     DO: { letra: 'DO', clase: 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400', label: 'Domingo no laborable' },
     DE: { letra: 'DE', clase: 'bg-red-500 text-white', label: 'Descanso' },
+    DM: { letra: 'DM', clase: 'bg-orange-500 text-white', label: 'Descanso médico' },
     FE: { letra: 'FE', clase: 'bg-amber-400 text-amber-900', label: 'Feriado' }
 };
 
@@ -83,6 +91,7 @@ export function renderRoster(container) {
                 ${esAdmin ? `
                     <button onclick="window.openDescansoModal()" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700"><i class="fa-solid fa-umbrella-beach mr-1"></i> Descanso</button>
                     <button onclick="window.openFeriadoModal()" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600"><i class="fa-solid fa-star mr-1"></i> Feriado</button>
+                    <button onclick="window.openDescansoMedicoModal()" class="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-semibold hover:bg-orange-600"><i class="fa-solid fa-notes-medical mr-1"></i> Descanso Médico</button>
                     <button onclick="window.openTrabajoExtraModal()" class="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700"><i class="fa-solid fa-briefcase mr-1"></i> Trabajo extra</button>
                 ` : ''}
             </div>
@@ -435,3 +444,21 @@ export function esDiaLaborable(usuarioId, fechaStr) {
 export function tipoDia(usuarioId, fechaStr) {
     return clasificarDia(usuarioId, fechaStr);
 }
+
+window.openDescansoMedicoModal = function(id, fechaPredefinida) {
+    if (!state.isAdmin) return;
+    asegurarModales(); // Reutiliza la función que ya tienes
+    const d = id ? (state.descansosMedicosCache || []).find(x => x.id === id) : null;
+    // Usamos el mismo modal de descanso pero cambiando el ID del form y título
+    document.getElementById('descanso-title').innerText = d ? 'Editar descanso médico' : 'Nuevo descanso médico';
+    document.getElementById('descanso-id').value = d?.id || '';
+    llenarUsuarios('descanso-usuario', d?.usuario_id);
+    document.getElementById('descanso-inicio').value = d?.fecha_inicio || fechaPredefinida || '';
+    document.getElementById('descanso-fin').value = d?.fecha_fin || '';
+    document.getElementById('descanso-motivo').value = d?.motivo || '';
+    
+    // Cambiamos el evento submit temporalmente o usamos una bandera
+    window._isDM = true; 
+    document.getElementById('modal-descanso').classList.remove('hidden');
+    document.getElementById('modal-descanso').classList.add('flex');
+};
