@@ -77,7 +77,7 @@ async function initApp(user) {
     }
 
     await fetchAll();
-    window.switchTab(state.isAdmin ? 'dashboard' : 'mitrabajo');
+    window.switchTab('mitrabajo');
 }
 
 window.switchTab = function(tab) {
