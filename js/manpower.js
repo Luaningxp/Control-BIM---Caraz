@@ -17,7 +17,8 @@ let manpowerState = {
     filterResp: '',
     filterGrupo: '',
     iniDesde: '',
-    iniHasta: ''
+    iniHasta: '',
+    soloRegistradosPorMi: true
 };
 
 function isUserInvolved(t) {
@@ -118,6 +119,9 @@ export function renderManpower(container) {
     let registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
     );
+        if (manpowerState.soloRegistradosPorMi) {
+        registros = registros.filter(m => m.usuario_id === state.currentUser?.id);
+    }
 
     // Aplicar filtros
     registros = registros.filter(r => {
@@ -155,6 +159,9 @@ export function renderManpower(container) {
                 <button onclick="window.toggleManpowerFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
+                </button>
+                <button onclick="window.toggleManpowerSoloMios()" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${manpowerState.soloRegistradosPorMi ? 'bg-sky-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}">
+                    <i class="fa-solid fa-user-check"></i> Registrados por mí
                 </button>
             </div>
             <div class="flex items-center gap-3">
@@ -469,6 +476,17 @@ window.applyManpowerFilter = function(key, value) {
 };
 
 window.clearManpowerFilters = function() {
-    manpowerState = { search: '', filterResp: '', filterGrupo: '', iniDesde: '', iniHasta: '' };
+    manpowerState = { 
+        search: '', 
+        filterResp: '', 
+        filterGrupo: '', 
+        iniDesde: '', 
+        iniHasta: '',
+        soloRegistradosPorMi: true // <--- Añadir aquí
+    };
+    window.renderView();
+};
+window.toggleManpowerSoloMios = function() {
+    manpowerState.soloRegistradosPorMi = !manpowerState.soloRegistradosPorMi;
     window.renderView();
 };
