@@ -743,8 +743,17 @@ window.clearTableFilters = function() {
         estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         cierreDesde: '', cierreHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false, soloAsignadosAMi: true
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
+        soloAsignadosAMi: true
     };
+    
+    // ▼ Añadir esta línea ▼
+    const drawer = document.getElementById('table-filter-drawer');
+    if (drawer) drawer.remove();
+    const overlay = document.getElementById('table-filter-drawer-overlay');
+    if (overlay) overlay.remove();
+    // ▲ Añadir esta línea ▲
+
     window.renderView();
 };
 
