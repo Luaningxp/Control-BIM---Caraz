@@ -224,9 +224,14 @@ window.rosterToday = function() {
 
 window.rosterCellClick = function(usuarioId, fecha, tipo) {
     if (!state.isAdmin) return;
+    
     if (tipo === 'DE') {
         const d = (state.descansosCache || []).find(x => x.usuario_id === usuarioId && fecha >= x.fecha_inicio && fecha <= x.fecha_fin);
         if (d) { window.openDescansoModal(d.id); return; }
+    }
+    if (tipo === 'DM') {
+        const d = (state.descansosMedicosCache || []).find(x => x.usuario_id === usuarioId && fecha >= x.fecha_inicio && fecha <= x.fecha_fin);
+        if (d) { window.openDescansoMedicoModal(d.id); return; }
     }
     if (tipo === 'FE') {
         const f = (state.feriadosCache || []).find(x => x.fecha === fecha);
@@ -236,6 +241,7 @@ window.rosterCellClick = function(usuarioId, fecha, tipo) {
         const t = (state.trabajosExtraCache || []).find(x => x.usuario_id === usuarioId && x.fecha === fecha);
         if (t) { window.openTrabajoExtraModal(t.id); return; }
     }
+    
     // Clic en T o DO: ofrecer crear trabajo extra en esa fecha
     window.openTrabajoExtraModal(null, usuarioId, fecha);
 };
