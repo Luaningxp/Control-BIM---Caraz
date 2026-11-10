@@ -362,6 +362,14 @@ window.clearPlanosFilters = function() {
     planosState.filterEstado = '';
     planosState.filterAconex = '';
     planosState.filterCategoria = '';
+
+    // ▼ Añadir esta línea ▼
+    const drawer = document.getElementById('planos-filter-drawer');
+    if (drawer) drawer.remove();
+    const overlay = document.getElementById('planos-filter-drawer-overlay');
+    if (overlay) overlay.remove();
+    // ▲ Añadir esta línea ▲
+
     window.renderView();
 };
 window.togglePlanosColMenu = function() {
