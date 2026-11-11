@@ -125,7 +125,7 @@ export function renderRecursos(container) {
         porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
     });
 
-    // === CÁLCULO DE DISTRIBUCIÓN DE EQUIPOS ===
+        // === CÁLCULO DE DISTRIBUCIÓN DE EQUIPOS ===
     const jefesValidos = state.perfilesCache.filter(p => {
         const c = (p.cargo || '').toLowerCase();
         return c.includes('supervisor') || c.includes('coordinador') || c.includes('bim manager');
@@ -133,12 +133,8 @@ export function renderRecursos(container) {
 
     const distribucionEquipos = {};
     jefesValidos.forEach(j => distribucionEquipos[j.id] = { nombre: nombreFormateado(j), cargo: j.cargo, modeladores: new Set() });
-    const modeladoresLibres = new Set(modeladores.map(m => m.id));
-
-     // Obtenemos la fecha de hoy para saber si están de descanso
+    
     const hoyFechaStr = new Date().toISOString().split('T')[0];
-
-    // FILTRAMOS: Solo modeladores que estén laborando hoy (ni descanso, ni feriado, ni DM)
     const modeladoresLaborandoHoy = modeladores.filter(m => {
         const tipo = tipoDia(m.id, hoyFechaStr);
         return tipo === 'T' || tipo === 'TE';
@@ -146,7 +142,7 @@ export function renderRecursos(container) {
 
     const modeladoresLibres = new Set(modeladoresLaborandoHoy.map(m => m.id));
 
-    modeladores.forEach(m => {
+    modeladoresLaborandoHoy.forEach(m => {
         const tareasM = state.tasksCache.filter(t => 
             t.estado !== 'Cerrado' && 
             (t.responsable_id === m.id || (state.actividadRecursosCache || []).some(r => r.pendiente_id === t.id && r.usuario_id === m.id))
@@ -171,7 +167,7 @@ export function renderRecursos(container) {
         }
     });
 
-        // Crear la matriz de datos para el gráfico
+    // Crear la matriz de datos para el gráfico
     const puntosGrafico = [];
     const jefesEjeY = [];
     const modeladoresEjeX = new Set();
@@ -204,10 +200,8 @@ export function renderRecursos(container) {
         });
     }
 
-    // Convertir el Set a Array y ordenar alfabéticamente
     const labelsX = Array.from(modeladoresEjeX).sort();
     const labelsY = jefesEjeY.sort();
-    
     // === FIN CÁLCULO DISTRIBUCIÓN ===
 
     const fechas = registros.map(r => r.fecha).filter(Boolean).sort();
