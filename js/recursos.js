@@ -660,13 +660,10 @@ export function renderRecursos(container) {
         }
     });
 
-    const labelsEquipos = datosGraficoEquipos.map(d => d.nombre);
-    const valuesEquipos = datosGraficoEquipos.map(d => d.cantidad);
-
         if (state.charts.equipos) state.charts.equipos.destroy();
 
     state.charts.equipos = new Chart(document.getElementById('chart-equipos'), {
-        type: 'scatter', // Cambiamos a gráfico de dispersión
+        type: 'scatter', // Gráfico de dispersión
         data: {
             datasets: [{
                 label: 'Asignación',
