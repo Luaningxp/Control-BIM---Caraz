@@ -1,6 +1,6 @@
 import { state } from './db.js';
 import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
-import { esDiaLaborable } from './roster.js';
+import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) { return (parseFloat(pct || 0) * HORAS_POR_100) / 100; }
@@ -134,6 +134,17 @@ export function renderRecursos(container) {
     const distribucionEquipos = {};
     jefesValidos.forEach(j => distribucionEquipos[j.id] = { nombre: nombreFormateado(j), cargo: j.cargo, modeladores: new Set() });
     const modeladoresLibres = new Set(modeladores.map(m => m.id));
+
+     // Obtenemos la fecha de hoy para saber si están de descanso
+    const hoyFechaStr = new Date().toISOString().split('T')[0];
+
+    // FILTRAMOS: Solo modeladores que estén laborando hoy (ni descanso, ni feriado, ni DM)
+    const modeladoresLaborandoHoy = modeladores.filter(m => {
+        const tipo = tipoDia(m.id, hoyFechaStr);
+        return tipo === 'T' || tipo === 'TE';
+    });
+
+    const modeladoresLibres = new Set(modeladoresLaborandoHoy.map(m => m.id));
 
     modeladores.forEach(m => {
         const tareasM = state.tasksCache.filter(t => 
