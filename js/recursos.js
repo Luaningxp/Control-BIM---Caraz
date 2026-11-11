@@ -160,12 +160,42 @@ export function renderRecursos(container) {
         }
     });
 
-    const datosGraficoEquipos = Object.values(distribucionEquipos)
-        .map(j => ({ nombre: j.nombre, cargo: j.cargo, cantidad: j.modeladores.size }))
-        .sort((a, b) => b.cantidad - a.cantidad);
-    
+        // Crear la matriz de datos para el gráfico
+    const puntosGrafico = [];
+    const jefesEjeY = [];
+    const modeladoresEjeX = new Set();
+
+    // 1. Procesar a los jefes y sus modeladores
+    Object.values(distribucionEquipos).forEach(jefe => {
+        if (jefe.modeladores.size > 0) {
+            jefesEjeY.push(jefe.nombre);
+            jefe.modeladores.forEach(modId => {
+                const m = modeladores.find(x => x.id === modId);
+                if (m) {
+                    const nombreM = nombreFormateado(m);
+                    modeladoresEjeX.add(nombreM);
+                    puntosGrafico.push({ x: nombreM, y: jefe.nombre, jefe: jefe.nombre, mod: nombreM });
+                }
+            });
+        }
+    });
+
+    // 2. Procesar a los modeladores libres
     if (modeladoresLibres.size > 0) {
-        datosGraficoEquipos.push({ nombre: 'Modeladores Libres', cargo: 'Sin carga', cantidad: modeladoresLibres.size });
+        jefesEjeY.push('Modeladores Libres');
+        modeladoresLibres.forEach(modId => {
+            const m = modeladores.find(x => x.id === modId);
+            if (m) {
+                const nombreM = nombreFormateado(m);
+                modeladoresEjeX.add(nombreM);
+                puntosGrafico.push({ x: nombreM, y: 'Modeladores Libres', jefe: 'Modeladores Libres', mod: nombreM });
+            }
+        });
+    }
+
+    // Convertir el Set a Array y ordenar alfabéticamente
+    const labelsX = Array.from(modeladoresEjeX).sort();
+    const labelsY = jefesEjeY.sort();
     }
     // === FIN CÁLCULO DISTRIBUCIÓN ===
 
@@ -345,8 +375,8 @@ export function renderRecursos(container) {
             </div>
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Distribución de Modeladores</h4>
-                <p class="text-[11px] text-slate-500 mb-2">Bajo el mando de supervisores/coordinadores o libres.</p>
-                <div class="chart-box" style="height: 230px;"><canvas id="chart-equipos"></canvas></div>
+                <p class="text-[11px] text-slate-500 mb-2">Puntos indican qué modelador está bajo el mando de qué jefe.</p>
+                <div class="chart-box" style="height: 300px;"><canvas id="chart-equipos"></canvas></div>
             </div>
         </div>
 
@@ -633,40 +663,49 @@ export function renderRecursos(container) {
     const labelsEquipos = datosGraficoEquipos.map(d => d.nombre);
     const valuesEquipos = datosGraficoEquipos.map(d => d.cantidad);
 
+        if (state.charts.equipos) state.charts.equipos.destroy();
+
     state.charts.equipos = new Chart(document.getElementById('chart-equipos'), {
-        type: 'bar',
+        type: 'scatter', // Cambiamos a gráfico de dispersión
         data: {
-            labels: labelsEquipos,
             datasets: [{
-                label: 'Modeladores a cargo',
-                data: valuesEquipos,
-                backgroundColor: datosGraficoEquipos.map(d => 
-                    d.nombre === 'Modeladores Libres' ? '#94a3b8' : '#0ea5e9'
+                label: 'Asignación',
+                data: puntosGrafico,
+                backgroundColor: puntosGrafico.map(p => 
+                    p.y === 'Modeladores Libres' ? '#94a3b8' : '#0ea5e9'
                 ),
-                borderRadius: 4
+                pointRadius: 8,
+                pointHoverRadius: 10
             }]
         },
         options: {
-            indexAxis: 'y',
-            responsive: true, 
+            responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (ctx) => `${ctx.parsed.x} modelador${ctx.parsed.x === 1 ? '' : 'es'}`
+                        label: (ctx) => {
+                            if (ctx.raw.y === 'Modeladores Libres') return `${ctx.raw.x} (Libre)`;
+                            return `${ctx.raw.x} ➔ bajo el mando de ${ctx.raw.y}`;
+                        }
                     }
                 }
             },
             scales: {
-                x: { 
-                    beginAtZero: true, 
-                    ticks: { precision: 0 },
+                x: {
+                    type: 'category',
+                    labels: labelsX,
+                    title: { display: true, text: 'Modeladores', font: { size: 10, weight: 'bold' } },
+                    ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 },
                     grid: { display: false }
                 },
-                y: { 
-                    grid: { display: false },
-                    ticks: { font: { size: 10 } }
+                y: {
+                    type: 'category',
+                    labels: labelsY,
+                    title: { display: true, text: 'Supervisores / Coordinadores', font: { size: 10, weight: 'bold' } },
+                    ticks: { font: { size: 9 } },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
                 }
             }
         }
