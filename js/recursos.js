@@ -196,7 +196,7 @@ export function renderRecursos(container) {
     // Convertir el Set a Array y ordenar alfabéticamente
     const labelsX = Array.from(modeladoresEjeX).sort();
     const labelsY = jefesEjeY.sort();
-    }
+    
     // === FIN CÁLCULO DISTRIBUCIÓN ===
 
     const fechas = registros.map(r => r.fecha).filter(Boolean).sort();
