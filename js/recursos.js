@@ -57,6 +57,56 @@ export function renderRecursos(container) {
     );
 
     if (registros.length === 0) {
+            // === DISTRIBUCIÓN POR JEFE (SUPERVISOR / COORDINADOR / MANAGER) ===
+    const jefesValidos = state.perfilesCache.filter(p => {
+        const c = (p.cargo || '').toLowerCase();
+        return c.includes('supervisor') || c.includes('coordinador') || c.includes('bim manager');
+    });
+
+    const distribucionEquipos = {};
+    // Inicializar a todos los jefes con 0 modeladores
+    jefesValidos.forEach(j => distribucionEquipos[j.id] = { nombre: nombreFormateado(j), cargo: j.cargo, modeladores: new Set() });
+
+    const modeladores = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
+    const modeladoresLibres = new Set(modeladores.map(m => m.id));
+
+    modeladores.forEach(m => {
+        // Buscar en qué tareas abiertas está el modelador
+        const tareasM = state.tasksCache.filter(t => 
+            t.estado !== 'Cerrado' && 
+            (t.responsable_id === m.id || (state.actividadRecursosCache || []).some(r => r.pendiente_id === t.id && r.usuario_id === m.id))
+        );
+
+        // Contar las tareas que tiene con cada jefe
+        const conteoJefes = {};
+        tareasM.forEach(t => {
+            if (t.responsable_id && distribucionEquipos[t.responsable_id]) {
+                conteoJefes[t.responsable_id] = (conteoJefes[t.responsable_id] || 0) + 1;
+            }
+        });
+
+        // Asignar al jefe con el que tenga más tareas
+        let jefePrincipal = null;
+        let maxTareas = 0;
+        Object.entries(conteoJefes).forEach(([idJefe, cant]) => {
+            if (cant > maxTareas) { maxTareas = cant; jefePrincipal = idJefe; }
+        });
+
+        if (jefePrincipal) {
+            distribucionEquipos[jefePrincipal].modeladores.add(m.id);
+            modeladoresLibres.delete(m.id);
+        }
+    });
+
+    const datosGraficoEquipos = Object.values(distribucionEquipos)
+        .map(j => ({ nombre: j.nombre, cargo: j.cargo, cantidad: j.modeladores.size }))
+        .sort((a, b) => b.cantidad - a.cantidad);
+    
+    // Si hay modeladores que no tienen tareas abiertas (libres)
+    if (modeladoresLibres.size > 0) {
+        datosGraficoEquipos.push({ nombre: 'Modeladores Libres', cargo: 'Sin carga', cantidad: modeladoresLibres.size });
+    }
+    // === FIN DISTRIBUCIÓN ===
         container.innerHTML = `<div class="card p-8 text-center text-slate-500">
             <p class="text-sm font-semibold mb-1">Aún no hay registros</p>
             <p class="text-xs">Cuando los modeladores registren su % diario, aquí verás el análisis en horas hombre.</p>
@@ -296,9 +346,16 @@ export function renderRecursos(container) {
                 <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Nivel (importancia)</h4>
                 <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-nivel"></canvas></div>
             </div>
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por Grupo (acumulado)</h4>
-                <div class="chart-box" style="height: 260px;"><canvas id="chart-grupos"></canvas></div>
+            <div class="grid lg:grid-cols-2 gap-3 mb-4">
+                <div class="card p-4">
+                    <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Horas por Grupo (acumulado)</h4>
+                    <div class="chart-box" style="height: 260px;"><canvas id="chart-grupos"></canvas></div>
+                </div>
+                <div class="card p-4">
+                    <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Distribución de Modeladores</h4>
+                    <p class="text-[11px] text-slate-500 mb-2">Bajo el mando de supervisores/coordinadores o libres.</p>
+                    <div class="chart-box" style="height: 230px;"><canvas id="chart-equipos"></canvas></div>
+                </div>
             </div>
         </div>
 
@@ -530,8 +587,10 @@ export function renderRecursos(container) {
         type: 'line', data: serieNivel, options: optsLinea
     });
 
-        const gruposLabels = Object.keys(porGrupo);
+           const gruposLabels = Object.keys(porGrupo);
     const totalGrupos = gruposLabels.reduce((s, g) => s + porGrupo[g], 0);
+
+    if (state.charts.grupos) state.charts.grupos.destroy(); // <-- Añadido para evitar error al recargar
 
     state.charts.grupos = new Chart(document.getElementById('chart-grupos'), {
         type: 'doughnut',
@@ -577,6 +636,51 @@ export function renderRecursos(container) {
                             return `${ctx.label}: ${valor.toFixed(1)} h (${pct}%)`;
                         }
                     }
+                }
+            }
+        }
+    });
+
+    // ▼▼▼ NUEVO GRÁFICO DE DISTRIBUCIÓN DE EQUIPOS ▼▼▼
+    if (state.charts.equipos) state.charts.equipos.destroy();
+
+    const labelsEquipos = datosGraficoEquipos.map(d => d.nombre);
+    const valuesEquipos = datosGraficoEquipos.map(d => d.cantidad);
+
+    state.charts.equipos = new Chart(document.getElementById('chart-equipos'), {
+        type: 'bar',
+        data: {
+            labels: labelsEquipos,
+            datasets: [{
+                label: 'Modeladores a cargo',
+                data: valuesEquipos,
+                backgroundColor: datosGraficoEquipos.map(d => 
+                    d.nombre === 'Modeladores Libres' ? '#94a3b8' : '#0ea5e9'
+                ),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.parsed.x} modelador${ctx.parsed.x === 1 ? '' : 'es'}`
+                    }
+                }
+            },
+            scales: {
+                x: { 
+                    beginAtZero: true, 
+                    ticks: { precision: 0 },
+                    grid: { display: false }
+                },
+                y: { 
+                    grid: { display: false },
+                    ticks: { font: { size: 10 } }
                 }
             }
         }
