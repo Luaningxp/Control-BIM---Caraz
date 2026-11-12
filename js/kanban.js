@@ -398,20 +398,9 @@ export function onDragStart(e, id) {
     e.currentTarget.classList.add('opacity-50');
 }
 
-export function onDragEnd(e) { 
-    e.currentTarget.classList.remove('opacity-50'); 
-    state.dragId = null; 
-}
-
-export function onDragOver(e) { 
-    e.preventDefault(); 
-    e.dataTransfer.dropEffect = 'move'; 
-    e.currentTarget.classList.add('bg-sky-50', 'ring-2', 'ring-sky-300'); 
-}
-
-export function onDragLeave(e) { 
-    e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300'); 
-}
+export function onDragEnd(e) { e.currentTarget.classList.remove('opacity-50'); state.dragId = null; }
+export function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('bg-sky-50', 'ring-2', 'ring-sky-300'); }
+export function onDragLeave(e) { e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300'); }
 
 export async function onDrop(e, nuevoEstado) {
     e.preventDefault();
@@ -429,6 +418,7 @@ export async function onDrop(e, nuevoEstado) {
         return;
     }
 
+    // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
         toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
         window.editTask(id);
@@ -442,6 +432,5 @@ export async function onDrop(e, nuevoEstado) {
     if (error) { toast('Error al mover: ' + error.message); return; }
     
     toast(`Movido a ${nuevoEstado}`);
-    await fetchAll(); 
-    window.renderView();
+    await fetchAll(); window.renderView();
 }
