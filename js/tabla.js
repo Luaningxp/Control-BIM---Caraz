@@ -409,9 +409,27 @@ function esMia(t) {
 
 function getProcessedTasks() {
     let result = [...state.tasksCache];
-    if (tableState.filters.search) {
-        const q = tableState.filters.search.toLowerCase();
-        result = result.filter(t => (t.actividad || '').toLowerCase().includes(q) || (t.codigo_contenedor || '').toLowerCase().includes(q));
+        if (tableState.filters.search) {
+        const q = tableState.filters.search.toLowerCase().trim();
+        result = result.filter(t => {
+            // 1. Nombre del responsable
+            const nombreResp = (nombreResponsable(t, state.perfilesCache) || '').toLowerCase();
+            
+            // 2. Nombres de los recursos
+            const nombresRecursos = state.actividadRecursosCache
+                .filter(r => r.pendiente_id === t.id)
+                .map(r => {
+                    const perfil = state.perfilesCache.find(p => p.id === r.usuario_id);
+                    return perfil ? nombreFormateado(perfil).toLowerCase() : '';
+                })
+                .join(' ');
+
+            // 3. Evaluar
+            return (t.actividad || '').toLowerCase().includes(q) || 
+                   (t.codigo_contenedor || '').toLowerCase().includes(q) ||
+                   nombreResp.includes(q) ||
+                   nombresRecursos.includes(q);
+        });
     }
     if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
     if (tableState.filters.responsable) result = result.filter(t => t.responsable_id === tableState.filters.responsable);
