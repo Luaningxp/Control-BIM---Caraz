@@ -295,6 +295,13 @@ function inicializarGantt(tareas) {
         ganttState.currentGantt.on_click = (task) => {
             if (task.id === 'today-line') return;
             window.editTask(parseInt(task.id));
+            setTimeout(() => {
+            const today = new Date().toISOString().split('T')[0];
+            const todayEl = document.querySelector(`.gantt-container .grid-header .tick[data-date="${today}"]`);
+            if (todayEl) {
+                todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }, 500);
         };
 
     } catch (err) {
