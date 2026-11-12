@@ -295,13 +295,21 @@ function inicializarGantt(tareas) {
         ganttState.currentGantt.on_click = (task) => {
             if (task.id === 'today-line') return;
             window.editTask(parseInt(task.id));
-            setTimeout(() => {
-            const today = new Date().toISOString().split('T')[0];
-            const todayEl = document.querySelector(`.gantt-container .grid-header .tick[data-date="${today}"]`);
-            if (todayEl) {
-                todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    // Forzar el scroll a la fecha de hoy
+        setTimeout(() => {
+            const todayBar = document.querySelector('.gantt-container .bar-wrapper[data-id="today-line"]');
+            if (todayBar) {
+                todayBar.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            } else {
+                // Si no encuentra la barra de hoy, intenta con el contenedor scrollable
+                const scroller = document.querySelector('.gantt-container .gantt');
+                if (scroller) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const tick = document.querySelector(`.gantt-container .grid-header .tick[data-date="${today}"]`);
+                    if (tick) tick.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+                }
             }
-        }, 500);
+        }, 600);
         };
 
     } catch (err) {
