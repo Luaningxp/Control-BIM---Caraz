@@ -391,46 +391,4 @@ window.toggleKanbanEstadoOculto = function(estado, checked) {
     window.renderView();
 };
 
-export function onDragStart(e, id) {
-    if (e.currentTarget.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
-    state.dragId = id;
-    e.dataTransfer.effectAllowed = 'move';
-    e.currentTarget.classList.add('opacity-50');
-}
 
-export function onDragEnd(e) { e.currentTarget.classList.remove('opacity-50'); state.dragId = null; }
-export function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('bg-sky-50', 'ring-2', 'ring-sky-300'); }
-export function onDragLeave(e) { e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300'); }
-
-export async function onDrop(e, nuevoEstado) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('bg-sky-50', 'ring-2', 'ring-sky-300');
-    const id = state.dragId;
-    state.dragId = null;
-    if (!id) return;
-    
-    const t = state.tasksCache.find(x => x.id === id);
-    if (!t || t.estado === nuevoEstado) return;
-
-    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-    if (soloModelador && nuevoEstado === 'Cerrado') {
-        toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
-        return;
-    }
-
-    // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
-    if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
-        toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
-        window.editTask(id);
-        return;
-    }
-    
-    const updateData = { estado: nuevoEstado };
-    if (nuevoEstado !== 'Cerrado') updateData.fecha_cierre = null;
-
-    const { error } = await supabaseClient.from('pendientes_bim').update(updateData).eq('id', id);
-    if (error) { toast('Error al mover: ' + error.message); return; }
-    
-    toast(`Movido a ${nuevoEstado}`);
-    await fetchAll(); window.renderView();
-}
