@@ -225,7 +225,7 @@ export function renderRecursos(container) {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
-            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 4);
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 5);
             const dias = [];
             for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
             const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
