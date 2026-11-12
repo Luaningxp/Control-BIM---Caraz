@@ -823,7 +823,7 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 1. Filtrar solo las tareas reales que están dentro del rango
+    // 1. Filtrar tareas del rango
     const tareasReales = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
@@ -832,37 +832,18 @@ async function generarPDFGantt() {
         t.fecha_inicio_programado <= fFin
     );
 
-        // Crear las tareas "fantasma" para forzar el encuadre
-    const fechaFinMasUnDia = new Date(fFin + 'T00:00:00');
-    fechaFinMasUnDia.setDate(fechaFinMasUnDia.getDate() + 1);
-    const fFinStr = fechaFinMasUnDia.toISOString().split('T')[0];
-
-    // Aseguramos que las fantasmas tengan al menos 1 día de duración
+    // 2. Tareas fantasma con duración mínima de 1 día
     const fIniMasUnDia = new Date(fIni + 'T00:00:00');
     fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
     const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
 
+    const fFinMasUnDia = new Date(fFin + 'T00:00:00');
+    fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
+    const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
+
     const tareasFantasma = [
-        {
-            id: 'phantom-start',
-            name: '',
-            start: fIni,
-            end: fIniStr, // <--- Un día de duración
-            progress: 0,
-            dependencies: '',
-            custom_class: 'gantt-phantom',
-            _isPhantom: true
-        },
-        {
-            id: 'phantom-end',
-            name: '',
-            start: fFin,
-            end: fFinStr, // <--- Un día de duración
-            progress: 0,
-            dependencies: '',
-            custom_class: 'gantt-phantom',
-            _isPhantom: true
-        }
+        { id: 'phantom-start', name: '', start: fIni, end: fIniStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true },
+        { id: 'phantom-end', name: '', start: fFin, end: fFinStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true }
     ];
 
     const tareasParaExportar = [...tareasReales, ...tareasFantasma];
@@ -870,53 +851,56 @@ async function generarPDFGantt() {
     // 3. Inicializar Gantt temporal
     await new Promise(resolve => {
         ganttState.viewMode = vista; 
-        // Usamos una función de inicialización especial para el PDF
         inicializarGanttParaPDF(tareasParaExportar);
         setTimeout(resolve, 1000);
     });
+
+    // 4. Guardar estilos originales del contenedor y UI
+    const ganttWrapper = document.getElementById('gantt-container');
+    const scrollContainer = ganttWrapper.closest('.overflow-x-auto');
+    
+    const styleOriginalScroll = {
+        overflow: scrollContainer ? scrollContainer.style.overflow : '',
+        width: scrollContainer ? scrollContainer.style.width : '',
+        maxHeight: scrollContainer ? scrollContainer.style.maxHeight : ''
+    };
+    
+    const styleOriginalWrapper = {
+        width: ganttWrapper.style.width,
+        overflow: ganttWrapper.style.overflow
+    };
 
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
     try {
-        const ganttWrapper = document.getElementById('gantt-container');
-        if (!ganttWrapper) throw new Error("No se encontró el contenedor del Gantt");
-
-        const scroller = ganttWrapper.querySelector('.gantt-container');
-        
-        const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.left = '-9999px';
-        tempContainer.style.top = '0';
-        tempContainer.style.backgroundColor = '#ffffff';
-        tempContainer.style.width = scroller ? scroller.scrollWidth + 'px' : ganttWrapper.offsetWidth + 'px';
-        
-        const clone = ganttWrapper.cloneNode(true);
-        clone.style.overflow = 'visible';
-        clone.style.height = 'auto';
-        clone.style.maxHeight = 'none';
-        clone.style.width = tempContainer.style.width;
-        
-        const cloneScroller = clone.querySelector('.gantt-container');
-        if (cloneScroller) {
-            cloneScroller.style.overflow = 'visible';
-            cloneScroller.style.width = tempContainer.style.width;
-            cloneScroller.scrollLeft = 0;
+        // 5. EXPANDIR EL CONTENEDOR REAL PARA CAPTURAR TODO
+        if (scrollContainer) {
+            scrollContainer.style.overflow = 'visible';
+            scrollContainer.style.maxHeight = 'none';
+            // Forzamos el ancho total
+            if (scrollContainer.firstElementChild) {
+                scrollContainer.firstElementChild.style.width = scrollContainer.scrollWidth + 'px';
+            }
         }
-        
-        tempContainer.appendChild(clone);
-        document.body.appendChild(tempContainer);
+        ganttWrapper.style.overflow = 'visible';
+        ganttWrapper.style.width = 'max-content';
 
-        const canvas = await html2canvas(tempContainer, {
+        // Damos un instante para que el navegador re-calcule el layout
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // 6. Capturar el contenedor real ya expandido
+        const canvas = await html2canvas(ganttWrapper, {
             scale: calidad,
             useCORS: true,
             backgroundColor: '#ffffff',
-            width: tempContainer.offsetWidth,
-            height: tempContainer.offsetHeight
+            width: ganttWrapper.scrollWidth,
+            height: ganttWrapper.scrollHeight,
+            windowWidth: ganttWrapper.scrollWidth,
+            windowHeight: ganttWrapper.scrollHeight
         });
 
-        document.body.removeChild(tempContainer);
-
+        // 7. Generar PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
@@ -931,8 +915,20 @@ async function generarPDFGantt() {
         console.error('Error al generar PDF:', error);
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
+        // 8. RESTAURAR TODO
         uiElements.forEach(el => el.style.display = '');
         
+        if (scrollContainer) {
+            scrollContainer.style.overflow = styleOriginalScroll.overflow;
+            scrollContainer.style.width = styleOriginalScroll.width;
+            scrollContainer.style.maxHeight = styleOriginalScroll.maxHeight;
+            if (scrollContainer.firstElementChild) {
+                scrollContainer.firstElementChild.style.width = '';
+            }
+        }
+        ganttWrapper.style.overflow = styleOriginalWrapper.overflow;
+        ganttWrapper.style.width = styleOriginalWrapper.width;
+
         ganttState.iniDesde = estadoOriginal.iniDesde;
         ganttState.iniHasta = estadoOriginal.iniHasta;
         ganttState.finDesde = estadoOriginal.finDesde;
@@ -947,6 +943,8 @@ async function generarPDFGantt() {
         if (modal) modal.remove();
     }
 }
+
+
 function inicializarGanttParaPDF(tasksData) {
     const container = document.getElementById('gantt-container');
     if (!container) return;
