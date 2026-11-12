@@ -42,9 +42,26 @@ export function renderKanban(container) {
 
     // Aplicar filtros
     const filteredTasks = state.tasksCache.filter(t => {
-        const matchSearch = !kanbanState.search || 
-            (t.actividad || '').toLowerCase().includes(kanbanState.search.toLowerCase()) ||
-            (t.codigo_contenedor || '').toLowerCase().includes(kanbanState.search.toLowerCase());
+               const searchLower = (kanbanState.search || '').toLowerCase().trim();
+        
+        // 1. Obtener nombre del responsable
+        const nombreResp = (nombreResponsable(t, state.perfilesCache) || '').toLowerCase();
+        
+        // 2. Obtener nombres de los recursos asignados a esta tarea
+        const nombresRecursos = state.actividadRecursosCache
+            .filter(r => r.pendiente_id === t.id)
+            .map(r => {
+                const perfil = state.perfilesCache.find(p => p.id === r.usuario_id);
+                return perfil ? nombreFormateado(perfil).toLowerCase() : '';
+            })
+            .join(' '); // Los unimos en un solo string para buscar fácil
+
+        // 3. Evaluar si el texto coincide con actividad, código, responsable o recursos
+        const matchSearch = !searchLower || 
+            (t.actividad || '').toLowerCase().includes(searchLower) ||
+            (t.codigo_contenedor || '').toLowerCase().includes(searchLower) ||
+            nombreResp.includes(searchLower) ||
+            nombresRecursos.includes(searchLower);
         const matchGrupo = !kanbanState.filterGrupo || t.grupo === kanbanState.filterGrupo;
         const matchResp = !kanbanState.filterResp || t.responsable_id === kanbanState.filterResp;
         const matchRecursos = !kanbanState.filterRecursos || state.actividadRecursosCache.some(r => 
