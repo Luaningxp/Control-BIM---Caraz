@@ -1077,6 +1077,16 @@ export function closeModal() {
 
 export async function saveTask(e) {
     e.preventDefault();
+    
+    const btn = document.getElementById('btn-save-task');
+    if (btn && btn.disabled) return; // Evitar doble ejecución
+
+    // Deshabilitar botón para evitar duplicados
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Guardando...';
+    }
+
     const id = document.getElementById('task-id').value;
     const respId = document.getElementById('task-responsable').value || null;
     const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
@@ -1088,6 +1098,7 @@ export async function saveTask(e) {
     if (estado === 'Cerrado' && !fechaCierre) {
         toast('No puedes cerrar la actividad sin una Fecha de Cierre Real.');
         document.getElementById('task-fecha-cierre').focus();
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
     }
 
@@ -1101,6 +1112,7 @@ export async function saveTask(e) {
         }
         const causasSearch = document.getElementById('causas-search');
         if (causasSearch) setTimeout(() => causasSearch.focus(), 300);
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
     }
 
@@ -1108,6 +1120,7 @@ export async function saveTask(e) {
 
     if (soloModelador && estado === 'Cerrado') {
         toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
     }
 
@@ -1137,11 +1150,19 @@ export async function saveTask(e) {
     let taskId = id;
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
-        if (error) { toast('Error: ' + error.message); return; }
+        if (error) { 
+            toast('Error: ' + error.message); 
+            if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+            return; 
+        }
     } else {
         payload.estado_cde = 'WIP'; payload.codigo_aptitud = 'S0'; payload.user_id = state.currentUser.id;
         const { data, error } = await supabaseClient.from('pendientes_bim').insert([payload]).select();
-        if (error) { toast('Error: ' + error.message); return; }
+        if (error) { 
+            toast('Error: ' + error.message); 
+            if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+            return; 
+        }
         taskId = data[0].id;
     }
 
@@ -1182,7 +1203,17 @@ export async function saveTask(e) {
         if (errCausas) { toast('Error al guardar causas: ' + errCausas.message); }
     }
 
-    closeModal(); await fetchAll(); window.renderView(); toast('Guardado');
+    closeModal(); 
+    
+    // Restaurar botón antes de cerrar para la próxima vez
+    if (btn) { 
+        btn.disabled = false; 
+        btn.innerHTML = 'Guardar'; 
+    }
+    
+    await fetchAll(); 
+    window.renderView(); 
+    toast('Guardado');
 }
 
 export async function deleteTask(id) {
