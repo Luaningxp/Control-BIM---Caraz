@@ -825,28 +825,25 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 3. Aplicar filtros temporalmente
-    ganttState.iniDesde = fIni;
-    ganttState.finDesde = fIni;
-    ganttState.iniHasta = fFin;
-    ganttState.finHasta = fFin;
-    ganttState.viewMode = vista;
-
+    // 3. FILTRO ESTRICTO: Solo tareas que caen dentro del rango
+    // Esto evita que el Gantt se expanda hacia atrás por una tarea vieja
     const tareasFiltradas = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
         t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_inicio_programado <= fFin &&
-        t.fecha_fin >= fIni
+        t.fecha_inicio_programado <= fFin && // Empieza antes o durante
+        t.fecha_fin >= fIni                  // Termina después o durante
     );
-    
-    // Inicializar Gantt temporal y esperar a que frappe lo dibuje
+
+    // 4. Inicializar Gantt temporal con SOLO esas tareas
     await new Promise(resolve => {
+        // Forzamos la vista para que el renderizado sea rápido y preciso
+        ganttState.viewMode = vista; 
         inicializarGantt(tareasFiltradas);
-        setTimeout(resolve, 1000); // Damos 1 segundo para asegurar que todo se dibuje
+        setTimeout(resolve, 1000); // 1 segundo para asegurar que frappe dibuje todo
     });
 
-    // 4. Ocultar barras de UI temporalmente
+    // 5. Ocultar UI
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
@@ -854,21 +851,19 @@ async function generarPDFGantt() {
         const ganttWrapper = document.getElementById('gantt-container');
         if (!ganttWrapper) throw new Error("No se encontró el contenedor del Gantt");
 
-        // 5. CLONAR EL GANTT SIN SCROLL
-        // Buscamos el contenedor interno que tiene el scroll
         const scroller = ganttWrapper.querySelector('.gantt-container');
         
-        // Creamos un contenedor temporal fuera de la pantalla
+        // 6. Clonar el Gantt SIN SCROLL
         const tempContainer = document.createElement('div');
         tempContainer.style.position = 'absolute';
         tempContainer.style.left = '-9999px';
         tempContainer.style.top = '0';
-        tempContainer.style.width = scroller ? scroller.scrollWidth + 'px' : ganttWrapper.offsetWidth + 'px';
         tempContainer.style.backgroundColor = '#ffffff';
         
-        // Clonamos el SVG o el contenido del Gantt
+        // El ancho del clon será exactamente el ancho de la barra de scroll
+        tempContainer.style.width = scroller ? scroller.scrollWidth + 'px' : ganttWrapper.offsetWidth + 'px';
+        
         const clone = ganttWrapper.cloneNode(true);
-        // Quitamos restricciones de scroll y altura del clon
         clone.style.overflow = 'visible';
         clone.style.height = 'auto';
         clone.style.maxHeight = 'none';
@@ -878,13 +873,13 @@ async function generarPDFGantt() {
         if (cloneScroller) {
             cloneScroller.style.overflow = 'visible';
             cloneScroller.style.width = tempContainer.style.width;
-            cloneScroller.scrollLeft = 0; // Aseguramos que empiece desde el inicio
+            cloneScroller.scrollLeft = 0; // Forzamos inicio desde la izquierda
         }
         
         tempContainer.appendChild(clone);
         document.body.appendChild(tempContainer);
 
-        // 6. Capturar el clon temporal
+        // 7. Capturar
         const canvas = await html2canvas(tempContainer, {
             scale: calidad,
             useCORS: true,
@@ -893,16 +888,14 @@ async function generarPDFGantt() {
             height: tempContainer.offsetHeight
         });
 
-        // Eliminar el contenedor temporal
         document.body.removeChild(tempContainer);
 
-        // 7. Crear PDF
+        // 8. Generar PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        // Calcular proporción
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
@@ -912,8 +905,9 @@ async function generarPDFGantt() {
         console.error('Error al generar PDF:', error);
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
-        // 8. Restaurar UI y estado
+        // 9. Restaurar
         uiElements.forEach(el => el.style.display = '');
+        
         ganttState.iniDesde = estadoOriginal.iniDesde;
         ganttState.iniHasta = estadoOriginal.iniHasta;
         ganttState.finDesde = estadoOriginal.finDesde;
