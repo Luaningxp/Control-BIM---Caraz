@@ -823,7 +823,7 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 1. INCLUIR TAREAS SIN RECORTAR SUS FECHAS Y ORDENADAS
+    // 1. Filtrar tareas sin recortar fechas y ordenadas
     const tareasReales = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
@@ -836,18 +836,33 @@ async function generarPDFGantt() {
         return fechaA.localeCompare(fechaB);
     });
 
-    // 2. TAREAS FANTASMA CON MARGEN
-    const fIniMasUnDia = new Date(fIni + 'T00:00:00');
-    fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
-    const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
-
-    const fFinMargen = new Date(fFin + 'T00:00:00');
-    fFinMargen.setDate(fFinMargen.getDate() + (vista === 'Month' ? 30 : 7));
-    const fFinMargenStr = fFinMargen.toISOString().split('T')[0];
+    // 2. TAREAS FANTASMA EXACTAS
+    // Creamos dos tareas que actúan como "tijeras" en el gráfico
+    const fFinMasUnDia = new Date(fFin + 'T00:00:00');
+    fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
+    const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
 
     const tareasFantasma = [
-        { id: 'phantom-start', name: '', start: fIni, end: fIniStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true },
-        { id: 'phantom-end', name: '', start: fFinMargenStr, end: fFinMargenStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true }
+        { 
+            id: 'corte-inicio', 
+            name: '', 
+            start: fIni, 
+            end: fIni, 
+            progress: 0, 
+            dependencies: '', 
+            custom_class: 'gantt-corte', 
+            _isPhantom: true 
+        },
+        { 
+            id: 'corte-fin', 
+            name: '', 
+            start: fFin, 
+            end: fFinStr, 
+            progress: 0, 
+            dependencies: '', 
+            custom_class: 'gantt-corte', 
+            _isPhantom: true 
+        }
     ];
 
     const tareasParaExportar = [...tareasReales, ...tareasFantasma];
@@ -856,7 +871,7 @@ async function generarPDFGantt() {
     await new Promise(resolve => {
         ganttState.viewMode = vista; 
         inicializarGanttParaPDF(tareasParaExportar);
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 1200);
     });
 
     const ganttWrapper = document.getElementById('gantt-container');
@@ -887,7 +902,7 @@ async function generarPDFGantt() {
         ganttWrapper.style.overflow = 'visible';
         ganttWrapper.style.width = 'max-content';
 
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 400));
 
         // 4. Capturar TODO el Gantt
         const canvasCompleto = await html2canvas(ganttWrapper, {
@@ -900,57 +915,31 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 5. CALCULAR RECORTE EXACTO POR DÍA (No por tick de vista)
-        const ticks = Array.from(ganttWrapper.querySelectorAll('.grid-header .tick'));
+        // 5. CALCULAR RECORTE USANDO LAS BARRAS FANTASMA
         const rectGantt = ganttWrapper.getBoundingClientRect();
         
-        const fIniDate = new Date(fIni + 'T00:00:00');
-        const fFinDate = new Date(fFin + 'T00:00:00');
-        
+        // Buscamos las barras de corte en el DOM
+        const barraInicio = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-inicio"]');
+        const barraFin = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-fin"]');
+
         let pixelInicio = 0;
         let pixelFin = canvasCompleto.width;
 
-        // Función para calcular píxeles basados en la proporción de días del tick
-        const calcularPixelesFecha = (fechaTarget, esInicio) => {
-            // Encontrar el tick que contiene la fecha
-            for (let i = 0; i < ticks.length; i++) {
-                const tick = ticks[i];
-                const dateStr = tick.getAttribute('data-date');
-                if (!dateStr) continue;
-                
-                const tickDate = new Date(dateStr + 'T00:00:00');
-                const tickRect = tick.getBoundingClientRect();
-                
-                // Calcular la duración del tick (en días)
-                let diasTick = 1;
-                if (vista === 'Week') diasTick = 7;
-                if (vista === 'Month') diasTick = 30; // Aproximado
-
-                // Verificar si la fecha cae dentro de este tick
-                const diffDias = (fechaTarget - tickDate) / (1000 * 60 * 60 * 24);
-                
-                if (diffDias >= 0 && diffDias < diasTick) {
-                    // Calcular píxeles proporcionalmente
-                    const proporcion = diffDias / diasTick;
-                    const anchoTick = tickRect.width;
-                    const offsetX = (tickRect.left - rectGantt.left) * calidad;
-                    
-                    if (esInicio) {
-                        return offsetX + (proporcion * anchoTick * calidad);
-                    } else {
-                        return offsetX + (proporcion * anchoTick * calidad) + (anchoTick * calidad / diasTick);
-                    }
-                }
-            }
-            return null;
-        };
-
-        const pixIni = calcularPixelesFecha(fIniDate, true);
-        const pixFin = calcularPixelesFecha(fFinDate, false);
-
-        if (pixIni !== null) pixelInicio = Math.max(0, pixIni);
-        if (pixFin !== null) pixelFin = Math.min(canvasCompleto.width, pixFin);
+        if (barraInicio) {
+            const rectIni = barraInicio.getBoundingClientRect();
+            // Cortamos justo en el borde IZQUIERDO de la barra de inicio
+            pixelInicio = (rectIni.left - rectGantt.left) * calidad;
+        }
         
+        if (barraFin) {
+            const rectFin = barraFin.getBoundingClientRect();
+            // Cortamos justo en el borde DERECHO de la barra de fin
+            pixelFin = (rectFin.right - rectGantt.left) * calidad;
+        }
+
+        // Asegurar límites
+        pixelInicio = Math.max(0, pixelInicio);
+        pixelFin = Math.min(canvasCompleto.width, pixelFin);
         const anchoRecorte = pixelFin - pixelInicio;
 
         // 6. Crear el canvas recortado
