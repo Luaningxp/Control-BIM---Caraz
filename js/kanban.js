@@ -73,8 +73,9 @@ export function renderKanban(container) {
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 w-full">
                 <div class="relative w-full max-w-xs">
-                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="kb-search" placeholder="Buscar actividad..." value="${kanbanState.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-xs"></i>
+                    <input type="text" id="kb-search" placeholder="Buscar actividad..." value="${kanbanState.search}" 
+                           class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/50 transition">
                 </div>
                 <button onclick="window.toggleKanbanFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
@@ -272,7 +273,26 @@ export function renderKanban(container) {
         document.body.insertAdjacentHTML('beforeend', drawerHtml);
     }
 
-    document.getElementById('kb-search').addEventListener('input', (e) => { kanbanState.search = e.target.value; window.renderView(); });
+    // ▼ AQUÍ ESTÁ EL CAMBIO CLAVE ▼
+    const kbSearch = document.getElementById('kb-search');
+    if (kbSearch) {
+        kbSearch.addEventListener('input', (e) => {
+            kanbanState.search = e.target.value;
+            
+            clearTimeout(window.kbSearchTimeout);
+            window.kbSearchTimeout = setTimeout(() => {
+                window.renderView();
+                const inputAfterRender = document.getElementById('kb-search');
+                if (inputAfterRender) {
+                    inputAfterRender.focus();
+                    const val = inputAfterRender.value;
+                    inputAfterRender.value = '';
+                    inputAfterRender.value = val; // Restaura el cursor al final
+                }
+            }, 400);
+        });
+    }
+    // ▲ FIN DEL CAMBIO ▲
 }
 
 window.toggleKanbanFilterDrawer = function() {
