@@ -410,3 +410,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
     filter: brightness(0) saturate(100%) invert(90%) sepia(10%) saturate(800%) hue-rotate(170deg) brightness(105%) contrast(95%);
 }
+
+.gantt-corte {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
