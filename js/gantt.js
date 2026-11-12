@@ -902,12 +902,11 @@ async function generarPDFGantt() {
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
-    try {
+     try {
         // 5. EXPANDIR EL CONTENEDOR REAL PARA CAPTURAR TODO
         if (scrollContainer) {
             scrollContainer.style.overflow = 'visible';
             scrollContainer.style.maxHeight = 'none';
-            // Forzamos el ancho total
             if (scrollContainer.firstElementChild) {
                 scrollContainer.firstElementChild.style.width = scrollContainer.scrollWidth + 'px';
             }
@@ -915,11 +914,10 @@ async function generarPDFGantt() {
         ganttWrapper.style.overflow = 'visible';
         ganttWrapper.style.width = 'max-content';
 
-        // Damos un instante para que el navegador re-calcule el layout
         await new Promise(resolve => setTimeout(resolve, 300));
 
         // 6. Capturar el contenedor real ya expandido
-        const canvas = await html2canvas(ganttWrapper, {
+        const canvasCompleto = await html2canvas(ganttWrapper, {
             scale: calidad,
             useCORS: true,
             backgroundColor: '#ffffff',
@@ -929,13 +927,48 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 7. Generar PDF
+        // 7. RECORTAR LA IMAGEN POR LA DERECHA HASTA LA FECHA DE FIN
+        // Buscamos el elemento del header que corresponde a la fecha de fin
+        const ticks = ganttWrapper.querySelectorAll('.grid-header .tick');
+        const rectGantt = ganttWrapper.getBoundingClientRect();
+        let pixelesCorte = canvasCompleto.width;
+
+        // Buscamos el tick cuya fecha sea la última que sea <= fFin
+        const fFinDate = new Date(fFin + 'T00:00:00');
+        let tickCorte = null;
+        
+        ticks.forEach(tick => {
+            const dateStr = tick.getAttribute('data-date');
+            if (dateStr) {
+                const tickDate = new Date(dateStr + 'T00:00:00');
+                if (tickDate <= fFinDate) {
+                    tickCorte = tick;
+                }
+            }
+        });
+
+        if (tickCorte) {
+            // Calculamos la posición del tick en píxeles escalados
+            const tickRect = tickCorte.getBoundingClientRect();
+            const offsetDerecha = (tickRect.right - rectGantt.left) * calidad;
+            // Aseguramos que no nos pasemos del ancho total del canvas
+            pixelesCorte = Math.min(offsetDerecha, canvasCompleto.width);
+        }
+
+        // Creamos un nuevo canvas solo con la parte izquierda
+        const canvasRecortado = document.createElement('canvas');
+        canvasRecortado.width = pixelesCorte;
+        canvasRecortado.height = canvasCompleto.height;
+        const ctx = canvasRecortado.getContext('2d');
+        ctx.drawImage(canvasCompleto, 0, 0, pixelesCorte, canvasCompleto.height, 0, 0, pixelesCorte, canvasCompleto.height);
+
+        // 8. Generar PDF con el canvas recortado
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvasRecortado.toDataURL('image/jpeg', 0.95);
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const pdfHeight = (canvasRecortado.height * pdfWidth) / canvasRecortado.width;
 
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`Gantt_BIM_${fIni}_al_${fFin}.pdf`);
