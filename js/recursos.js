@@ -219,20 +219,22 @@ export function renderRecursos(container) {
         return t ? (t.importancia || 'Medio') : 'Sin tarea';
     });
 
-    const semanasRecientes = semanas.slice(-6);
+        const semanasRecientes = semanas.slice(-6);
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
-            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 5);
+            const fin = new Date(inicio); fin.setDate(inicio.getDate() + 6);
             const dias = [];
-            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) dias.push(d.toISOString().split('T')[0]);
+            for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+                const fechaStr = d.toISOString().split('T')[0];
+                if (esDiaLaborable(p.id, fechaStr)) dias.push(fechaStr);
+            }
             const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
             cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
         });
     });
-
     const porGrupoTareas = {};
     Object.keys(porGrupo).forEach(g => {
         const tareasGrupo = state.tasksCache.filter(t => (t.grupo || 'Sin grupo') === g);
