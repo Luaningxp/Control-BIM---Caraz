@@ -32,7 +32,11 @@ const COLORES_ESTADO = {
 };
 
 export function renderGantt(container) {
-    const tareasConFechas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
+   const tareasConFechas = state.tasksCache.filter(t => 
+    t.fecha_inicio_programado && 
+    t.fecha_fin && 
+    t.fecha_fin >= t.fecha_inicio_programado
+);
 
     let tareas = tareasConFechas.filter(t => {
         const matchGrupo = !ganttState.filterGrupo || t.grupo === ganttState.filterGrupo;
