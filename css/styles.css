@@ -415,3 +415,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 0 !important;
     pointer-events: none !important;
 }
+/* =========================================
+   COLUMNAS FIJAS: CÓDIGO Y ACTIVIDAD
+   ========================================= */
+td.sticky.left-0, th.sticky.left-0 {
+    background-color: var(--bg-card) !important;
+    z-index: 20 !important;
+}
+
+/* Asegurar que las celdas fijas mantengan el fondo correcto en modo oscuro y hover */
+.dark td.sticky.left-0 {
+    background-color: var(--bg-card) !important;
+}
