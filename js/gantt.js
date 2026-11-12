@@ -267,6 +267,7 @@ function inicializarGantt(tareas) {
             arrow_curve: 5,
             padding: 18,
             date_format: 'YYYY-MM-DD',
+            scroll_to: 'today',
             custom_popup_html: (task) => {
                 if (task.id === 'today-line') return '';
                 const original = tareas.find(t => String(t.id) === task.id);
