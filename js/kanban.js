@@ -327,14 +327,14 @@ window.clearKanbanFilters = function() {
         soloAsignadosAMi: true
     };
 
-    // ▼ Añadir esta línea ▼
+        // ▼ Añadir esta línea ▼
     const drawer = document.getElementById('kanban-filter-drawer');
     if (drawer) drawer.remove();
     const overlay = document.getElementById('kanban-filter-drawer-overlay');
     if (overlay) overlay.remove();
     // ▲ Añadir esta línea ▲
 
-        window.renderView();
+    window.renderView();
 };
 
 export function onDragStart(e, id) {
