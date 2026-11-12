@@ -278,13 +278,9 @@ export function renderKanban(container) {
         document.body.insertAdjacentHTML('beforeend', drawerHtml);
     }
 
-            const kbSearch = document.getElementById('kb-search');
+                const kbSearch = document.getElementById('kb-search');
     if (kbSearch) {
-        // Removemos el listener viejo para no duplicarlo
-        const newKbSearch = kbSearch.cloneNode(true);
-        kbSearch.parentNode.replaceChild(newKbSearch, kbSearch);
-        
-        newKbSearch.addEventListener('input', (e) => {
+        kbSearch.addEventListener('input', (e) => {
             kanbanState.search = e.target.value;
             
             clearTimeout(window.kbSearchTimeout);
@@ -338,8 +334,9 @@ window.clearKanbanFilters = function() {
     if (overlay) overlay.remove();
     // ▲ Añadir esta línea ▲
 
-    window.renderView();
+        window.renderView();
 };
+
 export function onDragStart(e, id) {
     if (e.currentTarget.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
     state.dragId = id;
