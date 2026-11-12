@@ -95,6 +95,9 @@ export function renderGantt(container) {
                     <button onclick="window.setGanttView('Day')" class="px-2.5 py-1.5 text-xs font-medium ${ganttState.viewMode === 'Day' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}">Día</button>
                     <button onclick="window.setGanttView('Week')" class="px-2.5 py-1.5 text-xs font-medium ${ganttState.viewMode === 'Week' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}">Semana</button>
                     <button onclick="window.setGanttView('Month')" class="px-2.5 py-1.5 text-xs font-medium ${ganttState.viewMode === 'Month' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}">Mes</button>
+                    <button onclick="window.openExportModal()" class="px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold hover:bg-sky-700 transition">
+                        <i class="fa-solid fa-file-pdf mr-1"></i> Exportar PDF
+                    </button>
                 </div>
                 <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition">
                     <i class="fa-solid fa-rotate-right mr-1"></i> Refrescar
@@ -706,3 +709,201 @@ window.ocupacionMove = function(dir) {
     else ocupacionState.semanaOffset += dir;
     window.renderView();
 };
+
+// ============================================
+// EXPORTACIÓN A PDF
+// ============================================
+
+window.openExportModal = function() {
+    if (document.getElementById('modal-export-gantt')) return; // Evitar duplicados
+
+    const modalHtml = `
+        <div id="modal-export-gantt" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4 border border-slate-200 dark:border-slate-700">
+                <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white">Exportar Gantt a PDF</h3>
+                    <button onclick="document.getElementById('modal-export-gantt').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                
+                <form id="form-export-gantt" class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Rango de fechas</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" id="exp-fecha-ini" required class="inp">
+                            <input type="date" id="exp-fecha-fin" required class="inp">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Tamaño</label>
+                            <select id="exp-tamano" class="inp">
+                                <option value="a4">A4</option>
+                                <option value="a3">A3</option>
+                                <option value="a2">A2</option>
+                                <option value="letter">Carta</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Orientación</label>
+                            <select id="exp-orientacion" class="inp">
+                                <option value="l">Horizontal</option>
+                                <option value="p">Vertical</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Vista</label>
+                            <select id="exp-vista" class="inp">
+                                <option value="Day">Día</option>
+                                <option value="Week" selected>Semana</option>
+                                <option value="Month">Mes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Calidad</label>
+                            <select id="exp-calidad" class="inp">
+                                <option value="1">Normal (Rápido)</option>
+                                <option value="2" selected>Alta (Recomendado)</option>
+                                <option value="3">Muy Alta (Pesado)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                        <button type="button" onclick="document.getElementById('modal-export-gantt').classList.add('hidden')" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300">Cancelar</button>
+                        <button type="submit" id="btn-generar-pdf" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700 flex items-center gap-2">
+                            <i class="fa-solid fa-download"></i> Descargar PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Establecer fechas por defecto (hoy - 1 mes, hoy + 1 mes)
+    const hoy = new Date();
+    const haceUnMes = new Date(hoy); haceUnMes.setMonth(hoy.getMonth() - 1);
+    const dentroUnMes = new Date(hoy); dentroUnMes.setMonth(hoy.getMonth() + 1);
+    
+    document.getElementById('exp-fecha-ini').value = haceUnMes.toISOString().split('T')[0];
+    document.getElementById('exp-fecha-fin').value = dentroUnMes.toISOString().split('T')[0];
+
+    document.getElementById('modal-export-gantt').classList.remove('hidden');
+    document.getElementById('modal-export-gantt').classList.add('flex');
+
+    document.getElementById('form-export-gantt').onsubmit = async (e) => {
+        e.preventDefault();
+        await generarPDFGantt();
+    };
+};
+
+async function generarPDFGantt() {
+    const btn = document.getElementById('btn-generar-pdf');
+    const htmlOriginal = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
+    btn.disabled = true;
+
+    // 1. Guardar estado original del Gantt
+    const estadoOriginal = {
+        iniDesde: ganttState.iniDesde,
+        iniHasta: ganttState.iniHasta,
+        finDesde: ganttState.finDesde,
+        finHasta: ganttState.finHasta,
+        viewMode: ganttState.viewMode
+    };
+
+    // 2. Obtener parámetros del formulario
+    const fIni = document.getElementById('exp-fecha-ini').value;
+    const fFin = document.getElementById('exp-fecha-fin').value;
+    const tamano = document.getElementById('exp-tamano').value;
+    const orientacion = document.getElementById('exp-orientacion').value;
+    const vista = document.getElementById('exp-vista').value;
+    const calidad = parseFloat(document.getElementById('exp-calidad').value);
+
+    // 3. Aplicar filtros y vista temporalmente
+    ganttState.iniDesde = fIni;
+    ganttState.finDesde = fIni; // Ocultamos las que empiezan antes
+    ganttState.iniHasta = fFin;
+    ganttState.finHasta = fFin;
+    ganttState.viewMode = vista;
+
+    // Forzar re-renderizado del Gantt con los filtros
+    const tareasFiltradas = state.tasksCache.filter(t => 
+        t.fecha_inicio_programado && 
+        t.fecha_fin && 
+        t.fecha_fin >= t.fecha_inicio_programado &&
+        t.fecha_inicio_programado <= fFin &&
+        t.fecha_fin >= fIni
+    );
+    
+    // Inicializar Gantt temporal
+    await new Promise(resolve => {
+        inicializarGantt(tareasFiltradas);
+        setTimeout(resolve, 800); // Esperar a que frappe dibuje todo
+    });
+
+    // 4. Ocultar botones de la UI para que no salgan en el PDF
+    const uiElements = [
+        document.querySelector('button[onclick="window.openExportModal()"]'),
+        document.querySelector('.flex.border.border-slate-300.rounded-lg.overflow-hidden'), // Botones Día/Semana/Mes
+        document.querySelector('button[onclick="window.fetchAll().then(window.renderView)"]') // Botón refrescar
+    ];
+    uiElements.forEach(el => { if(el) el.style.display = 'none'; });
+
+    // Ocultar la barra de filtros superior del Gantt temporalmente
+    const headerGantt = document.getElementById('gantt-container')?.closest('.card');
+    const barraFiltros = headerGantt?.previousElementSibling;
+    if (barraFiltros) barraFiltros.style.display = 'none';
+
+    try {
+        // 5. Capturar el Gantt
+        const elemento = document.getElementById('gantt-container');
+        
+        // Necesitamos un clon para que html2canvas no sufra con los scrolls
+        const canvas = await html2canvas(elemento, {
+            scale: calidad,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            windowWidth: elemento.scrollWidth,
+            windowHeight: elemento.scrollHeight
+        });
+
+        // 6. Crear PDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF(orientacion, 'mm', tamano);
+        
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'JPEG', 0, 10, pdfWidth, pdfHeight);
+        pdf.save(`Gantt_BIM_${fIni}_al_${fFin}.pdf`);
+
+    } catch (error) {
+        console.error('Error al generar PDF:', error);
+        alert('Hubo un error al generar el PDF. Revisa la consola.');
+    } finally {
+        // 7. Restaurar UI y estado original
+        uiElements.forEach(el => { if(el) el.style.display = ''; });
+        if (barraFiltros) barraFiltros.style.display = '';
+
+        // Restaurar estado
+        ganttState.iniDesde = estadoOriginal.iniDesde;
+        ganttState.iniHasta = estadoOriginal.iniHasta;
+        ganttState.finDesde = estadoOriginal.finDesde;
+        ganttState.finHasta = estadoOriginal.finHasta;
+        ganttState.viewMode = estadoOriginal.viewMode;
+        
+        // Re-renderizar la vista original
+        window.renderView();
+
+        // Restaurar botón
+        btn.innerHTML = htmlOriginal;
+        btn.disabled = false;
+        document.getElementById('modal-export-gantt').classList.add('hidden');
+    }
+}
