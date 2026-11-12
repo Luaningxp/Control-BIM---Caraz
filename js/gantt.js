@@ -54,11 +54,7 @@ export function renderGantt(container) {
     });
 
     const sinFechas = state.tasksCache.length - tareasConFechas.length;
-     tareas.sort((a, b) => {
-        const fechaA = a.fecha_inicio_programado || '9999-12-31';
-        const fechaB = b.fecha_inicio_programado || '9999-12-31';
-        return fechaA.localeCompare(fechaB);
-    });
+     
 
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
