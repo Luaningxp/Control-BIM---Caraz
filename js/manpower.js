@@ -1,7 +1,7 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
-    getIniciales, colorAvatar, confirmDelete
+    getIniciales, colorAvatar, confirmDelete, nombreResponsable
 } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
