@@ -808,13 +808,7 @@ async function generarPDFGantt() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
     btn.disabled = true;
 
-    const estadoOriginal = {
-        iniDesde: ganttState.iniDesde,
-        iniHasta: ganttState.iniHasta,
-        finDesde: ganttState.finDesde,
-        finHasta: ganttState.finHasta,
-        viewMode: ganttState.viewMode
-    };
+    const estadoOriginal = { iniDesde: ganttState.iniDesde, iniHasta: ganttState.iniHasta, finDesde: ganttState.finDesde, finHasta: ganttState.finHasta, viewMode: ganttState.viewMode };
 
     const fIni = document.getElementById('exp-fecha-ini').value;
     const fFin = document.getElementById('exp-fecha-fin').value;
@@ -823,88 +817,48 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 1. Filtrar tareas sin recortar fechas y ordenadas
     const tareasReales = state.tasksCache.filter(t => 
-        t.fecha_inicio_programado && 
-        t.fecha_fin && 
-        t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_fin >= fIni && 
-        t.fecha_inicio_programado <= fFin
-    ).sort((a, b) => {
-        const fechaA = a.fecha_inicio_programado || '9999-12-31';
-        const fechaB = b.fecha_inicio_programado || '9999-12-31';
-        return fechaA.localeCompare(fechaB);
-    });
+        t.fecha_inicio_programado && t.fecha_fin && t.fecha_fin >= t.fecha_inicio_programado &&
+        t.fecha_fin >= fIni && t.fecha_inicio_programado <= fFin
+    ).sort((a, b) => (a.fecha_inicio_programado || '9999').localeCompare(b.fecha_inicio_programado || '9999'));
 
-    // 2. TAREAS FANTASMA EXACTAS
-    // Creamos dos tareas que actúan como "tijeras" en el gráfico
-    const fFinMasUnDia = new Date(fFin + 'T00:00:00');
-    fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
+    const fFinMasUnDia = new Date(fFin + 'T00:00:00'); fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
     const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
 
     const tareasFantasma = [
-        { 
-            id: 'corte-inicio', 
-            name: '', 
-            start: fIni, 
-            end: fIni, 
-            progress: 0, 
-            dependencies: '', 
-            custom_class: 'gantt-corte', 
-            _isPhantom: true 
-        },
-        { 
-            id: 'corte-fin', 
-            name: '', 
-            start: fFin, 
-            end: fFinStr, 
-            progress: 0, 
-            dependencies: '', 
-            custom_class: 'gantt-corte', 
-            _isPhantom: true 
-        }
+        { id: 'corte-inicio', name: '', start: fIni, end: fIni, progress: 0, dependencies: '', custom_class: 'gantt-corte', _isPhantom: true },
+        { id: 'corte-fin', name: '', start: fFin, end: fFinStr, progress: 0, dependencies: '', custom_class: 'gantt-corte', _isPhantom: true }
     ];
 
-    const tareasParaExportar = [...tareasReales, ...tareasFantasma];
-
-    // 3. Inicializar Gantt temporal
     await new Promise(resolve => {
         ganttState.viewMode = vista; 
-        inicializarGanttParaPDF(tareasParaExportar);
+        inicializarGanttParaPDF([...tareasReales, ...tareasFantasma]);
         setTimeout(resolve, 1200);
     });
 
     const ganttWrapper = document.getElementById('gantt-container');
     const scrollContainer = ganttWrapper.closest('.overflow-x-auto');
-    
-    const styleOriginalScroll = {
-        overflow: scrollContainer ? scrollContainer.style.overflow : '',
-        width: scrollContainer ? scrollContainer.style.width : '',
-        maxHeight: scrollContainer ? scrollContainer.style.maxHeight : ''
-    };
-    
-    const styleOriginalWrapper = {
-        width: ganttWrapper.style.width,
-        overflow: ganttWrapper.style.overflow
-    };
-
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
     try {
+        // 1. Expandir contenedor para capturar TODO el alto y ancho
         if (scrollContainer) {
             scrollContainer.style.overflow = 'visible';
             scrollContainer.style.maxHeight = 'none';
+            scrollContainer.style.height = 'auto';
             if (scrollContainer.firstElementChild) {
                 scrollContainer.firstElementChild.style.width = scrollContainer.scrollWidth + 'px';
+                scrollContainer.firstElementChild.style.height = 'auto';
             }
         }
         ganttWrapper.style.overflow = 'visible';
         ganttWrapper.style.width = 'max-content';
+        ganttWrapper.style.height = 'max-content';
 
         await new Promise(resolve => setTimeout(resolve, 400));
 
-        // 4. Capturar TODO el Gantt
+        // 2. Capturar TODO el Gantt
         const canvasCompleto = await html2canvas(ganttWrapper, {
             scale: calidad,
             useCORS: true,
@@ -915,54 +869,57 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 5. CALCULAR RECORTE USANDO LAS BARRAS FANTASMA
+        // 3. Calcular recorte de fechas (usando barras fantasma)
         const rectGantt = ganttWrapper.getBoundingClientRect();
-        
-        // Buscamos las barras de corte en el DOM
         const barraInicio = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-inicio"]');
         const barraFin = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-fin"]');
 
         let pixelInicio = 0;
         let pixelFin = canvasCompleto.width;
 
-        if (barraInicio) {
-            const rectIni = barraInicio.getBoundingClientRect();
-            // Cortamos justo en el borde IZQUIERDO de la barra de inicio
-            pixelInicio = (rectIni.left - rectGantt.left) * calidad;
-        }
-        
-        if (barraFin) {
-            const rectFin = barraFin.getBoundingClientRect();
-            // Cortamos justo en el borde DERECHO de la barra de fin
-            pixelFin = (rectFin.right - rectGantt.left) * calidad;
-        }
+        if (barraInicio) pixelInicio = (barraInicio.getBoundingClientRect().left - rectGantt.left) * calidad;
+        if (barraFin) pixelFin = (barraFin.getBoundingClientRect().right - rectGantt.left) * calidad;
 
-        // Asegurar límites
         pixelInicio = Math.max(0, pixelInicio);
         pixelFin = Math.min(canvasCompleto.width, pixelFin);
         const anchoRecorte = pixelFin - pixelInicio;
 
-        // 6. Crear el canvas recortado
+        // 4. Crear canvas recortado
         const canvasRecortado = document.createElement('canvas');
         canvasRecortado.width = anchoRecorte;
         canvasRecortado.height = canvasCompleto.height;
         const ctx = canvasRecortado.getContext('2d');
-        
-        ctx.drawImage(
-            canvasCompleto, 
-            pixelInicio, 0, anchoRecorte, canvasCompleto.height,
-            0, 0, anchoRecorte, canvasCompleto.height
-        );
+        ctx.drawImage(canvasCompleto, pixelInicio, 0, anchoRecorte, canvasCompleto.height, 0, 0, anchoRecorte, canvasCompleto.height);
 
-        // 7. Generar PDF
+        // 5. GENERAR PDF MULTIPÁGINA
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
-        const imgData = canvasRecortado.toDataURL('image/jpeg', 0.95);
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvasRecortado.height * pdfWidth) / canvasRecortado.width;
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        
+        // Calcular la altura de la imagen escalada al ancho del PDF
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvasRecortado.height * imgWidth) / canvasRecortado.width;
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        let heightLeft = imgHeight;
+        let position = 0;
+        
+        // Convertir el canvas a imagen
+        const imgData = canvasRecortado.toDataURL('image/jpeg', 0.95);
+
+        // Primera página
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+
+        // Páginas adicionales
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
+        }
+
         pdf.save(`Gantt_BIM_${fIni}_al_${fFin}.pdf`);
 
     } catch (error) {
@@ -970,26 +927,24 @@ async function generarPDFGantt() {
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
         uiElements.forEach(el => el.style.display = '');
-        
         if (scrollContainer) {
-            scrollContainer.style.overflow = styleOriginalScroll.overflow;
-            scrollContainer.style.width = styleOriginalScroll.width;
-            scrollContainer.style.maxHeight = styleOriginalScroll.maxHeight;
+            scrollContainer.style.overflow = '';
+            scrollContainer.style.maxHeight = '';
+            scrollContainer.style.height = '';
             if (scrollContainer.firstElementChild) {
                 scrollContainer.firstElementChild.style.width = '';
+                scrollContainer.firstElementChild.style.height = '';
             }
         }
-        ganttWrapper.style.overflow = styleOriginalWrapper.overflow;
-        ganttWrapper.style.width = styleOriginalWrapper.width;
+        ganttWrapper.style.overflow = '';
+        ganttWrapper.style.width = '';
+        ganttWrapper.style.height = '';
 
-        ganttState.iniDesde = estadoOriginal.iniDesde;
-        ganttState.iniHasta = estadoOriginal.iniHasta;
-        ganttState.finDesde = estadoOriginal.finDesde;
-        ganttState.finHasta = estadoOriginal.finHasta;
+        ganttState.iniDesde = estadoOriginal.iniDesde; ganttState.iniHasta = estadoOriginal.iniHasta;
+        ganttState.finDesde = estadoOriginal.finDesde; ganttState.finHasta = estadoOriginal.finHasta;
         ganttState.viewMode = estadoOriginal.viewMode;
         
         window.renderView();
-
         btn.innerHTML = htmlOriginal;
         btn.disabled = false;
         const modal = document.getElementById('modal-export-gantt');
