@@ -826,13 +826,22 @@ async function generarPDFGantt() {
     // 1. Filtrar tareas del rango
         // Filtro ESTRICTO: Solo tareas que empiezan dentro del rango
     // Esto evita que frappe-gantt expanda el lienzo hacia atrás
-    const tareasReales = state.tasksCache.filter(t => 
-        t.fecha_inicio_programado && 
-        t.fecha_fin && 
-        t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_inicio_programado >= fIni && 
-        t.fecha_inicio_programado <= fFin
-    );
+        const tareasReales = state.tasksCache
+        .filter(t => 
+            t.fecha_inicio_programado && 
+            t.fecha_fin && 
+            t.fecha_fin >= t.fecha_inicio_programado &&
+            t.fecha_fin >= fIni &&  // Se solapa con el rango
+            t.fecha_inicio_programado <= fFin
+        )
+        .map(t => {
+            // Si la tarea empieza antes del rango, la recortamos a fIni
+            const inicioRecortado = t.fecha_inicio_programado < fIni ? fIni : t.fecha_inicio_programado;
+            return {
+                ...t,
+                fecha_inicio_programado: inicioRecortado
+            };
+        });
 
     // 2. Tareas fantasma con duración mínima de 1 día
     const fIniMasUnDia = new Date(fIni + 'T00:00:00');
