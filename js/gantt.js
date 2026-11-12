@@ -824,11 +824,13 @@ async function generarPDFGantt() {
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
     // 1. Filtrar tareas del rango
+        // Filtro ESTRICTO: Solo tareas que empiezan dentro del rango
+    // Esto evita que frappe-gantt expanda el lienzo hacia atrás
     const tareasReales = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
         t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_fin >= fIni && 
+        t.fecha_inicio_programado >= fIni && 
         t.fecha_inicio_programado <= fFin
     );
 
