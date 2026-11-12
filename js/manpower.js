@@ -132,9 +132,26 @@ export function renderManpower(container) {
         const grupo = t ? (t.grupo || '') : '';
         const actividad = t ? t.actividad : 'General';
 
-        const matchSearch = !manpowerState.search || 
-            nombre.toLowerCase().includes(manpowerState.search.toLowerCase()) ||
-            actividad.toLowerCase().includes(manpowerState.search.toLowerCase());
+                const q = (manpowerState.search || '').toLowerCase().trim();
+        
+        // Buscar también si el nombre del usuario es el responsable o recurso de la tarea
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        let nombresRecursos = '';
+        if (t) {
+            nombresRecursos = state.actividadRecursosCache
+                .filter(ar => ar.pendiente_id === t.id)
+                .map(ar => {
+                    const perfil = state.perfilesCache.find(p => p.id === ar.usuario_id);
+                    return perfil ? nombreFormateado(perfil).toLowerCase() : '';
+                })
+                .join(' ');
+        }
+
+        const matchSearch = !q || 
+            nombre.toLowerCase().includes(q) ||
+            actividad.toLowerCase().includes(q) ||
+            (t && nombreResponsable(t, state.perfilesCache).toLowerCase().includes(q)) ||
+            nombresRecursos.includes(q);
         const matchResp = !manpowerState.filterResp || r.usuario_id === manpowerState.filterResp;
         const matchGrupo = !manpowerState.filterGrupo || grupo === manpowerState.filterGrupo;
         const matchIni = !manpowerState.iniDesde || (r.fecha && r.fecha >= manpowerState.iniDesde);
