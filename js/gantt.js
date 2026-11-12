@@ -808,7 +808,6 @@ async function generarPDFGantt() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
     btn.disabled = true;
 
-    // 1. Guardar estado original
     const estadoOriginal = {
         iniDesde: ganttState.iniDesde,
         iniHasta: ganttState.iniHasta,
@@ -817,7 +816,6 @@ async function generarPDFGantt() {
         viewMode: ganttState.viewMode
     };
 
-    // 2. Obtener parámetros
     const fIni = document.getElementById('exp-fecha-ini').value;
     const fFin = document.getElementById('exp-fecha-fin').value;
     const tamano = document.getElementById('exp-tamano').value;
@@ -825,25 +823,53 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 3. FILTRO ESTRICTO: Solo tareas que caen dentro del rango
-    // Esto evita que el Gantt se expanda hacia atrás por una tarea vieja
-    const tareasFiltradas = state.tasksCache.filter(t => 
+    // 1. Filtrar solo las tareas reales que están dentro del rango
+    const tareasReales = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
         t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_inicio_programado <= fFin && // Empieza antes o durante
-        t.fecha_fin >= fIni                  // Termina después o durante
+        t.fecha_fin >= fIni && 
+        t.fecha_inicio_programado <= fFin
     );
 
-    // 4. Inicializar Gantt temporal con SOLO esas tareas
+    // 2. Crear las tareas "fantasma" para forzar el encuadre
+    const fechaFinMasUnDia = new Date(fFin + 'T00:00:00');
+    fechaFinMasUnDia.setDate(fechaFinMasUnDia.getDate() + 1);
+    const fFinStr = fechaFinMasUnDia.toISOString().split('T')[0];
+
+    const tareasFantasma = [
+        {
+            id: 'phantom-start',
+            name: '',
+            start: fIni,
+            end: fIni,
+            progress: 0,
+            dependencies: '',
+            custom_class: 'gantt-phantom',
+            _isPhantom: true
+        },
+        {
+            id: 'phantom-end',
+            name: '',
+            start: fFinStr,
+            end: fFinStr,
+            progress: 0,
+            dependencies: '',
+            custom_class: 'gantt-phantom',
+            _isPhantom: true
+        }
+    ];
+
+    const tareasParaExportar = [...tareasReales, ...tareasFantasma];
+
+    // 3. Inicializar Gantt temporal
     await new Promise(resolve => {
-        // Forzamos la vista para que el renderizado sea rápido y preciso
         ganttState.viewMode = vista; 
-        inicializarGantt(tareasFiltradas);
-        setTimeout(resolve, 1000); // 1 segundo para asegurar que frappe dibuje todo
+        // Usamos una función de inicialización especial para el PDF
+        inicializarGanttParaPDF(tareasParaExportar);
+        setTimeout(resolve, 1000);
     });
 
-    // 5. Ocultar UI
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
@@ -853,14 +879,11 @@ async function generarPDFGantt() {
 
         const scroller = ganttWrapper.querySelector('.gantt-container');
         
-        // 6. Clonar el Gantt SIN SCROLL
         const tempContainer = document.createElement('div');
         tempContainer.style.position = 'absolute';
         tempContainer.style.left = '-9999px';
         tempContainer.style.top = '0';
         tempContainer.style.backgroundColor = '#ffffff';
-        
-        // El ancho del clon será exactamente el ancho de la barra de scroll
         tempContainer.style.width = scroller ? scroller.scrollWidth + 'px' : ganttWrapper.offsetWidth + 'px';
         
         const clone = ganttWrapper.cloneNode(true);
@@ -873,13 +896,12 @@ async function generarPDFGantt() {
         if (cloneScroller) {
             cloneScroller.style.overflow = 'visible';
             cloneScroller.style.width = tempContainer.style.width;
-            cloneScroller.scrollLeft = 0; // Forzamos inicio desde la izquierda
+            cloneScroller.scrollLeft = 0;
         }
         
         tempContainer.appendChild(clone);
         document.body.appendChild(tempContainer);
 
-        // 7. Capturar
         const canvas = await html2canvas(tempContainer, {
             scale: calidad,
             useCORS: true,
@@ -890,7 +912,6 @@ async function generarPDFGantt() {
 
         document.body.removeChild(tempContainer);
 
-        // 8. Generar PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
@@ -905,7 +926,6 @@ async function generarPDFGantt() {
         console.error('Error al generar PDF:', error);
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
-        // 9. Restaurar
         uiElements.forEach(el => el.style.display = '');
         
         ganttState.iniDesde = estadoOriginal.iniDesde;
@@ -920,5 +940,60 @@ async function generarPDFGantt() {
         btn.disabled = false;
         const modal = document.getElementById('modal-export-gantt');
         if (modal) modal.remove();
+    }
+}
+function inicializarGanttParaPDF(tasksData) {
+    const container = document.getElementById('gantt-container');
+    if (!container) return;
+
+    if (ganttState.currentGantt) {
+        ganttState.currentGantt = null;
+    }
+    container.innerHTML = '';
+
+    // Mapear las tareas para frappe-gantt
+    const datosGantt = tasksData.map(t => {
+        const estadoClase = (t.estado || '').replace(/\s/g, '-').toLowerCase();
+        return {
+            id: String(t.id),
+            name: t.name || `${t.codigo_contenedor || ''} ${t.actividad || ''}`.substring(0, 70),
+            start: t.start || t.fecha_inicio_programado,
+            end: t.end || t.fecha_fin,
+            progress: t.progress !== undefined ? t.progress : (t.estado === 'Cerrado' ? 100 : t.estado === 'En proceso' ? 50 : 0),
+            dependencies: '',
+            custom_class: t._isPhantom ? 'gantt-phantom' : `gantt-bar-${estadoClase}`,
+            _estado: t.estado,
+            _isPhantom: t._isPhantom
+        };
+    });
+
+    try {
+        ganttState.currentGantt = new Gantt('#gantt-container', datosGantt, {
+            view_mode: ganttState.viewMode,
+            language: 'es',
+            header_height: 50,
+            column_width: ganttState.viewMode === 'Day' ? 40 : ganttState.viewMode === 'Week' ? 60 : 100,
+            step: 24,
+            bar_height: 24,
+            bar_corner_radius: 4,
+            arrow_curve: 5,
+            padding: 18,
+            date_format: 'YYYY-MM-DD',
+            custom_popup_html: () => '' // Sin popups en el PDF
+        });
+
+        // Pintar barras (ignorando las fantasma)
+        pintarBarrasPorEstado(tasksData.filter(t => !t._isPhantom));
+
+        // Ocultar visualmente las barras fantasma
+        setTimeout(() => {
+            document.querySelectorAll('.gantt-phantom').forEach(el => {
+                el.style.opacity = '0';
+                el.style.pointerEvents = 'none';
+            });
+        }, 100);
+
+    } catch (err) {
+        console.error('Error al crear Gantt para PDF:', err);
     }
 }
