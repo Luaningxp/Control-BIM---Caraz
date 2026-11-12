@@ -106,7 +106,7 @@ export async function guardarSnapshotSemanal() {
         const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer').length;
         const sinFecha = abiertas.filter(t => !t.fecha_fin).length;
 
-        const finSemana = new Date(lunes); finSemana.setDate(lunes.getDate() + 6); finSemana.setHours(23,59,59,999);
+        const finSemana = new Date(lunes); finSemana.setDate(lunes.getDate() + 5); finSemana.setHours(23,59,59,999);
         const tareasSemana = tareas.filter(t => t.fecha_fin && new Date(t.fecha_fin + 'T00:00:00') >= lunes && new Date(t.fecha_fin + 'T00:00:00') <= finSemana);
         const cumplidas = tareasSemana.filter(t => t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= finSemana);
         const ppc = tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null;
