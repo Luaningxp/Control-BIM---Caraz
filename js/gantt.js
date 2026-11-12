@@ -832,17 +832,22 @@ async function generarPDFGantt() {
         t.fecha_inicio_programado <= fFin
     );
 
-    // 2. Crear las tareas "fantasma" para forzar el encuadre
+        // Crear las tareas "fantasma" para forzar el encuadre
     const fechaFinMasUnDia = new Date(fFin + 'T00:00:00');
     fechaFinMasUnDia.setDate(fechaFinMasUnDia.getDate() + 1);
     const fFinStr = fechaFinMasUnDia.toISOString().split('T')[0];
+
+    // Aseguramos que las fantasmas tengan al menos 1 día de duración
+    const fIniMasUnDia = new Date(fIni + 'T00:00:00');
+    fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
+    const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
 
     const tareasFantasma = [
         {
             id: 'phantom-start',
             name: '',
             start: fIni,
-            end: fIni,
+            end: fIniStr, // <--- Un día de duración
             progress: 0,
             dependencies: '',
             custom_class: 'gantt-phantom',
@@ -851,8 +856,8 @@ async function generarPDFGantt() {
         {
             id: 'phantom-end',
             name: '',
-            start: fFinStr,
-            end: fFinStr,
+            start: fFin,
+            end: fFinStr, // <--- Un día de duración
             progress: 0,
             dependencies: '',
             custom_class: 'gantt-phantom',
