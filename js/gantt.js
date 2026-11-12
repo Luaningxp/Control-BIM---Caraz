@@ -774,6 +774,11 @@ window.openExportModal = function() {
                                 <option value="3">Muy Alta (Pesado)</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Reducción (%)</label>
+                            <input type="number" id="exp-escala" class="inp" value="100" min="10" max="100" step="5">
+                            <p class="text-[10px] text-slate-400 mt-1">100% = Tamaño completo. 50% = Mitad de tamaño. Útil para encajar muchas actividades.</p>
+                        </div>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
@@ -808,7 +813,13 @@ async function generarPDFGantt() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
     btn.disabled = true;
 
-    const estadoOriginal = { iniDesde: ganttState.iniDesde, iniHasta: ganttState.iniHasta, finDesde: ganttState.finDesde, finHasta: ganttState.finHasta, viewMode: ganttState.viewMode };
+    const estadoOriginal = {
+        iniDesde: ganttState.iniDesde,
+        iniHasta: ganttState.iniHasta,
+        finDesde: ganttState.finDesde,
+        finHasta: ganttState.finHasta,
+        viewMode: ganttState.viewMode
+    };
 
     const fIni = document.getElementById('exp-fecha-ini').value;
     const fFin = document.getElementById('exp-fecha-fin').value;
@@ -816,13 +827,26 @@ async function generarPDFGantt() {
     const orientacion = document.getElementById('exp-orientacion').value;
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
+    
+    // NUEVO: Leer el porcentaje de reducción
+    const porcentajeReduccion = parseFloat(document.getElementById('exp-escala').value) / 100;
 
+    // 1. Filtrar tareas sin recortar fechas y ordenadas
     const tareasReales = state.tasksCache.filter(t => 
-        t.fecha_inicio_programado && t.fecha_fin && t.fecha_fin >= t.fecha_inicio_programado &&
-        t.fecha_fin >= fIni && t.fecha_inicio_programado <= fFin
-    ).sort((a, b) => (a.fecha_inicio_programado || '9999').localeCompare(b.fecha_inicio_programado || '9999'));
+        t.fecha_inicio_programado && 
+        t.fecha_fin && 
+        t.fecha_fin >= t.fecha_inicio_programado &&
+        t.fecha_fin >= fIni && 
+        t.fecha_inicio_programado <= fFin
+    ).sort((a, b) => {
+        const fechaA = a.fecha_inicio_programado || '9999-12-31';
+        const fechaB = b.fecha_inicio_programado || '9999-12-31';
+        return fechaA.localeCompare(fechaB);
+    });
 
-    const fFinMasUnDia = new Date(fFin + 'T00:00:00'); fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
+    // 2. TAREAS FANTASMA EXACTAS
+    const fFinMasUnDia = new Date(fFin + 'T00:00:00');
+    fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
     const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
 
     const tareasFantasma = [
@@ -830,19 +854,23 @@ async function generarPDFGantt() {
         { id: 'corte-fin', name: '', start: fFin, end: fFinStr, progress: 0, dependencies: '', custom_class: 'gantt-corte', _isPhantom: true }
     ];
 
+    const tareasParaExportar = [...tareasReales, ...tareasFantasma];
+
+    // 3. Inicializar Gantt temporal
     await new Promise(resolve => {
         ganttState.viewMode = vista; 
-        inicializarGanttParaPDF([...tareasReales, ...tareasFantasma]);
+        inicializarGanttParaPDF(tareasParaExportar);
         setTimeout(resolve, 1200);
     });
 
     const ganttWrapper = document.getElementById('gantt-container');
     const scrollContainer = ganttWrapper.closest('.overflow-x-auto');
+    
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
     try {
-        // 1. Expandir contenedor para capturar TODO el alto y ancho
+        // 4. Expandir el contenedor para capturar TODO el alto y ancho
         if (scrollContainer) {
             scrollContainer.style.overflow = 'visible';
             scrollContainer.style.maxHeight = 'none';
@@ -858,7 +886,7 @@ async function generarPDFGantt() {
 
         await new Promise(resolve => setTimeout(resolve, 400));
 
-        // 2. Capturar TODO el Gantt
+        // 5. Capturar TODO el Gantt
         const canvasCompleto = await html2canvas(ganttWrapper, {
             scale: calidad,
             useCORS: true,
@@ -869,7 +897,7 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 3. Calcular recorte de fechas (usando barras fantasma)
+        // 6. Calcular recorte usando las barras fantasma
         const rectGantt = ganttWrapper.getBoundingClientRect();
         const barraInicio = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-inicio"]');
         const barraFin = ganttWrapper.querySelector('.bar-wrapper[data-id="corte-fin"]');
@@ -884,41 +912,45 @@ async function generarPDFGantt() {
         pixelFin = Math.min(canvasCompleto.width, pixelFin);
         const anchoRecorte = pixelFin - pixelInicio;
 
-        // 4. Crear canvas recortado
+        // 7. Crear el canvas recortado (solo fechas)
         const canvasRecortado = document.createElement('canvas');
         canvasRecortado.width = anchoRecorte;
         canvasRecortado.height = canvasCompleto.height;
         const ctx = canvasRecortado.getContext('2d');
         ctx.drawImage(canvasCompleto, pixelInicio, 0, anchoRecorte, canvasCompleto.height, 0, 0, anchoRecorte, canvasCompleto.height);
 
-        // 5. GENERAR PDF MULTIPÁGINA
+        // 8. GENERAR PDF CON REDUCCIÓN MANUAL
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
-        // Calcular la altura de la imagen escalada al ancho del PDF
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvasRecortado.height * imgWidth) / canvasRecortado.width;
+        // Calcular la proporción de la imagen
+        const imgAspect = canvasRecortado.width / canvasRecortado.height;
+        const pageAspect = pdfWidth / pdfHeight;
 
-        let heightLeft = imgHeight;
-        let position = 0;
-        
-        // Convertir el canvas a imagen
-        const imgData = canvasRecortado.toDataURL('image/jpeg', 0.95);
-
-        // Primera página
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-
-        // Páginas adicionales
-        while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pdfHeight;
+        // Calcular tamaño base (ajustado a la hoja)
+        let baseWidth, baseHeight;
+        if (imgAspect > pageAspect) {
+            baseWidth = pdfWidth;
+            baseHeight = pdfWidth / imgAspect;
+        } else {
+            baseHeight = pdfHeight;
+            baseWidth = pdfHeight * imgAspect;
         }
+
+        // Aplicar el porcentaje de reducción manual
+        const finalWidth = baseWidth * porcentajeReduccion;
+        const finalHeight = baseHeight * porcentajeReduccion;
+
+        // Centrar en la hoja
+        const xOffset = (pdfWidth - finalWidth) / 2;
+        const yOffset = (pdfHeight - finalHeight) / 2;
+
+        const imgData = canvasRecortado.toDataURL('image/jpeg', 0.95);
+        
+        pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
 
         pdf.save(`Gantt_BIM_${fIni}_al_${fFin}.pdf`);
 
