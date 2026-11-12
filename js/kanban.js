@@ -40,20 +40,17 @@ export function renderKanban(container) {
 
     const filtrosActivos = Object.values(kanbanState).filter(v => v !== '' && v !== false).length;
 
-        // Aplicar filtros
+    // Aplicar filtros
     const filteredTasks = state.tasksCache.filter(t => {
-        const searchLower = (kanbanState.search || '').toLowerCase().trim();
-        
-        const matchSearch = !searchLower || 
-            (t.actividad || '').toLowerCase().includes(searchLower) ||
-            (t.codigo_contenedor || '').toLowerCase().includes(searchLower);
-            
+        const matchSearch = !kanbanState.search || 
+            (t.actividad || '').toLowerCase().includes(kanbanState.search.toLowerCase()) ||
+            (t.codigo_contenedor || '').toLowerCase().includes(kanbanState.search.toLowerCase());
         const matchGrupo = !kanbanState.filterGrupo || t.grupo === kanbanState.filterGrupo;
         const matchResp = !kanbanState.filterResp || t.responsable_id === kanbanState.filterResp;
         const matchRecursos = !kanbanState.filterRecursos || state.actividadRecursosCache.some(r => 
             r.pendiente_id === t.id && r.usuario_id === kanbanState.filterRecursos
         );
-        const matchEstado = kanbanState.estadosOcultos.length === 0 || !kanbanState.estadosOcultos.includes(t.estado);
+       const matchEstado = kanbanState.estadosOcultos.length === 0 || !kanbanState.estadosOcultos.includes(t.estado);
         const matchIniDesde = !kanbanState.iniDesde || (t.fecha_inicio_programado && t.fecha_inicio_programado >= kanbanState.iniDesde);
         const matchIniHasta = !kanbanState.iniHasta || (t.fecha_inicio_programado && t.fecha_inicio_programado <= kanbanState.iniHasta);
         const matchFinDesde = !kanbanState.finDesde || (t.fecha_fin && t.fecha_fin >= kanbanState.finDesde);
@@ -61,14 +58,12 @@ export function renderKanban(container) {
         const matchVencidas = !kanbanState.soloVencidas || semaforo(t) === 'Vencida';
         const matchPorVencer = !kanbanState.soloPorVencer || semaforo(t) === 'Por vencer';
         const matchSinFecha = !kanbanState.soloSinFecha || semaforo(t) === 'Sin fecha';
-        
         const matchAsignados = !kanbanState.soloAsignadosAMi || (() => {
-            const uid = state.currentUser?.id;
+        const uid = state.currentUser?.id;
             if (!uid) return false;
             if (t.responsable_id === uid) return true;
             return state.actividadRecursosCache.some(r => r.pendiente_id === t.id && r.usuario_id === uid);
         })();
-
         return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
                matchIniDesde && matchIniHasta && matchFinDesde && matchFinHasta &&
                matchVencidas && matchPorVencer && matchSinFecha && matchAsignados;
@@ -79,8 +74,7 @@ export function renderKanban(container) {
             <div class="flex flex-1 items-center gap-2 w-full">
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="kb-search" placeholder="Buscar actividad..." value="${kanbanState.search}" 
-       class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900/50 transition">
+                    <input type="text" id="kb-search" placeholder="Buscar actividad..." value="${kanbanState.search}" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
                 <button onclick="window.toggleKanbanFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
@@ -278,24 +272,9 @@ export function renderKanban(container) {
         document.body.insertAdjacentHTML('beforeend', drawerHtml);
     }
 
-                const kbSearch = document.getElementById('kb-search');
-    if (kbSearch) {
-        kbSearch.addEventListener('input', (e) => {
-            kanbanState.search = e.target.value;
-            
-            clearTimeout(window.kbSearchTimeout);
-            window.kbSearchTimeout = setTimeout(() => {
-                window.renderView();
-                const inputAfterRender = document.getElementById('kb-search');
-                if (inputAfterRender) {
-                    inputAfterRender.focus();
-                    const val = inputAfterRender.value;
-                    inputAfterRender.value = '';
-                    inputAfterRender.value = val;
-                }
-            }, 400);
-        });
-    }
+    document.getElementById('kb-search').addEventListener('input', (e) => { kanbanState.search = e.target.value; window.renderView(); });
+}
+
 window.toggleKanbanFilterDrawer = function() {
     const drawer = document.getElementById('kanban-filter-drawer');
     const overlay = document.getElementById('kanban-filter-drawer-overlay');
@@ -327,7 +306,7 @@ window.clearKanbanFilters = function() {
         soloAsignadosAMi: true
     };
 
-        // ▼ Añadir esta línea ▼
+    // ▼ Añadir esta línea ▼
     const drawer = document.getElementById('kanban-filter-drawer');
     if (drawer) drawer.remove();
     const overlay = document.getElementById('kanban-filter-drawer-overlay');
@@ -336,7 +315,6 @@ window.clearKanbanFilters = function() {
 
     window.renderView();
 };
-
 export function onDragStart(e, id) {
     if (e.currentTarget.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
     state.dragId = id;
@@ -390,5 +368,3 @@ window.toggleKanbanEstadoOculto = function(estado, checked) {
     }
     window.renderView();
 };
-
-
