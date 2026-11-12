@@ -823,56 +823,29 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-        // 1. Filtro: Incluir tareas que se solapan con el rango
-    const tareasReales = state.tasksCache
-        .filter(t => 
-            t.fecha_inicio_programado && 
-            t.fecha_fin && 
-            t.fecha_fin >= t.fecha_inicio_programado &&
-            t.fecha_fin >= fIni && 
-            t.fecha_inicio_programado <= fFin
-        )
-        .map(t => {
-            // Recortamos las fechas para que no se salgan del rango
-            const inicioRecortado = t.fecha_inicio_programado < fIni ? fIni : t.fecha_inicio_programado;
-            const finRecortado = t.fecha_fin > fFin ? fFin : t.fecha_fin;
-            return {
-                ...t,
-                fecha_inicio_programado: inicioRecortado,
-                fecha_fin: finRecortado
-            };
-        });
+    // 1. INCLUIR TAREAS SIN RECORTAR SUS FECHAS
+    // Solo filtramos las que no se solapan con el rango en absoluto
+    const tareasReales = state.tasksCache.filter(t => 
+        t.fecha_inicio_programado && 
+        t.fecha_fin && 
+        t.fecha_fin >= t.fecha_inicio_programado &&
+        t.fecha_fin >= fIni && 
+        t.fecha_inicio_programado <= fFin
+    );
 
-    // 2. Tareas fantasma: una al inicio (para anclar la izquierda) y una 10 días después del fin (para dar margen a la derecha)
+    // 2. TAREAS FANTASMA CON MARGEN
+    // Ponemos una fantasma al inicio y otra al final con margen para dar espacio
     const fIniMasUnDia = new Date(fIni + 'T00:00:00');
     fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
     const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
 
     const fFinMargen = new Date(fFin + 'T00:00:00');
-    fFinMargen.setDate(fFinMargen.getDate() + 10); // 10 días de margen
+    fFinMargen.setDate(fFinMargen.getDate() + (vista === 'Month' ? 30 : 7));
     const fFinMargenStr = fFinMargen.toISOString().split('T')[0];
 
     const tareasFantasma = [
-        { 
-            id: 'phantom-start', 
-            name: '', 
-            start: fIni, 
-            end: fIniStr, 
-            progress: 0, 
-            dependencies: '', 
-            custom_class: 'gantt-phantom', 
-            _isPhantom: true 
-        },
-        { 
-            id: 'phantom-end', 
-            name: '', 
-            start: fFinMargenStr, 
-            end: fFinMargenStr, 
-            progress: 0, 
-            dependencies: '', 
-            custom_class: 'gantt-phantom', 
-            _isPhantom: true 
-        }
+        { id: 'phantom-start', name: '', start: fIni, end: fIniStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true },
+        { id: 'phantom-end', name: '', start: fFinMargenStr, end: fFinMargenStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true }
     ];
 
     const tareasParaExportar = [...tareasReales, ...tareasFantasma];
@@ -884,7 +857,6 @@ async function generarPDFGantt() {
         setTimeout(resolve, 1000);
     });
 
-    // 4. Guardar estilos originales del contenedor y UI
     const ganttWrapper = document.getElementById('gantt-container');
     const scrollContainer = ganttWrapper.closest('.overflow-x-auto');
     
@@ -902,8 +874,7 @@ async function generarPDFGantt() {
     const uiElements = document.querySelectorAll('.gantt-ui-hide');
     uiElements.forEach(el => el.style.display = 'none');
 
-     try {
-        // 5. EXPANDIR EL CONTENEDOR REAL PARA CAPTURAR TODO
+    try {
         if (scrollContainer) {
             scrollContainer.style.overflow = 'visible';
             scrollContainer.style.maxHeight = 'none';
@@ -916,7 +887,7 @@ async function generarPDFGantt() {
 
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // 6. Capturar el contenedor real ya expandido
+        // 4. Capturar TODO el Gantt
         const canvasCompleto = await html2canvas(ganttWrapper, {
             scale: calidad,
             useCORS: true,
@@ -927,42 +898,62 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 7. RECORTAR LA IMAGEN POR LA DERECHA HASTA LA FECHA DE FIN
-        // Buscamos el elemento del header que corresponde a la fecha de fin
+        // 5. CALCULAR RECORTE POR IZQUIERDA Y DERECHA
         const ticks = ganttWrapper.querySelectorAll('.grid-header .tick');
         const rectGantt = ganttWrapper.getBoundingClientRect();
-        let pixelesCorte = canvasCompleto.width;
-
-        // Buscamos el tick cuya fecha sea la última que sea <= fFin
-        const fFinDate = new Date(fFin + 'T00:00:00');
-        let tickCorte = null;
         
+        const fIniDate = new Date(fIni + 'T00:00:00');
+        const fFinDate = new Date(fFin + 'T00:00:00');
+        
+        let tickIni = null;
+        let tickFin = null;
+
         ticks.forEach(tick => {
             const dateStr = tick.getAttribute('data-date');
-            if (dateStr) {
-                const tickDate = new Date(dateStr + 'T00:00:00');
-                if (tickDate <= fFinDate) {
-                    tickCorte = tick;
-                }
+            if (!dateStr) return;
+            const tickDate = new Date(dateStr + 'T00:00:00');
+            
+            // Buscamos el primer tick que sea >= fIni
+            if (tickDate >= fIniDate && !tickIni) {
+                tickIni = tick;
+            }
+            // Buscamos el último tick que sea <= fFin
+            if (tickDate <= fFinDate) {
+                tickFin = tick;
             }
         });
 
-        if (tickCorte) {
-            // Calculamos la posición del tick en píxeles escalados
-            const tickRect = tickCorte.getBoundingClientRect();
-            const offsetDerecha = (tickRect.right - rectGantt.left) * calidad;
-            // Aseguramos que no nos pasemos del ancho total del canvas
-            pixelesCorte = Math.min(offsetDerecha, canvasCompleto.width);
+        let pixelInicio = 0;
+        let pixelFin = canvasCompleto.width;
+
+        if (tickIni) {
+            const tickRect = tickIni.getBoundingClientRect();
+            pixelInicio = (tickRect.left - rectGantt.left) * calidad;
+        }
+        if (tickFin) {
+            const tickRect = tickFin.getBoundingClientRect();
+            pixelFin = (tickRect.right - rectGantt.left) * calidad;
         }
 
-        // Creamos un nuevo canvas solo con la parte izquierda
+        // Aseguramos que los límites estén dentro del canvas
+        pixelInicio = Math.max(0, pixelInicio);
+        pixelFin = Math.min(canvasCompleto.width, pixelFin);
+        
+        const anchoRecorte = pixelFin - pixelInicio;
+
+        // 6. Crear el canvas recortado
         const canvasRecortado = document.createElement('canvas');
-        canvasRecortado.width = pixelesCorte;
+        canvasRecortado.width = anchoRecorte;
         canvasRecortado.height = canvasCompleto.height;
         const ctx = canvasRecortado.getContext('2d');
-        ctx.drawImage(canvasCompleto, 0, 0, pixelesCorte, canvasCompleto.height, 0, 0, pixelesCorte, canvasCompleto.height);
+        
+        ctx.drawImage(
+            canvasCompleto, 
+            pixelInicio, 0, anchoRecorte, canvasCompleto.height, // Origen (recorte)
+            0, 0, anchoRecorte, canvasCompleto.height           // Destino
+        );
 
-        // 8. Generar PDF con el canvas recortado
+        // 7. Generar PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
@@ -977,7 +968,6 @@ async function generarPDFGantt() {
         console.error('Error al generar PDF:', error);
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
-        // 8. RESTAURAR TODO
         uiElements.forEach(el => el.style.display = '');
         
         if (scrollContainer) {
