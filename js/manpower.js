@@ -124,7 +124,7 @@ export function renderManpower(container) {
         registros = registros.filter(m => m.usuario_id === state.currentUser?.id);
     }
 
-        // Aplicar filtros
+            // Aplicar filtros
     registros = registros.filter(r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
@@ -133,24 +133,11 @@ export function renderManpower(container) {
         const actividad = t ? t.actividad : 'General';
 
         const q = (manpowerState.search || '').toLowerCase().trim();
-        
-        // Buscar también si el nombre del usuario es el responsable o recurso de la tarea
-        let nombresRecursos = '';
-        if (t) {
-            nombresRecursos = state.actividadRecursosCache
-                .filter(ar => ar.pendiente_id === t.id)
-                .map(ar => {
-                    const perfil = state.perfilesCache.find(perf => perf.id === ar.usuario_id);
-                    return perfil ? nombreFormateado(perfil).toLowerCase() : '';
-                })
-                .join(' ');
-        }
 
+        // La búsqueda se limita al Nombre del Usuario y a la Actividad
         const matchSearch = !q || 
             nombre.toLowerCase().includes(q) ||
-            actividad.toLowerCase().includes(q) ||
-            (t && nombreResponsable(t, state.perfilesCache).toLowerCase().includes(q)) ||
-            nombresRecursos.includes(q);
+            actividad.toLowerCase().includes(q);
 
         const matchResp = !manpowerState.filterResp || r.usuario_id === manpowerState.filterResp;
         const matchGrupo = !manpowerState.filterGrupo || grupo === manpowerState.filterGrupo;
