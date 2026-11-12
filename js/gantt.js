@@ -292,16 +292,17 @@ function inicializarGantt(tareas) {
 
         pintarBarrasPorEstado(tareas);
 
-        ganttState.currentGantt.on_click = (task) => {
+                ganttState.currentGantt.on_click = (task) => {
             if (task.id === 'today-line') return;
             window.editTask(parseInt(task.id));
-                    // Forzar el scroll a la fecha de hoy
+        };
+
+        // Forzar el scroll a la fecha de hoy
         setTimeout(() => {
             const todayBar = document.querySelector('.gantt-container .bar-wrapper[data-id="today-line"]');
             if (todayBar) {
                 todayBar.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             } else {
-                // Si no encuentra la barra de hoy, intenta con el contenedor scrollable
                 const scroller = document.querySelector('.gantt-container .gantt');
                 if (scroller) {
                     const today = new Date().toISOString().split('T')[0];
@@ -310,7 +311,6 @@ function inicializarGantt(tareas) {
                 }
             }
         }, 600);
-        };
 
     } catch (err) {
         console.error('Error al crear Gantt:', err);
@@ -430,8 +430,9 @@ function dibujarLineaHoyNativa() {
         ">HOY</div>
     `;
 
-    scroller.appendChild(line);
+        scroller.appendChild(line);
 }
+
 window.setGanttView = function(mode) {
     ganttState.viewMode = mode;
     if (ganttState.currentGantt) {
