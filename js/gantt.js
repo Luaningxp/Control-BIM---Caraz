@@ -823,18 +823,20 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 1. INCLUIR TAREAS SIN RECORTAR SUS FECHAS
-    // Solo filtramos las que no se solapan con el rango en absoluto
+    // 1. INCLUIR TAREAS SIN RECORTAR SUS FECHAS Y ORDENADAS
     const tareasReales = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
         t.fecha_fin >= t.fecha_inicio_programado &&
         t.fecha_fin >= fIni && 
         t.fecha_inicio_programado <= fFin
-    );
+    ).sort((a, b) => {
+        const fechaA = a.fecha_inicio_programado || '9999-12-31';
+        const fechaB = b.fecha_inicio_programado || '9999-12-31';
+        return fechaA.localeCompare(fechaB);
+    });
 
     // 2. TAREAS FANTASMA CON MARGEN
-    // Ponemos una fantasma al inicio y otra al final con margen para dar espacio
     const fIniMasUnDia = new Date(fIni + 'T00:00:00');
     fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
     const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
@@ -898,46 +900,56 @@ async function generarPDFGantt() {
             windowHeight: ganttWrapper.scrollHeight
         });
 
-        // 5. CALCULAR RECORTE POR IZQUIERDA Y DERECHA
-        const ticks = ganttWrapper.querySelectorAll('.grid-header .tick');
+        // 5. CALCULAR RECORTE EXACTO POR DÍA (No por tick de vista)
+        const ticks = Array.from(ganttWrapper.querySelectorAll('.grid-header .tick'));
         const rectGantt = ganttWrapper.getBoundingClientRect();
         
         const fIniDate = new Date(fIni + 'T00:00:00');
         const fFinDate = new Date(fFin + 'T00:00:00');
         
-        let tickIni = null;
-        let tickFin = null;
-
-        ticks.forEach(tick => {
-            const dateStr = tick.getAttribute('data-date');
-            if (!dateStr) return;
-            const tickDate = new Date(dateStr + 'T00:00:00');
-            
-            // Buscamos el primer tick que sea >= fIni
-            if (tickDate >= fIniDate && !tickIni) {
-                tickIni = tick;
-            }
-            // Buscamos el último tick que sea <= fFin
-            if (tickDate <= fFinDate) {
-                tickFin = tick;
-            }
-        });
-
         let pixelInicio = 0;
         let pixelFin = canvasCompleto.width;
 
-        if (tickIni) {
-            const tickRect = tickIni.getBoundingClientRect();
-            pixelInicio = (tickRect.left - rectGantt.left) * calidad;
-        }
-        if (tickFin) {
-            const tickRect = tickFin.getBoundingClientRect();
-            pixelFin = (tickRect.right - rectGantt.left) * calidad;
-        }
+        // Función para calcular píxeles basados en la proporción de días del tick
+        const calcularPixelesFecha = (fechaTarget, esInicio) => {
+            // Encontrar el tick que contiene la fecha
+            for (let i = 0; i < ticks.length; i++) {
+                const tick = ticks[i];
+                const dateStr = tick.getAttribute('data-date');
+                if (!dateStr) continue;
+                
+                const tickDate = new Date(dateStr + 'T00:00:00');
+                const tickRect = tick.getBoundingClientRect();
+                
+                // Calcular la duración del tick (en días)
+                let diasTick = 1;
+                if (vista === 'Week') diasTick = 7;
+                if (vista === 'Month') diasTick = 30; // Aproximado
 
-        // Aseguramos que los límites estén dentro del canvas
-        pixelInicio = Math.max(0, pixelInicio);
-        pixelFin = Math.min(canvasCompleto.width, pixelFin);
+                // Verificar si la fecha cae dentro de este tick
+                const diffDias = (fechaTarget - tickDate) / (1000 * 60 * 60 * 24);
+                
+                if (diffDias >= 0 && diffDias < diasTick) {
+                    // Calcular píxeles proporcionalmente
+                    const proporcion = diffDias / diasTick;
+                    const anchoTick = tickRect.width;
+                    const offsetX = (tickRect.left - rectGantt.left) * calidad;
+                    
+                    if (esInicio) {
+                        return offsetX + (proporcion * anchoTick * calidad);
+                    } else {
+                        return offsetX + (proporcion * anchoTick * calidad) + (anchoTick * calidad / diasTick);
+                    }
+                }
+            }
+            return null;
+        };
+
+        const pixIni = calcularPixelesFecha(fIniDate, true);
+        const pixFin = calcularPixelesFecha(fFinDate, false);
+
+        if (pixIni !== null) pixelInicio = Math.max(0, pixIni);
+        if (pixFin !== null) pixelFin = Math.min(canvasCompleto.width, pixFin);
         
         const anchoRecorte = pixelFin - pixelInicio;
 
@@ -949,8 +961,8 @@ async function generarPDFGantt() {
         
         ctx.drawImage(
             canvasCompleto, 
-            pixelInicio, 0, anchoRecorte, canvasCompleto.height, // Origen (recorte)
-            0, 0, anchoRecorte, canvasCompleto.height           // Destino
+            pixelInicio, 0, anchoRecorte, canvasCompleto.height,
+            0, 0, anchoRecorte, canvasCompleto.height
         );
 
         // 7. Generar PDF
