@@ -390,7 +390,7 @@ export function renderRecursos(container) {
         <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Cumplimiento semanal del 100%</h4>
-                <p class="text-[11px] text-slate-500">% de días hábiles (lun-vie) con 100% registrado, por modelador y semana.</p>
+                <p class="text-[11px] text-slate-500">% de días laborables reales (según roster) con 100% registrado, por modelador y semana.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
