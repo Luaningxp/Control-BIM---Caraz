@@ -172,6 +172,11 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     text-align: center; margin-bottom: 1rem; display: none;
 }
 
+.gantt-phantom {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* =========================================
    MAGIA PARA EL MODO OSCURO
    ========================================= */
