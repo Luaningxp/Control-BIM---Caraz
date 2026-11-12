@@ -715,14 +715,16 @@ window.ocupacionMove = function(dir) {
 // ============================================
 
 window.openExportModal = function() {
-    if (document.getElementById('modal-export-gantt')) return; // Evitar duplicados
+    // Si el modal ya existe, lo eliminamos para que se cree de nuevo limpio
+    const modalExistente = document.getElementById('modal-export-gantt');
+    if (modalExistente) modalExistente.remove();
 
     const modalHtml = `
-        <div id="modal-export-gantt" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div id="modal-export-gantt" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4 border border-slate-200 dark:border-slate-700">
                 <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
                     <h3 class="font-bold text-sm text-slate-800 dark:text-white">Exportar Gantt a PDF</h3>
-                    <button onclick="document.getElementById('modal-export-gantt').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    <button onclick="document.getElementById('modal-export-gantt').remove()" class="text-slate-400 hover:text-slate-700 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 
                 <form id="form-export-gantt" class="space-y-3 text-xs">
@@ -773,7 +775,7 @@ window.openExportModal = function() {
                     </div>
 
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                        <button type="button" onclick="document.getElementById('modal-export-gantt').classList.add('hidden')" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300">Cancelar</button>
+                        <button type="button" onclick="document.getElementById('modal-export-gantt').remove()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300">Cancelar</button>
                         <button type="submit" id="btn-generar-pdf" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700 flex items-center gap-2">
                             <i class="fa-solid fa-download"></i> Descargar PDF
                         </button>
@@ -784,16 +786,13 @@ window.openExportModal = function() {
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Establecer fechas por defecto (hoy - 1 mes, hoy + 1 mes)
+    // Fechas por defecto basadas en las tareas reales
     const hoy = new Date();
     const haceUnMes = new Date(hoy); haceUnMes.setMonth(hoy.getMonth() - 1);
     const dentroUnMes = new Date(hoy); dentroUnMes.setMonth(hoy.getMonth() + 1);
     
     document.getElementById('exp-fecha-ini').value = haceUnMes.toISOString().split('T')[0];
     document.getElementById('exp-fecha-fin').value = dentroUnMes.toISOString().split('T')[0];
-
-    document.getElementById('modal-export-gantt').classList.remove('hidden');
-    document.getElementById('modal-export-gantt').classList.add('flex');
 
     document.getElementById('form-export-gantt').onsubmit = async (e) => {
         e.preventDefault();
@@ -807,7 +806,7 @@ async function generarPDFGantt() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
     btn.disabled = true;
 
-    // 1. Guardar estado original del Gantt
+    // 1. Guardar estado original
     const estadoOriginal = {
         iniDesde: ganttState.iniDesde,
         iniHasta: ganttState.iniHasta,
@@ -816,7 +815,7 @@ async function generarPDFGantt() {
         viewMode: ganttState.viewMode
     };
 
-    // 2. Obtener parámetros del formulario
+    // 2. Obtener parámetros
     const fIni = document.getElementById('exp-fecha-ini').value;
     const fFin = document.getElementById('exp-fecha-fin').value;
     const tamano = document.getElementById('exp-tamano').value;
@@ -824,14 +823,13 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 3. Aplicar filtros y vista temporalmente
+    // 3. Aplicar filtros temporalmente
     ganttState.iniDesde = fIni;
-    ganttState.finDesde = fIni; // Ocultamos las que empiezan antes
+    ganttState.finDesde = fIni;
     ganttState.iniHasta = fFin;
     ganttState.finHasta = fFin;
     ganttState.viewMode = vista;
 
-    // Forzar re-renderizado del Gantt con los filtros
     const tareasFiltradas = state.tasksCache.filter(t => 
         t.fecha_inicio_programado && 
         t.fecha_fin && 
@@ -840,70 +838,91 @@ async function generarPDFGantt() {
         t.fecha_fin >= fIni
     );
     
-    // Inicializar Gantt temporal
+    // Inicializar Gantt temporal y esperar a que frappe lo dibuje
     await new Promise(resolve => {
         inicializarGantt(tareasFiltradas);
-        setTimeout(resolve, 800); // Esperar a que frappe dibuje todo
+        setTimeout(resolve, 1000); // Damos 1 segundo para asegurar que todo se dibuje
     });
 
-    // 4. Ocultar botones de la UI para que no salgan en el PDF
-    const uiElements = [
-        document.querySelector('button[onclick="window.openExportModal()"]'),
-        document.querySelector('.flex.border.border-slate-300.rounded-lg.overflow-hidden'), // Botones Día/Semana/Mes
-        document.querySelector('button[onclick="window.fetchAll().then(window.renderView)"]') // Botón refrescar
-    ];
-    uiElements.forEach(el => { if(el) el.style.display = 'none'; });
-
-    // Ocultar la barra de filtros superior del Gantt temporalmente
-    const headerGantt = document.getElementById('gantt-container')?.closest('.card');
-    const barraFiltros = headerGantt?.previousElementSibling;
-    if (barraFiltros) barraFiltros.style.display = 'none';
+    // 4. Ocultar barras de UI temporalmente
+    const uiElements = document.querySelectorAll('.gantt-ui-hide');
+    uiElements.forEach(el => el.style.display = 'none');
 
     try {
-        // 5. Capturar el Gantt
-        const elemento = document.getElementById('gantt-container');
+        const ganttWrapper = document.getElementById('gantt-container');
+        if (!ganttWrapper) throw new Error("No se encontró el contenedor del Gantt");
+
+        // 5. CLONAR EL GANTT SIN SCROLL
+        // Buscamos el contenedor interno que tiene el scroll
+        const scroller = ganttWrapper.querySelector('.gantt-container');
         
-        // Necesitamos un clon para que html2canvas no sufra con los scrolls
-        const canvas = await html2canvas(elemento, {
+        // Creamos un contenedor temporal fuera de la pantalla
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '0';
+        tempContainer.style.width = scroller ? scroller.scrollWidth + 'px' : ganttWrapper.offsetWidth + 'px';
+        tempContainer.style.backgroundColor = '#ffffff';
+        
+        // Clonamos el SVG o el contenido del Gantt
+        const clone = ganttWrapper.cloneNode(true);
+        // Quitamos restricciones de scroll y altura del clon
+        clone.style.overflow = 'visible';
+        clone.style.height = 'auto';
+        clone.style.maxHeight = 'none';
+        clone.style.width = tempContainer.style.width;
+        
+        const cloneScroller = clone.querySelector('.gantt-container');
+        if (cloneScroller) {
+            cloneScroller.style.overflow = 'visible';
+            cloneScroller.style.width = tempContainer.style.width;
+            cloneScroller.scrollLeft = 0; // Aseguramos que empiece desde el inicio
+        }
+        
+        tempContainer.appendChild(clone);
+        document.body.appendChild(tempContainer);
+
+        // 6. Capturar el clon temporal
+        const canvas = await html2canvas(tempContainer, {
             scale: calidad,
             useCORS: true,
             backgroundColor: '#ffffff',
-            windowWidth: elemento.scrollWidth,
-            windowHeight: elemento.scrollHeight
+            width: tempContainer.offsetWidth,
+            height: tempContainer.offsetHeight
         });
 
-        // 6. Crear PDF
+        // Eliminar el contenedor temporal
+        document.body.removeChild(tempContainer);
+
+        // 7. Crear PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF(orientacion, 'mm', tamano);
         
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const pdfWidth = pdf.internal.pageSize.getWidth();
+        // Calcular proporción
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-        pdf.addImage(imgData, 'JPEG', 0, 10, pdfWidth, pdfHeight);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`Gantt_BIM_${fIni}_al_${fFin}.pdf`);
 
     } catch (error) {
         console.error('Error al generar PDF:', error);
         alert('Hubo un error al generar el PDF. Revisa la consola.');
     } finally {
-        // 7. Restaurar UI y estado original
-        uiElements.forEach(el => { if(el) el.style.display = ''; });
-        if (barraFiltros) barraFiltros.style.display = '';
-
-        // Restaurar estado
+        // 8. Restaurar UI y estado
+        uiElements.forEach(el => el.style.display = '');
         ganttState.iniDesde = estadoOriginal.iniDesde;
         ganttState.iniHasta = estadoOriginal.iniHasta;
         ganttState.finDesde = estadoOriginal.finDesde;
         ganttState.finHasta = estadoOriginal.finHasta;
         ganttState.viewMode = estadoOriginal.viewMode;
         
-        // Re-renderizar la vista original
         window.renderView();
 
-        // Restaurar botón
         btn.innerHTML = htmlOriginal;
         btn.disabled = false;
-        document.getElementById('modal-export-gantt').classList.add('hidden');
+        const modal = document.getElementById('modal-export-gantt');
+        if (modal) modal.remove();
     }
 }
