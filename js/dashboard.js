@@ -16,7 +16,7 @@ export function renderDashboard(container) {
     inicioSemana.setDate(diffLunes);
     inicioSemana.setHours(0,0,0,0);
     const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6);
+    finSemana.setDate(inicioSemana.getDate() + 5);
     finSemana.setHours(23,59,59,999);
 
     const cerradasEstaSemana = state.tasksCache.filter(t => {
@@ -205,7 +205,7 @@ function calcularKPIs() {
     inicioSemana.setDate(diffLunes);
     inicioSemana.setHours(0,0,0,0);
     const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6);
+    finSemana.setDate(inicioSemana.getDate() + 5);
     finSemana.setHours(23,59,59,999);
 
     const tareasDeEstaSemana = state.tasksCache.filter(t => {
@@ -248,7 +248,7 @@ function renderCharts(inicioSemana, finSemana) {
         const inicio = new Date(inicioSemana);
         inicio.setDate(inicio.getDate() - i * 7);
         const fin = new Date(inicio);
-        fin.setDate(inicio.getDate() + 6);
+        fin.setDate(inicio.getDate() + 5);
         fin.setHours(23,59,59,999);
 
         const tareasSemana = state.tasksCache.filter(t => {
