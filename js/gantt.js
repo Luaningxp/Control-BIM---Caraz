@@ -823,38 +823,56 @@ async function generarPDFGantt() {
     const vista = document.getElementById('exp-vista').value;
     const calidad = parseFloat(document.getElementById('exp-calidad').value);
 
-    // 1. Filtrar tareas del rango
-        // Filtro ESTRICTO: Solo tareas que empiezan dentro del rango
-    // Esto evita que frappe-gantt expanda el lienzo hacia atrás
-        const tareasReales = state.tasksCache
+        // 1. Filtro: Incluir tareas que se solapan con el rango
+    const tareasReales = state.tasksCache
         .filter(t => 
             t.fecha_inicio_programado && 
             t.fecha_fin && 
             t.fecha_fin >= t.fecha_inicio_programado &&
-            t.fecha_fin >= fIni &&  // Se solapa con el rango
+            t.fecha_fin >= fIni && 
             t.fecha_inicio_programado <= fFin
         )
         .map(t => {
-            // Si la tarea empieza antes del rango, la recortamos a fIni
+            // Recortamos las fechas para que no se salgan del rango
             const inicioRecortado = t.fecha_inicio_programado < fIni ? fIni : t.fecha_inicio_programado;
+            const finRecortado = t.fecha_fin > fFin ? fFin : t.fecha_fin;
             return {
                 ...t,
-                fecha_inicio_programado: inicioRecortado
+                fecha_inicio_programado: inicioRecortado,
+                fecha_fin: finRecortado
             };
         });
 
-    // 2. Tareas fantasma con duración mínima de 1 día
+    // 2. Tareas fantasma: una al inicio (para anclar la izquierda) y una 10 días después del fin (para dar margen a la derecha)
     const fIniMasUnDia = new Date(fIni + 'T00:00:00');
     fIniMasUnDia.setDate(fIniMasUnDia.getDate() + 1);
     const fIniStr = fIniMasUnDia.toISOString().split('T')[0];
 
-    const fFinMasUnDia = new Date(fFin + 'T00:00:00');
-    fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
-    const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
+    const fFinMargen = new Date(fFin + 'T00:00:00');
+    fFinMargen.setDate(fFinMargen.getDate() + 10); // 10 días de margen
+    const fFinMargenStr = fFinMargen.toISOString().split('T')[0];
 
     const tareasFantasma = [
-        { id: 'phantom-start', name: '', start: fIni, end: fIniStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true },
-        { id: 'phantom-end', name: '', start: fFin, end: fFinStr, progress: 0, dependencies: '', custom_class: 'gantt-phantom', _isPhantom: true }
+        { 
+            id: 'phantom-start', 
+            name: '', 
+            start: fIni, 
+            end: fIniStr, 
+            progress: 0, 
+            dependencies: '', 
+            custom_class: 'gantt-phantom', 
+            _isPhantom: true 
+        },
+        { 
+            id: 'phantom-end', 
+            name: '', 
+            start: fFinMargenStr, 
+            end: fFinMargenStr, 
+            progress: 0, 
+            dependencies: '', 
+            custom_class: 'gantt-phantom', 
+            _isPhantom: true 
+        }
     ];
 
     const tareasParaExportar = [...tareasReales, ...tareasFantasma];
