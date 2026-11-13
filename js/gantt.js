@@ -620,8 +620,13 @@ function renderOcupacion(container, tareasFiltradas) {
         const fondoFranjas = franjasNoLaborables.map(f => {
             const left = f.iniIdx * anchoDiaPct;
             const width = (f.finIdx - f.iniIdx + 1) * anchoDiaPct;
-            // Rayado más grueso y oscuro (opacidad 50% y líneas de 3px)
-            return `<div class="absolute top-0 bottom-0 opacity-50 dark:opacity-30" style="left:${left}%;width:${width}%;background:repeating-linear-gradient(45deg, #64748b 0, #64748b 3px, transparent 3px, transparent 9px); pointer-events: none;"></div>`;
+            
+            // Velo gris azulado muy suave. En modo oscuro, un velo más oscuro.
+            return `
+                <div class="absolute top-0 bottom-0 pointer-events-none border-t-2 border-dashed border-slate-300 dark:border-slate-600" 
+                     style="left:${left}%;width:${width}%;background:rgba(100, 116, 139, 0.08);">
+                </div>
+            `;
         }).join('');
 
         const alturaFila = 8 + numSubfilas * 22;
