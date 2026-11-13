@@ -621,10 +621,13 @@ function renderOcupacion(container, tareasFiltradas) {
             const left = f.iniIdx * anchoDiaPct;
             const width = (f.finIdx - f.iniIdx + 1) * anchoDiaPct;
             
-            // Velo gris azulado muy suave. En modo oscuro, un velo más oscuro.
+            // Fondo gris azulado claro en modo claro, gris oscuro en modo oscuro
+            // El borde superior punteado ayuda a delimitar la zona
             return `
-                <div class="absolute top-0 bottom-0 pointer-events-none border-t-2 border-dashed border-slate-300 dark:border-slate-600" 
-                     style="left:${left}%;width:${width}%;background:rgba(100, 116, 139, 0.08);">
+                <div class="absolute top-0 bottom-0 pointer-events-none 
+                            bg-slate-200/60 dark:bg-slate-700/60 
+                            border-t-2 border-dashed border-slate-400 dark:border-slate-500" 
+                     style="left:${left}%;width:${width}%;">
                 </div>
             `;
         }).join('');
