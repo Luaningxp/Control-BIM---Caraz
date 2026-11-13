@@ -15,6 +15,10 @@ function getRecursosDeTarea(pendienteId) {
 
 let recursosSeleccionados = new Set();
 
+function guardarOrdenColumnas() {
+    localStorage.setItem('bim_colOrder', JSON.stringify(tableState.colOrder));
+}
+
 function renderRecursosChips(pendienteId) {
     recursosSeleccionados.clear();
     if (pendienteId) {
@@ -360,9 +364,12 @@ function textoCargaCorto(info) {
     return `${info.tareas} tarea${info.tareas === 1 ? '' : 's'} · ${info.semanas.toFixed(1)} sem`;
 }
 
+const DEFAULT_COL_ORDER = ['codigo', 'actividad', 'grupo', 'responsable', 'recursos', 'planos', 'importancia', 'urgencia', 'criticidad', 'estado', 'inicio', 'fin', 'cierre', 'cde'];
+
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
+    colOrder: JSON.parse(localStorage.getItem('bim_colOrder')) || [...DEFAULT_COL_ORDER],
     visibleCols: { 
         codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
         importancia: true, urgencia: true, criticidad: true, 
@@ -561,7 +568,7 @@ export function renderTabla(container) {
                <table class="text-left text-xs" style="table-layout: fixed;">
                     <thead class="sticky top-0 z-20 shadow-sm">
                         <tr class="bg-slate-50 dark:bg-slate-800">
-                            ${Object.keys(tableState.visibleCols).map(col => {
+                            ${tableState.colOrder.map((col, idx) => {
                                 if (!tableState.visibleCols[col]) return '';
                                 let title = col.replace('_', ' ');
                                 if (col === 'cde') title = 'CDE ISO';
@@ -573,14 +580,23 @@ export function renderTabla(container) {
                                     stickyClass = 'sticky left-0 z-20 bg-slate-50 dark:bg-slate-800';
                                     stickyStyle = 'left: 0px;';
                                 } else if (col === 'actividad') {
-                                    // El left debe ser el ancho de la columna código (100px)
                                     stickyClass = 'sticky z-20 bg-slate-50 dark:bg-slate-800';
                                     stickyStyle = 'left: 100px;';
                                 }
 
-                                return `<th data-col="${col}" style="${colStyle(col)} ${stickyStyle}" class="${thClass} ${stickyClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')"><div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}</th>`;
+                                return `<th data-col="${col}" draggable="true" 
+                                            ondragstart="window.handleDragStart(event, '${col}')" 
+                                            ondragover="window.handleDragOver(event)" 
+                                            ondrop="window.handleDrop(event, '${col}')"
+                                            style="${colStyle(col)} ${stickyStyle}" 
+                                            class="${thClass} ${stickyClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 select-none" 
+                                            onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')">
+                                            <div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}
+                                        </th>`;
                             }).join('')}
+                            
                             ${visiblePropDefs.map(pd => `<th data-col="prop_${pd.id}" style="${colStyle('prop_'+pd.id)}" class="${thClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700" onclick="window.toggleSort('prop_${pd.id}')"><div class="pr-2">${escapeHtml(pd.nombre)} ${getSortIcon(`prop_${pd.id}`)}</div>${resizer('prop_'+pd.id)}</th>`).join('')}
+                            
                             <th data-col="acciones" style="width:100px !important;min-width:100px !important;max-width:100px !important;"
                                 class="p-3 text-center sticky right-0 z-30 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
                                 Acciones
@@ -593,20 +609,39 @@ export function renderTabla(container) {
                             const crit = getCriticidad(t); 
                             return `
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
-                                                                ${tableState.visibleCols.codigo ? `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50" style="${colStyle('codigo')} left: 0px;">${t.codigo_contenedor || '–'}</td>` : ''}
-                                ${tableState.visibleCols.actividad ? `<td data-col="actividad" class="p-3 truncate sticky z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50" style="${colStyle('actividad')} left: 100px;" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px]">${escapeHtml(t.actividad)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>` : ''}
-                                ${tableState.visibleCols.grupo ? `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>` : ''}
-                                ${tableState.visibleCols.responsable ? `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>` : ''}
-                                ${tableState.visibleCols.recursos ? `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>` : ''}
-                                ${tableState.visibleCols.planos ? `<td data-col="planos" class="p-3 truncate" style="${colStyle('planos')}"><div class="flex flex-wrap gap-1">${(state.actividadPlanosCache||[]).filter(ap => ap.pendiente_id === t.id).map(ap => { const plano = (state.planosCache||[]).find(p => p.id === ap.plano_id); return plano ? `<span class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 rounded text-[10px] font-medium" title="${escapeHtml(plano.titulo)}">${escapeHtml(plano.codigo.split('-').pop())}</span>` : ''; }).join('') || '<span class="text-slate-300 text-[10px]">-</span>'}</div></td>` : ''}
-                                ${tableState.visibleCols.importancia ? `<td data-col="importancia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.urgencia ? `<td data-col="urgencia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>` : ''}
-                                ${tableState.visibleCols.criticidad ? `<td data-col="criticidad" class="p-3 font-semibold ${critColor(crit)} truncate" style="${colStyle('criticidad')}">${crit}</td>` : ''}
-                                ${tableState.visibleCols.estado ? `<td data-col="estado" class="p-3 truncate" style="${colStyle('estado')}"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 dark:text-slate-300 text-[11px]">${escapeHtml(t.estado)}</span></div></td>` : ''}
-                                ${tableState.visibleCols.inicio ? `<td data-col="inicio" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('inicio')}">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.fin ? `<td data-col="fin" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('fin')}">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cierre ? `<td data-col="cierre" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('cierre')}">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>` : ''}
-                                ${tableState.visibleCols.cde ? `<td data-col="cde" class="p-3 truncate" style="${colStyle('cde')}">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>` : ''}
+                                ${tableState.colOrder.map(col => {
+                                    if (!tableState.visibleCols[col]) return '';
+                                    
+                                    // Clases sticky para Código y Actividad
+                                    let stickyClass = '';
+                                    let stickyStyle = '';
+                                    if (col === 'codigo') {
+                                        stickyClass = 'sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50';
+                                        stickyStyle = 'left: 0px;';
+                                    } else if (col === 'actividad') {
+                                        stickyClass = 'sticky z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50';
+                                        stickyStyle = 'left: 100px;';
+                                    }
+                                    
+                                    let contenido = '';
+                                    switch(col) {
+                                        case 'codigo': contenido = `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate ${stickyClass}" style="${colStyle('codigo')} ${stickyStyle}">${t.codigo_contenedor || '–'}</td>`; break;
+                                        case 'actividad': contenido = `<td data-col="actividad" class="p-3 truncate ${stickyClass}" style="${colStyle('actividad')} ${stickyStyle}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px]">${escapeHtml(t.actividad)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>`; break;
+                                        case 'grupo': contenido = `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>`; break;
+                                        case 'responsable': contenido = `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>`; break;
+                                        case 'recursos': contenido = `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>`; break;
+                                        case 'planos': contenido = `<td data-col="planos" class="p-3 truncate" style="${colStyle('planos')}"><div class="flex flex-wrap gap-1">${(state.actividadPlanosCache||[]).filter(ap => ap.pendiente_id === t.id).map(ap => { const plano = (state.planosCache||[]).find(p => p.id === ap.plano_id); return plano ? `<span class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 rounded text-[10px] font-medium" title="${escapeHtml(plano.titulo)}">${escapeHtml(plano.codigo.split('-').pop())}</span>` : ''; }).join('') || '<span class="text-slate-300 text-[10px]">-</span>'}</div></td>`; break;
+                                        case 'importancia': contenido = `<td data-col="importancia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('importancia')}">${t.importancia || 'Medio'}</td>`; break;
+                                        case 'urgencia': contenido = `<td data-col="urgencia" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('urgencia')}">${t.urgencia || 'Medio'}</td>`; break;
+                                        case 'criticidad': contenido = `<td data-col="criticidad" class="p-3 font-semibold ${critColor(crit)} truncate" style="${colStyle('criticidad')}">${crit}</td>`; break;
+                                        case 'estado': contenido = `<td data-col="estado" class="p-3 truncate" style="${colStyle('estado')}"><div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${estadoColors[t.estado] || 'bg-slate-400'}"></span><span class="text-slate-700 dark:text-slate-300 text-[11px]">${escapeHtml(t.estado)}</span></div></td>`; break;
+                                        case 'inicio': contenido = `<td data-col="inicio" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('inicio')}">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'}</td>`; break;
+                                        case 'fin': contenido = `<td data-col="fin" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('fin')}">${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</td>`; break;
+                                        case 'cierre': contenido = `<td data-col="cierre" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('cierre')}">${t.fecha_cierre ? fmtDate(t.fecha_cierre) : '–'}</td>`; break;
+                                        case 'cde': contenido = `<td data-col="cde" class="p-3 truncate" style="${colStyle('cde')}">${cdeBadge(t.estado_cde, t.codigo_aptitud)}</td>`; break;
+                                    }
+                                    return contenido;
+                                }).join('')}
                                 ${visiblePropDefs.map(pd => {
                                     const pv = state.propValsCache.find(v => v.pendiente_id === t.id && v.propiedad_id === pd.id);
                                     let displayVal = '-';
@@ -622,7 +657,6 @@ export function renderTabla(container) {
                                     class="p-3 text-center whitespace-nowrap sticky right-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-l border-slate-200 dark:border-slate-700 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.15)]">
                                     <div class="flex items-center justify-center gap-0.5">
                                         ${canEdit(t) ? `<button onclick="event.stopPropagation(); window.editTask(${t.id})" class="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded transition" title="Editar"><i class="fa-solid fa-pen text-[11px]"></i></button>` : ''}
-                                        ${(state.isAdmin || state.isCoordinador || state.isSupervisor) ? `<button onclick="event.stopPropagation(); window.duplicateTask(${t.id})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition" title="Duplicar"><i class="fa-solid fa-copy text-[11px]"></i></button>` : ''}
                                         ${canTransition() ? `<button onclick="event.stopPropagation(); window.openModalCDE(${t.id})" class="p-1.5 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition" title="Transición CDE"><i class="fa-solid fa-arrows-rotate text-[11px]"></i></button>` : ''}
                                         ${canDelete() ? `<button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition" title="Eliminar"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
                                     </div>
@@ -1228,6 +1262,39 @@ export async function saveTask(e) {
     window.renderView(); 
     toast('Guardado');
 }
+
+let draggedCol = null;
+
+window.handleDragStart = function(e, col) {
+    draggedCol = col;
+    e.dataTransfer.effectAllowed = 'move';
+};
+
+window.handleDragOver = function(e) {
+    e.preventDefault(); // Necesario para permitir el drop
+    e.dataTransfer.dropEffect = 'move';
+};
+
+window.handleDrop = function(e, targetCol) {
+    e.preventDefault();
+    if (!draggedCol || draggedCol === targetCol) return;
+    // No permitir mover las columnas sticky
+    if (draggedCol === 'codigo' || draggedCol === 'actividad') return;
+    if (targetCol === 'codigo' || targetCol === 'actividad') return;
+
+    const oldIndex = tableState.colOrder.indexOf(draggedCol);
+    const newIndex = tableState.colOrder.indexOf(targetCol);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+        // Reinsertar en la nueva posición
+        tableState.colOrder.splice(oldIndex, 1);
+        tableState.colOrder.splice(newIndex, 0, draggedCol);
+        
+        guardarOrdenColumnas();
+        window.renderView();
+    }
+    draggedCol = null;
+};
 
 export async function deleteTask(id) {
     if (!canDelete()) return;
