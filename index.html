@@ -24,7 +24,7 @@
 <body class="min-h-screen flex flex-col">
 
     <!-- LOGIN -->
-    <div id="login-screen" class="login-page relative min-h-screen flex items-center justify-center p-4">
+        <div id="login-screen" class="login-page relative min-h-screen flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm z-0"></div>
         
         <div class="login-box relative z-10">
@@ -34,41 +34,45 @@
                     <div class="separator"></div>
                     <img src="assets/anin.png" alt="ANIN">
                 </div>
-                <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Control BIM</h2>
-                <p class="text-xs font-bold text-sky-600 uppercase tracking-widest mt-1">Consorcio SUYAY II</p>
+                <h2 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Control BIM</h2>
+                <p class="text-xs font-bold text-sky-600 uppercase tracking-[0.2em] mt-2">Consorcio SUYAY II</p>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">Hospital Caraz II-1 · Paquete 8</p>
             </div>
 
             <div class="login-body">
                 <div id="login-error" class="login-error"></div>
                 
-                <form id="login-form" class="space-y-4">
+                <form id="login-form" class="space-y-5">
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wide">Correo Electrónico</label>
-                        <input type="email" id="login-email" required 
-                               class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900" 
-                               placeholder="usuario@consorciosuyay.com">
+                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">Correo Electrónico</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="email" id="login-email" required 
+                                   class="w-full border border-slate-300 dark:border-slate-600 rounded-xl pl-10 pr-3 py-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600 focus:ring-4 focus:ring-sky-100 dark:focus:ring-sky-900/30 transition" 
+                                   placeholder="usuario@consorciosuyay.com">
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 uppercase tracking-wide">Contraseña</label>
+                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">Contraseña</label>
                         <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                             <input type="password" id="login-password" required 
-                                   class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2.5 pr-10 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 dark:focus:ring-sky-900" 
+                                   class="w-full border border-slate-300 dark:border-slate-600 rounded-xl pl-10 pr-10 py-3 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600 focus:ring-4 focus:ring-sky-100 dark:focus:ring-sky-900/30 transition" 
                                    placeholder="••••••••">
                             <button type="button" onclick="togglePassword()" 
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition p-1">
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition p-1">
                                 <i class="fa-solid fa-eye" id="eye-icon"></i>
                             </button>
                         </div>
                     </div>
                     <button type="submit" id="btn-login" 
-                            class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-lg shadow-sky-600/30 flex justify-center items-center gap-2 mt-2">
+                            class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-sky-600/30 flex justify-center items-center gap-2 mt-2 active:scale-[0.98]">
                         <i class="fa-solid fa-arrow-right-to-bracket"></i> Ingresar al CDE
                     </button>
                 </form>
             </div>
-            <div class="bg-slate-50 dark:bg-slate-800 p-3 text-center border-t border-slate-200 dark:border-slate-700 rounded-b-2xl">
-                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mb-1">© 2026 Consorcio SUYAY II · ANIN</p>
+            <div class="bg-slate-50 dark:bg-slate-800 p-4 text-center border-t border-slate-200 dark:border-slate-700 rounded-b-2xl">
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mb-1 tracking-wide">© 2026 Consorcio SUYAY II · ANIN</p>
                 <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                     Desarrollado por <span class="text-sky-600 dark:text-sky-400 font-bold">Ing. Luis Romero</span> · <i class="fa-solid fa-phone text-[9px] ml-0.5"></i> 928283031
                 </p>
