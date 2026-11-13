@@ -403,7 +403,11 @@ export function renderRecursos(container) {
         }
 
         const esfuerzoTotal = dias * 8 * PESO_CRITICO[t.importancia];
-        const recursosIds = (state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).map(r => r.usuario_id);
+        const recursosIds = [...new Set(
+            (state.actividadRecursosCache || [])
+                .filter(r => r.pendiente_id === t.id)
+                .map(r => r.usuario_id)
+        )];
         
         let esfuerzoResponsable = 0;
         let esfuerzoPorRecurso = 0;
