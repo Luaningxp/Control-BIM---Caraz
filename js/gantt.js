@@ -598,14 +598,16 @@ function renderOcupacion(container, tareasFiltradas) {
         const diasConTarea = new Set();
         barrasCalc.forEach(b => { for (let i = b.iniIdx; i <= b.finIdx; i++) diasConTarea.add(i); });
 
+                // 1. SIEMPRE bloquear los días no laborables (DO, DE, FE, DM)
         const franjasNoLaborables = [];
         for (let i = 0; i < dias.length; i++) {
             const dStr = dias[i].toISOString().split('T')[0];
             const tipo = tipoDia(p.id, dStr);
-            let bloquear = false;
-            if (tipo === 'DE' || tipo === 'FE' || tipo === 'DM') bloquear = true;
-            else if (tipo === 'DO' && !diasConTarea.has(i)) bloquear = true;
-            if (bloquear) {
+            
+            // Marcamos como no laborable si es Domingo, Descanso, Feriado o Descanso Médico
+            const esNoLaborable = (tipo === 'DO' || tipo === 'DE' || tipo === 'FE' || tipo === 'DM');
+            
+            if (esNoLaborable) {
                 if (franjasNoLaborables.length > 0 && franjasNoLaborables[franjasNoLaborables.length - 1].finIdx === i - 1) {
                     franjasNoLaborables[franjasNoLaborables.length - 1].finIdx = i;
                 } else {
@@ -614,10 +616,12 @@ function renderOcupacion(container, tareasFiltradas) {
             }
         }
 
+        // 2. Generar el fondo rayado con mayor contraste
         const fondoFranjas = franjasNoLaborables.map(f => {
             const left = f.iniIdx * anchoDiaPct;
             const width = (f.finIdx - f.iniIdx + 1) * anchoDiaPct;
-            return `<div class="absolute top-0 bottom-0 opacity-40" style="left:${left}%;width:${width}%;background:repeating-linear-gradient(45deg, #94a3b8 0, #94a3b8 2px, transparent 2px, transparent 8px);"></div>`;
+            // Rayado más grueso y oscuro (opacidad 50% y líneas de 3px)
+            return `<div class="absolute top-0 bottom-0 opacity-50 dark:opacity-30" style="left:${left}%;width:${width}%;background:repeating-linear-gradient(45deg, #64748b 0, #64748b 3px, transparent 3px, transparent 9px); pointer-events: none;"></div>`;
         }).join('');
 
         const alturaFila = 8 + numSubfilas * 22;
