@@ -125,7 +125,7 @@ export function renderRecursos(container) {
         porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
     });
 
-        // === CÁLCULO DE DISTRIBUCIÓN DE EQUIPOS ===
+    // === CÁLCULO DE DISTRIBUCIÓN DE EQUIPOS ===
     const jefesValidos = state.perfilesCache.filter(p => {
         const c = (p.cargo || '').toLowerCase();
         return c.includes('supervisor') || c.includes('coordinador') || c.includes('bim manager');
@@ -167,12 +167,10 @@ export function renderRecursos(container) {
         }
     });
 
-    // Crear la matriz de datos para el gráfico
     const puntosGrafico = [];
     const jefesEjeY = [];
     const modeladoresEjeX = new Set();
 
-    // 1. Procesar a los jefes y sus modeladores
     Object.values(distribucionEquipos).forEach(jefe => {
         if (jefe.modeladores.size > 0) {
             jefesEjeY.push(jefe.nombre);
@@ -187,7 +185,6 @@ export function renderRecursos(container) {
         }
     });
 
-    // 2. Procesar a los modeladores libres
     if (modeladoresLibres.size > 0) {
         jefesEjeY.push('Modeladores Libres');
         modeladoresLibres.forEach(modId => {
@@ -219,7 +216,7 @@ export function renderRecursos(container) {
         return t ? (t.importancia || 'Medio') : 'Sin tarea';
     });
 
-        const semanasRecientes = semanas.slice(-6);
+    const semanasRecientes = semanas.slice(-6);
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
@@ -235,6 +232,7 @@ export function renderRecursos(container) {
             cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
         });
     });
+
     const porGrupoTareas = {};
     Object.keys(porGrupo).forEach(g => {
         const tareasGrupo = state.tasksCache.filter(t => (t.grupo || 'Sin grupo') === g);
@@ -245,6 +243,34 @@ export function renderRecursos(container) {
         };
     });
 
+    // === LATENCIA PROMEDIO (VENTANA 8 SEMANAS) ===
+    const hoyLatencia = new Date();
+    hoyLatencia.setHours(0, 0, 0, 0);
+    const hace8Semanas = new Date(hoyLatencia);
+    hace8Semanas.setDate(hace8Semanas.getDate() - 56);
+
+    const cierresRecientesTarde = state.tasksCache.filter(t => 
+        t.fecha_cierre && 
+        t.fecha_fin && 
+        new Date(t.fecha_cierre + 'T00:00:00') > new Date(t.fecha_fin + 'T00:00:00') &&
+        new Date(t.fecha_cierre + 'T00:00:00') >= hace8Semanas
+    );
+
+    let latenciaPromedio = 0;
+    if (cierresRecientesTarde.length > 0) {
+        const sumaAtrasos = cierresRecientesTarde.reduce((s, t) => {
+            const dias = Math.round(
+                (new Date(t.fecha_cierre + 'T00:00:00') - new Date(t.fecha_fin + 'T00:00:00')) / 86400000
+            );
+            return s + dias;
+        }, 0);
+        latenciaPromedio = sumaAtrasos / cierresRecientesTarde.length;
+    }
+
+    const PENALIZACION_MINIMA = latenciaPromedio > 0 ? latenciaPromedio : 3;
+    // === FIN LATENCIA ===
+
+    // === SOBRECARGA POR MODELADOR ===
     const CAPACIDAD_SEMANAL_H = 40;
     const PESO_IMPORTANCIA = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
     const hoyStrCap = new Date().toISOString().split('T')[0];
@@ -253,7 +279,11 @@ export function renderRecursos(container) {
     state.perfilesCache.forEach(p => {
         const esModelador = (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
         if (!esModelador) return;
-        cargaPorModelador[p.id] = { nombre: nombreFormateado(p), avatar: p.id, tareas: 0, dias: 0, horasEstimadas: 0, horasReales: 0 };
+        cargaPorModelador[p.id] = { 
+            nombre: nombreFormateado(p), avatar: p.id, 
+            tareas: 0, dias: 0, horasEstimadas: 0, horasReales: 0,
+            tareasVencidas: 0
+        };
     });
 
     state.tasksCache.filter(t => t.estado !== 'Cerrado').forEach(t => {
@@ -263,12 +293,24 @@ export function renderRecursos(container) {
         asignados.forEach(uid => {
             if (!cargaPorModelador[uid]) return;
             cargaPorModelador[uid].tareas += 1;
+            
             let dias = 0;
             if (t.fecha_fin) {
                 const fin = new Date(t.fecha_fin + 'T00:00:00');
                 const hoyD = new Date(hoyStrCap + 'T00:00:00');
-                dias = Math.max(0, Math.ceil((fin - hoyD) / 86400000));
+                const diasRestantes = Math.ceil((fin - hoyD) / 86400000);
+                
+                if (diasRestantes > 0) {
+                    dias = diasRestantes;
+                } else {
+                    const diasAtraso = Math.abs(diasRestantes);
+                    dias = Math.max(PENALIZACION_MINIMA, diasAtraso);
+                    cargaPorModelador[uid].tareasVencidas += 1;
+                }
+            } else {
+                dias = PENALIZACION_MINIMA;
             }
+            
             const peso = PESO_IMPORTANCIA[t.importancia] || 1;
             cargaPorModelador[uid].dias += dias;
             cargaPorModelador[uid].horasEstimadas += dias * 8 * peso;
@@ -290,7 +332,9 @@ export function renderRecursos(container) {
         else { estado = 'Libre'; color = 'text-slate-500'; }
         return { ...m, semanasEquivalentes, estado, color };
     }).sort((a, b) => b.semanasEquivalentes - a.semanasEquivalentes);
+    // === FIN SOBRECARGA ===
 
+    // === CONCENTRACIÓN DE RIESGO ===
     const PESO_CRITICO = { 'Muy alto': 3, 'Alto': 2 };
     const hoyStrRiesgo = new Date().toISOString().split('T')[0];
 
@@ -309,7 +353,11 @@ export function renderRecursos(container) {
             if (t.fecha_fin) {
                 const fin = new Date(t.fecha_fin + 'T00:00:00');
                 const hoyD = new Date(hoyStrRiesgo + 'T00:00:00');
-                dias = Math.max(0, Math.ceil((fin - hoyD) / 86400000));
+                const diasRestantes = Math.ceil((fin - hoyD) / 86400000);
+                if (diasRestantes > 0) dias = diasRestantes;
+                else dias = Math.max(PENALIZACION_MINIMA, Math.abs(diasRestantes));
+            } else {
+                dias = PENALIZACION_MINIMA;
             }
             cargaCriticaPorModelador[uid].horasCriticas += dias * 8 * PESO_CRITICO[t.importancia];
             cargaCriticaPorModelador[uid].tareasCriticas += 1;
@@ -330,6 +378,7 @@ export function renderRecursos(container) {
 
     const concentracionTop1 = concentracionRiesgo[0]?.pct || 0;
     const concentracionTop2 = (concentracionRiesgo[0]?.pct || 0) + (concentracionRiesgo[1]?.pct || 0);
+    // === FIN CONCENTRACIÓN DE RIESGO ===
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
@@ -460,7 +509,7 @@ export function renderRecursos(container) {
         <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Sobrecarga por Modelador</h4>
-                <p class="text-[11px] text-slate-500">Estimación: días restantes × 8h × peso de importancia, contra capacidad de ${CAPACIDAD_SEMANAL_H}h/semana.</p>
+                <p class="text-[11px] text-slate-500">Estimación: días restantes × 8h × peso de importancia. Tareas vencidas usan penalización: max(latencia promedio (${latenciaPromedio > 0 ? latenciaPromedio.toFixed(1) : '3 (mínimo)'} d), días de atraso).</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -472,6 +521,7 @@ export function renderRecursos(container) {
                         <th class="p-3">Horas reales</th>
                         <th class="p-3">Semanas equiv.</th>
                         <th class="p-3">Estado</th>
+                        <th class="p-3 text-center">Vencidas</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -487,8 +537,9 @@ export function renderRecursos(container) {
                             <td class="p-3 font-bold text-teal-700">${m.horasReales.toFixed(1)} h</td>
                             <td class="p-3">${m.semanasEquivalentes.toFixed(1)}</td>
                             <td class="p-3 font-bold ${m.color}">${m.estado}</td>
+                            <td class="p-3 text-center ${m.tareasVencidas > 0 ? 'text-red-700 font-bold' : 'text-slate-400'}">${m.tareasVencidas || 0}</td>
                         </tr>
-                    `).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>'}
+                    `).join('') || '<tr><td colspan="8" class="text-center py-4 text-slate-400">Sin datos</td></tr>'}
                 </tbody>
             </table>
         </div>
@@ -667,10 +718,10 @@ export function renderRecursos(container) {
         }
     });
 
-        if (state.charts.equipos) state.charts.equipos.destroy();
+    if (state.charts.equipos) state.charts.equipos.destroy();
 
     state.charts.equipos = new Chart(document.getElementById('chart-equipos'), {
-        type: 'scatter', // Gráfico de dispersión
+        type: 'scatter',
         data: {
             datasets: [{
                 label: 'Asignación',
