@@ -703,34 +703,57 @@ function renderOcupacion(container, tareasFiltradas) {
     const todayBtn = `<button onclick="window.ocupacionMove(0)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Hoy</button>`;
 
     container.innerHTML = `
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-2">
-            <div>
-                <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Ocupación por modelador</h4>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} · Fondo rayado = día no laborable sin tarea</p>
-            </div>
-            <div class="flex items-center gap-1">
-                ${prevBtn}${todayBtn}${nextBtn}
-            </div>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-2">
+        <div>
+            <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Ocupación por modelador</h4>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                ${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} 
+                · Fondo gris = día no laborable (domingo, descanso o feriado)
+            </p>
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
-                <div style="min-width:900px;">
-                    <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                        <div class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" style="width:200px;min-width:200px;">Modelador</div>
-                        <div class="flex flex-1">${cabeceraDias}</div>
-                    </div>
-                    ${filas}
+        <div class="flex items-center gap-1">
+            ${prevBtn}${todayBtn}${nextBtn}
+        </div>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <div style="min-width:900px;">
+                <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                    <div class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" style="width:200px;min-width:200px;">Modelador</div>
+                    <div class="flex flex-1">${cabeceraDias}</div>
                 </div>
+                ${filas}
             </div>
         </div>
-        <div class="flex flex-wrap items-center gap-3 text-[10px] mt-2 text-slate-500 dark:text-slate-400">
-            <span class="font-bold uppercase tracking-wide">Criticidad:</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#b91c1c"></span>Muy alto</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#f59e0b"></span>Alto</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#2563eb"></span>Medio</span>
-            <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#94a3b8"></span>Bajo</span>
+    </div>
+    <div class="flex flex-col md:flex-row md:items-center gap-4 text-[11px] mt-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mr-1">Criticidad:</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded shadow-sm" style="background:#b91c1c"></span>Muy alto</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded shadow-sm" style="background:#f59e0b"></span>Alto</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded shadow-sm" style="background:#2563eb"></span>Medio</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded shadow-sm" style="background:#a3e635"></span>Bajo</span>
         </div>
-    `;
+        
+        <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 hidden md:block"></div>
+        
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mr-1">Borde de estado:</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#64748b"></span>No iniciado</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#0ea5e9"></span>En proceso</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#eab308"></span>En espera</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#a855f7"></span>Reprogramado</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#10b981"></span>Cerrado</span>
+        </div>
+
+        <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 hidden md:block"></div>
+
+        <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide mr-1">No laborable:</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-4 h-3 rounded border-t-2 border-dashed border-slate-400 dark:border-slate-500 bg-slate-200/60 dark:bg-slate-700/60"></span>Día bloqueado</span>
+        </div>
+    </div>
+`;
 }
 window.ocupacionMove = function(dir) {
     if (dir === 0) ocupacionState.semanaOffset = 0;
