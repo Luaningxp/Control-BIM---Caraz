@@ -421,11 +421,17 @@ td.sticky.left-0, th.sticky.left-0 {
     background-color: var(--bg-card) !important;
     z-index: 20 !important;
 }
-
-/* Asegurar que las celdas fijas mantengan el fondo correcto en modo oscuro y hover */
+td.sticky, th.sticky {
+    z-index: 20 !important;
+}
+th.sticky {
+    background-color: var(--bg-table-head) !important;
+    z-index: 40 !important;
+}
 .dark td.sticky.left-0 {
     background-color: var(--bg-card) !important;
 }
+
 .dark .login-box {
     background: rgba(30, 41, 59, 0.98);
     border-color: rgba(51, 65, 85, 0.6);
