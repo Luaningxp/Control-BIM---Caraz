@@ -533,10 +533,10 @@ function renderOcupacion(container, tareasFiltradas) {
     const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
     const COLOR_CRIT = {
-        'Muy alto': '#b91c1c',
-        'Alto':     '#f59e0b',
-        'Medio':    '#2563eb',
-        'Bajo':     '#94a3b8'
+        'Muy alto': '#b91c1c', // Rojo oscuro
+        'Alto':     '#f59e0b', // Ámbar/Naranja
+        'Medio':    '#2563eb', // Azul
+        'Bajo':     '#a3e635'  // Verde lima (NUEVO: ya no es gris)
     };
     const BORDE_ESTADO = {
         'No iniciado':  '#64748b',
