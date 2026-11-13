@@ -627,49 +627,65 @@ function renderOcupacion(container, tareasFiltradas) {
 
         const alturaFila = 8 + numSubfilas * 22;
 
-        const barras = barrasCalc.map(b => {
+                const barras = barrasCalc.map(b => {
             const { t, iniIdx, finIdx, subfila } = b;
-            const left = iniIdx * anchoDiaPct;
-            const width = (finIdx - iniIdx + 1) * anchoDiaPct;
             const crit = getCriticidad(t);
             const bg = COLOR_CRIT[crit] || '#94a3b8';
             const borde = BORDE_ESTADO[t.estado] || '#94a3b8';
+            const topPx = 4 + subfila * 22;
 
-            // Conflicto: solo DE o FE cuentan como aviso real, DO se ignora porque se asume trabajo
-            let conflicto = false;
+            // 1. Encontrar los segmentos de días laborables para esta tarea
+            const segmentos = [];
+            let inicioSegmento = null;
+
             for (let i = iniIdx; i <= finIdx; i++) {
                 const dStr = dias[i].toISOString().split('T')[0];
                 const tipo = tipoDia(p.id, dStr);
-                if (tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
+                const esLaborable = (tipo === 'T' || tipo === 'TE');
+
+                if (esLaborable) {
+                    if (inicioSegmento === null) inicioSegmento = i;
+                } else {
+                    if (inicioSegmento !== null) {
+                        segmentos.push({ ini: inicioSegmento, fin: i - 1 });
+                        inicioSegmento = null;
+                    }
+                }
+            }
+            // Si el último día del rango era laborable, cerramos el segmento
+            if (inicioSegmento !== null) {
+                segmentos.push({ ini: inicioSegmento, fin: finIdx });
             }
 
-            const topPx = 4 + subfila * 22;
-            const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}${conflicto ? '\n⚠ Programada sobre descanso o feriado' : ''}`;
-            return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:brightness-110 transition" 
-                        style="left:${left}%;width:${width}%;top:${topPx}px;height:18px;background:${bg};border-left:3px solid ${borde};" 
-                        title="${escapeHtml(titulo)}">
-                        <span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${escapeHtml(t.actividad)}</span>
-                        ${conflicto ? `<i class="fa-solid fa-triangle-exclamation absolute -top-1 -right-1 text-[10px] text-amber-300 drop-shadow"></i>` : ''}
-                    </div>`;
-        }).join('');
+            // 2. Si no hay ningún día laborable en el rango, no pintamos nada
+            if (segmentos.length === 0) return '';
 
-        return `
-            <div class="flex border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20">
-                <div class="sticky left-0 z-10 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-2 flex items-center gap-2" style="width:200px;min-width:200px;">
-                    <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>
-                    <div class="min-w-0 flex-1">
-                        <div class="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(nombreFormateado(p))}</div>
-                        <div class="text-[9px] text-slate-500 dark:text-slate-400">${tareasUsuario.length} tarea${tareasUsuario.length === 1 ? '' : 's'}</div>
-                    </div>
-                </div>
-                <div class="relative flex-1" style="min-height:${alturaFila}px;">
-                    ${fondoFranjas}
-                    ${hoyEnRango ? `<div class="absolute top-0 bottom-0 pointer-events-none" style="left:${hoyLeft}%;width:${anchoDiaPct}%;background:rgba(56,189,248,0.18);border-left:1px solid rgba(14,165,233,0.6);border-right:1px solid rgba(14,165,233,0.6);"></div>` : ''}
-                    ${barras}
-                </div>
-            </div>
-        `;
-    }).join('');
+            // 3. Generar un div por cada segmento
+            return segmentos.map(seg => {
+                const left = seg.ini * anchoDiaPct;
+                const width = (seg.fin - seg.ini + 1) * anchoDiaPct;
+                
+                // Verificamos si el segmento toca un día de descanso para mostrar el icono de advertencia
+                let conflicto = false;
+                for (let i = seg.ini; i <= seg.fin; i++) {
+                    const dStr = dias[i].toISOString().split('T')[0];
+                    const tipo = tipoDia(p.id, dStr);
+                    if (tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
+                }
+
+                const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}`;
+
+                // El primer segmento lleva el texto de la actividad, los demás solo el color
+                const esPrimerSegmento = seg.ini === segmentos[0].ini;
+
+                return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:brightness-110 transition" 
+                            style="left:${left}%;width:${width}%;top:${topPx}px;height:18px;background:${bg};border-left:3px solid ${borde};" 
+                            title="${escapeHtml(titulo)}">
+                            ${esPrimerSegmento ? `<span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${escapeHtml(t.actividad)}</span>` : ''}
+                            ${conflicto ? `<i class="fa-solid fa-triangle-exclamation absolute -top-1 -right-1 text-[10px] text-amber-300 drop-shadow"></i>` : ''}
+                        </div>`;
+            }).join('');
+        }).join('');
 
     const prevBtn = `<button onclick="window.ocupacionMove(-1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-left"></i></button>`;
     const nextBtn = `<button onclick="window.ocupacionMove(1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-right"></i></button>`;
