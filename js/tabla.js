@@ -566,7 +566,7 @@ export function renderTabla(container) {
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
                <table class="text-left text-xs" style="table-layout: fixed;">
-                    <thead class="sticky top-0 z-20 shadow-sm">
+                   <thead class="sticky top-0 z-30 shadow-sm">
                         <tr class="bg-slate-50 dark:bg-slate-800">
                             ${tableState.colOrder.map((col, idx) => {
                                 if (!tableState.visibleCols[col]) return '';
