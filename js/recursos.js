@@ -606,7 +606,7 @@ export function renderRecursos(container) {
                                 <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
                             </td>
                             <td class="p-3">${m.tareas}</td>
-                            <td class="p-3">${m.dias}</td>
+                            <td class="p-3">${Number(m.dias).toFixed(2)}</td>
                             <td class="p-3 font-bold text-sky-700">${m.horasEstimadas.toFixed(0)} h</td>
                             <td class="p-3 font-bold text-teal-700">${m.horasReales.toFixed(1)} h</td>
                             <td class="p-3">${m.semanasEquivalentes.toFixed(1)}</td>
