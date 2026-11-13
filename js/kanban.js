@@ -33,7 +33,13 @@ export function renderKanban(container) {
     };
 
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
-    const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
+    const respOpts = state.perfilesCache
+        .filter(p => {
+            const c = (p.cargo || '').toLowerCase();
+            return c.includes('supervisor') || c.includes('coordinador') || c.includes('bim manager');
+        })
+        .map(p => ({ id: p.id, name: nombreFormateado(p) }))
+        .sort((a, b) => a.name.localeCompare(b.name));
     const recursosOpts = state.perfilesCache.filter(p => 
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
