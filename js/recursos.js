@@ -316,14 +316,12 @@ export function renderRecursos(container) {
         const esfuerzoTotal = dias * 8 * peso;
 
         // Identificar asignados únicos
-        const recursosIds = (state.actividadRecursosCache || [])
-            .filter(r => r.pendiente_id === t.id)
-            .map(r => r.usuario_id);
+        const recursosIds = [...new Set(
+            (state.actividadRecursosCache || [])
+                .filter(r => r.pendiente_id === t.id)
+                .map(r => r.usuario_id)
+        )];
         
-        // El responsable también cuenta como recurso si está en la tabla (raro, pero posible)
-        const asignadosUnicos = new Set(recursosIds);
-        if (t.responsable_id) asignadosUnicos.add(t.responsable_id);
-
         // REPARTO
         let esfuerzoResponsable = 0;
         let esfuerzoPorRecurso = 0;
