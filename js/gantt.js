@@ -524,7 +524,7 @@ function renderOcupacion(container, tareasFiltradas) {
     const totalDias = dias.length;
     const anchoDiaPct = 100 / totalDias;
 
-        const hoyDate = new Date();
+    const hoyDate = new Date();
     hoyDate.setHours(0, 0, 0, 0);
     const hoyIdx = Math.round((hoyDate - inicio) / 86400000);
     const hoyEnRango = hoyIdx >= 0 && hoyIdx < totalDias;
@@ -546,7 +546,7 @@ function renderOcupacion(container, tareasFiltradas) {
         'Cerrado':      '#10b981'
     };
 
-        const cabeceraDias = dias.map((d, i) => {
+    const cabeceraDias = dias.map((d, i) => {
         const esLunes = d.getDay() === 1;
         const esDomingo = d.getDay() === 0;
         const esPrimero = d.getDate() === 1;
@@ -573,7 +573,6 @@ function renderOcupacion(container, tareasFiltradas) {
 
         const conFechas = tareasUsuario.filter(t => t.fecha_inicio_programado && t.fecha_fin);
 
-        // Calcular índices de cada barra dentro del rango visible
         const barrasCalc = conFechas.map(t => {
             const iniT = new Date(t.fecha_inicio_programado + 'T00:00:00');
             const finT = new Date(t.fecha_fin + 'T00:00:00');
@@ -583,8 +582,6 @@ function renderOcupacion(container, tareasFiltradas) {
             return { t, iniIdx, finIdx };
         }).filter(Boolean);
 
-        // Asignar sub-fila por apilado (interval partitioning greedy)
-        // Se ordena por iniIdx, cada barra va a la primera sub-fila cuyo última finIdx sea < iniIdx
         const ordenadas = [...barrasCalc].sort((a, b) => a.iniIdx - b.iniIdx);
         const subfilas = [];
         ordenadas.forEach(b => {
@@ -598,8 +595,6 @@ function renderOcupacion(container, tareasFiltradas) {
         });
         const numSubfilas = Math.max(1, subfilas.length);
 
-        // Franjas no laborables: DO solo si el día no tiene ninguna tarea asignada a este modelador;
-        // DE y FE siempre se rayan porque son bloqueos explícitos.
         const diasConTarea = new Set();
         barrasCalc.forEach(b => { for (let i = b.iniIdx; i <= b.finIdx; i++) diasConTarea.add(i); });
 
@@ -608,7 +603,7 @@ function renderOcupacion(container, tareasFiltradas) {
             const dStr = dias[i].toISOString().split('T')[0];
             const tipo = tipoDia(p.id, dStr);
             let bloquear = false;
-            if (tipo === 'DE' || tipo === 'FE') bloquear = true;
+            if (tipo === 'DE' || tipo === 'FE' || tipo === 'DM') bloquear = true;
             else if (tipo === 'DO' && !diasConTarea.has(i)) bloquear = true;
             if (bloquear) {
                 if (franjasNoLaborables.length > 0 && franjasNoLaborables[franjasNoLaborables.length - 1].finIdx === i - 1) {
@@ -627,14 +622,14 @@ function renderOcupacion(container, tareasFiltradas) {
 
         const alturaFila = 8 + numSubfilas * 22;
 
-                const barras = barrasCalc.map(b => {
+        // ▼▼▼ BARRAS SEGMENTADAS ▼▼▼
+        const barras = barrasCalc.map(b => {
             const { t, iniIdx, finIdx, subfila } = b;
             const crit = getCriticidad(t);
             const bg = COLOR_CRIT[crit] || '#94a3b8';
             const borde = BORDE_ESTADO[t.estado] || '#94a3b8';
             const topPx = 4 + subfila * 22;
 
-            // 1. Encontrar los segmentos de días laborables para esta tarea
             const segmentos = [];
             let inicioSegmento = null;
 
@@ -652,40 +647,44 @@ function renderOcupacion(container, tareasFiltradas) {
                     }
                 }
             }
-            // Si el último día del rango era laborable, cerramos el segmento
             if (inicioSegmento !== null) {
                 segmentos.push({ ini: inicioSegmento, fin: finIdx });
             }
 
-            // 2. Si no hay ningún día laborable en el rango, no pintamos nada
             if (segmentos.length === 0) return '';
 
-            // 3. Generar un div por cada segmento
-            return segmentos.map(seg => {
+            return segmentos.map((seg, idx) => {
                 const left = seg.ini * anchoDiaPct;
                 const width = (seg.fin - seg.ini + 1) * anchoDiaPct;
-                
-                // Verificamos si el segmento toca un día de descanso para mostrar el icono de advertencia
-                let conflicto = false;
-                for (let i = seg.ini; i <= seg.fin; i++) {
-                    const dStr = dias[i].toISOString().split('T')[0];
-                    const tipo = tipoDia(p.id, dStr);
-                    if (tipo === 'DE' || tipo === 'FE') { conflicto = true; break; }
-                }
-
+                const esPrimerSegmento = idx === 0;
                 const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}`;
-
-                // El primer segmento lleva el texto de la actividad, los demás solo el color
-                const esPrimerSegmento = seg.ini === segmentos[0].ini;
 
                 return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:brightness-110 transition" 
                             style="left:${left}%;width:${width}%;top:${topPx}px;height:18px;background:${bg};border-left:3px solid ${borde};" 
                             title="${escapeHtml(titulo)}">
                             ${esPrimerSegmento ? `<span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${escapeHtml(t.actividad)}</span>` : ''}
-                            ${conflicto ? `<i class="fa-solid fa-triangle-exclamation absolute -top-1 -right-1 text-[10px] text-amber-300 drop-shadow"></i>` : ''}
                         </div>`;
             }).join('');
         }).join('');
+        // ▲▲▲ FIN BARRAS SEGMENTADAS ▲▲▲
+
+        return `
+            <div class="flex border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20">
+                <div class="sticky left-0 z-10 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-2 flex items-center gap-2" style="width:200px;min-width:200px;">
+                    <div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(nombreFormateado(p))}</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400">${tareasUsuario.length} tarea${tareasUsuario.length === 1 ? '' : 's'}</div>
+                    </div>
+                </div>
+                <div class="relative flex-1" style="min-height:${alturaFila}px;">
+                    ${fondoFranjas}
+                    ${hoyEnRango ? `<div class="absolute top-0 bottom-0 pointer-events-none" style="left:${hoyLeft}%;width:${anchoDiaPct}%;background:rgba(56,189,248,0.18);border-left:1px solid rgba(14,165,233,0.6);border-right:1px solid rgba(14,165,233,0.6);"></div>` : ''}
+                    ${barras}
+                </div>
+            </div>
+        `;
+    }).join('');
 
     const prevBtn = `<button onclick="window.ocupacionMove(-1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-left"></i></button>`;
     const nextBtn = `<button onclick="window.ocupacionMove(1)" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"><i class="fa-solid fa-chevron-right"></i></button>`;
@@ -718,7 +717,6 @@ function renderOcupacion(container, tareasFiltradas) {
             <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#f59e0b"></span>Alto</span>
             <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#2563eb"></span>Medio</span>
             <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#94a3b8"></span>Bajo</span>
-            <span class="inline-flex items-center gap-1 ml-2 pl-3 border-l border-slate-300 dark:border-slate-600"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i>Sobre descanso o feriado</span>
         </div>
     `;
 }
