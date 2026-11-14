@@ -32,6 +32,7 @@ function isUserInvolved(t) {
 // ============================================================
 // MI TRABAJO
 // ============================================================
+export function renderMiTrabajo(container) {
     const hoyStr = today().toISOString().split('T')[0];
     const misTareas = state.tasksCache.filter(t => {
         if (t.estado_cde === 'Archived' || !isUserInvolved(t)) return false;
@@ -57,7 +58,7 @@ function isUserInvolved(t) {
         m.fecha === ayerStr
     );
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-        const ayerEraLaborable = esDiaLaborable(state.currentUser.id, ayerStr);
+    const ayerEraLaborable = esDiaLaborable(state.currentUser.id, ayerStr);
     const esModeladorPuro = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
     const noLlenoAyer = esModeladorPuro && porcentajeAyer < 100;
 
@@ -126,11 +127,11 @@ export function renderManpower(container) {
     let registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
     );
-        if (manpowerState.soloRegistradosPorMi) {
+    if (manpowerState.soloRegistradosPorMi) {
         registros = registros.filter(m => m.usuario_id === state.currentUser?.id);
     }
 
-            // Aplicar filtros
+    // Aplicar filtros
     registros = registros.filter(r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
@@ -156,7 +157,7 @@ export function renderManpower(container) {
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
 
-        const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
+    const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
         // "Registrados por mí" SÍ cuenta como filtro activo
         if (k === 'soloRegistradosPorMi') return v === true;
         
@@ -505,12 +506,10 @@ window.clearManpowerFilters = function() {
         soloRegistradosPorMi: true
     };
 
-    // ▼ Añadir esta línea ▼
     const drawer = document.getElementById('manpower-filter-drawer');
     if (drawer) drawer.remove();
     const overlay = document.getElementById('manpower-filter-drawer-overlay');
     if (overlay) overlay.remove();
-    // ▲ Añadir esta línea ▲
 
     window.renderView();
 };
