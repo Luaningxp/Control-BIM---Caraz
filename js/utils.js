@@ -7,7 +7,7 @@ export const CDE_COLORS = {
 
 export const APTITUD_DEFAULT = { WIP: 'S0', Shared: 'S1', Published: 'A1', Archived: null };
 export const ESTADOS_CDE = ['WIP', 'Shared', 'Published', 'Archived'];
-export const WEIGHT = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
+export const WEIGHT = { 'Muy alto': 1.65, 'Alto': 1.4, 'Medio': 1.2, 'Bajo': 1.0 };
 export const DAY = 86400000;
 
 export const cdeBadge = (e, a) => `<span class="badge-cde" style="${CDE_COLORS[e] || ''}">${e || 'WIP'} · ${a || '—'}</span>`;
