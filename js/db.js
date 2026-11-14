@@ -31,9 +31,183 @@ export const state = {
     currentTab: 'dashboard',
     cdeTargetId: null,
     dragId: null,
-    charts: {}
+    charts: {},
+    // Marcadores de "qué ya tengo cargado" para no pedir dos veces lo mismo
+    _loaded: {
+        core: false,
+        propVals: false,
+        manpower: false,
+        planos: false,
+        causas: false,
+        roster: false,
+        snapshots: false
+    }
 };
 
+// ------------------------------------------------------------------
+// Núcleo: lo que TODAS las vistas necesitan. Se carga una vez al login.
+// ------------------------------------------------------------------
+export async function fetchCore() {
+    try {
+        const [t, g, p, pd, ar, sub] = await Promise.all([
+            supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
+            supabaseClient.from('grupos_bim').select('*').order('nombre'),
+            supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
+            supabaseClient.from('propiedades_def').select('*').eq('activo', true).order('orden'),
+            supabaseClient.from('actividad_recursos').select('*'),
+            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre')
+        ]);
+
+        if (t.error) console.error('fetchCore tareas:', t.error);
+        if (p.error) console.error('fetchCore perfiles:', p.error);
+
+        state.tasksCache = t.data || [];
+        state.gruposCache = g.data || [];
+        state.perfilesCache = p.data || [];
+        state.propDefsCache = pd.data || [];
+        state.actividadRecursosCache = ar.data || [];
+        state.subcontratasCache = sub.data || [];
+        state._loaded.core = true;
+        return true;
+    } catch (err) {
+        console.error('fetchCore general:', err);
+        return false;
+    }
+}
+
+// ------------------------------------------------------------------
+// Cargas complementarias. Idempotentes: si ya están cargadas, no repiten.
+// ------------------------------------------------------------------
+export async function fetchPropVals() {
+    if (state._loaded.propVals) return true;
+    const { data, error } = await supabaseClient.from('propiedades_valores').select('*');
+    if (error) { console.error('fetchPropVals:', error); return false; }
+    state.propValsCache = data || [];
+    state._loaded.propVals = true;
+    return true;
+}
+
+export async function fetchManpower() {
+    if (state._loaded.manpower) return true;
+    const { data, error } = await supabaseClient
+        .from('manpower_registros')
+        .select('*')
+        .order('fecha', { ascending: false });
+    if (error) { console.error('fetchManpower:', error); return false; }
+    state.manpowerCache = data || [];
+    state._loaded.manpower = true;
+    return true;
+}
+
+export async function fetchPlanos() {
+    if (state._loaded.planos) return true;
+    const [pl, ap] = await Promise.all([
+        supabaseClient.from('planos').select('*').order('codigo'),
+        supabaseClient.from('actividad_planos').select('*')
+    ]);
+    if (pl.error) console.error('fetchPlanos planos:', pl.error);
+    if (ap.error) console.error('fetchPlanos actividad_planos:', ap.error);
+    state.planosCache = pl.data || [];
+    state.actividadPlanosCache = ap.data || [];
+    state._loaded.planos = true;
+    return true;
+}
+
+export async function fetchCausas() {
+    if (state._loaded.causas) return true;
+    const [ca, tc] = await Promise.all([
+        supabaseClient.from('causas_incumplimiento').select('*').eq('activo', true).order('orden'),
+        supabaseClient.from('tarea_causas').select('*')
+    ]);
+    if (ca.error) console.error('fetchCausas causas:', ca.error);
+    if (tc.error) console.error('fetchCausas tarea_causas:', tc.error);
+    state.causasCache = ca.data || [];
+    state.tareaCausasCache = tc.data || [];
+    state._loaded.causas = true;
+    return true;
+}
+
+export async function fetchSnapshots() {
+    if (state._loaded.snapshots) return true;
+    const { data, error } = await supabaseClient
+        .from('snapshots_semanales')
+        .select('*')
+        .order('semana', { ascending: false });
+    if (error) { console.error('fetchSnapshots:', error); return false; }
+    state.snapshotsCache = data || [];
+    state._loaded.snapshots = true;
+    return true;
+}
+
+export async function fetchRoster() {
+    if (state._loaded.roster) return true;
+    const [de, fe, te, dm] = await Promise.all([
+        supabaseClient.from('descansos').select('*'),
+        supabaseClient.from('feriados').select('*'),
+        supabaseClient.from('trabajos_extra').select('*'),
+        supabaseClient.from('descansos_medicos').select('*')
+    ]);
+    if (de.error) console.error('fetchRoster descansos:', de.error);
+    if (fe.error) console.error('fetchRoster feriados:', fe.error);
+    if (te.error) console.error('fetchRoster trabajos_extra:', te.error);
+    if (dm.error) console.error('fetchRoster descansos_medicos:', dm.error);
+    state.descansosCache = de.data || [];
+    state.feriadosCache = fe.data || [];
+    state.trabajosExtraCache = te.data || [];
+    state.descansosMedicosCache = dm.data || [];
+    state._loaded.roster = true;
+    return true;
+}
+
+// ------------------------------------------------------------------
+// Carga por vista: decide qué complementos necesita cada tab.
+// ------------------------------------------------------------------
+export async function fetchVista(tab) {
+    // El roster lo necesita casi todo (para esDiaLaborable).
+    // Lo pedimos siempre excepto si el usuario está en config.
+    if (tab !== 'config') {
+        await fetchRoster();
+    }
+
+    switch (tab) {
+        case 'mitrabajo':
+        case 'manpower':
+            await fetchManpower();
+            break;
+        case 'dashboard':
+            await Promise.all([fetchSnapshots(), fetchPlanos(), fetchCausas(), fetchManpower()]);
+            break;
+        case 'tabla':
+            await Promise.all([fetchPropVals(), fetchPlanos(), fetchCausas()]);
+            break;
+        case 'kanban':
+            // Kanban lee recursos (ya en core) y estilos. No necesita extras.
+            break;
+        case 'eisenhower':
+            break;
+        case 'gantt':
+            await fetchPlanos();
+            break;
+        case 'log-planos':
+            await fetchPlanos();
+            break;
+        case 'recursos':
+            await fetchManpower();
+            break;
+        case 'roster':
+            // El roster ya se cargó arriba.
+            break;
+        case 'config':
+            await fetchPropVals();
+            break;
+    }
+    return true;
+}
+
+// ------------------------------------------------------------------
+// Compatibilidad: fetchAll sigue existiendo y trae todo.
+// Se usa en botones "Refrescar" que quieren forzar recarga completa.
+// ------------------------------------------------------------------
 export async function fetchAll() {
     try {
         const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm] = await Promise.all([
@@ -84,11 +258,26 @@ export async function fetchAll() {
         state.subcontratasCache = sub.data || [];
         state.trabajosExtraCache = te.data || [];
 
+        // Marcar todo como cargado
+        Object.keys(state._loaded).forEach(k => state._loaded[k] = true);
     } catch (err) {
         console.error('Error general en fetchAll:', err);
     }
 }
 
+// ------------------------------------------------------------------
+// Invalida cachés que puedan quedar obsoletas tras una escritura.
+// Llamar tras guardar tarea, mover en kanban, registrar manpower, etc.
+// ------------------------------------------------------------------
+export function invalidarCache(keys) {
+    (keys || []).forEach(k => {
+        if (k in state._loaded) state._loaded[k] = false;
+    });
+}
+
+// ------------------------------------------------------------------
+// Snapshot semanal: sin cambios en lógica (ya está bien).
+// ------------------------------------------------------------------
 export async function guardarSnapshotSemanal() {
     try {
         const hoy = new Date();
@@ -99,19 +288,14 @@ export async function guardarSnapshotSemanal() {
         lunes.setHours(0, 0, 0, 0);
         const semana = lunes.toISOString().split('T')[0];
 
-        // Determinismo: si ya existe un snapshot para esta semana, NO lo sobreescribimos.
-        // Solo se crea la primera vez que alguien abre el dashboard en la semana.
         const { data: existente, error: errExiste } = await supabaseClient
             .from('snapshots_semanales')
             .select('id')
             .eq('semana', semana)
             .maybeSingle();
 
-        if (errExiste) {
-            console.error('Snapshot check error:', errExiste);
-            return false;
-        }
-        if (existente) return true; // ya congelado esta semana
+        if (errExiste) { console.error('Snapshot check error:', errExiste); return false; }
+        if (existente) return true;
 
         const { semaforo, isCerrado } = await import('./utils.js');
         const { esDiaLaborable } = await import('./roster.js');
@@ -175,8 +359,6 @@ export async function guardarSnapshotSemanal() {
             causas_top: causasTop
         };
 
-        // Insert (no upsert): si por condición de carrera otro usuario insertó
-        // primero, el unique sobre `semana` rechaza este y lo ignoramos.
         const { error } = await supabaseClient
             .from('snapshots_semanales')
             .insert([payload]);
