@@ -1,4 +1,4 @@
-import { supabaseClient, state, fetchAll, guardarSnapshotSemanal } from './db.js';
+import { supabaseClient, state, fetchCore, fetchVista, fetchAll, guardarSnapshotSemanal } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
@@ -87,16 +87,20 @@ async function initApp(user) {
         document.getElementById('tab-config-btn').classList.add('hidden');
     }
 
-    await fetchAll();
+        await fetchCore();
+    await fetchVista('mitrabajo');
     window.switchTab('mitrabajo');
 }
 
-window.switchTab = function(tab) {
+window.switchTab = async function(tab) {
     state.currentTab = tab;
     ['mitrabajo', 'dashboard', 'tabla', 'roster', 'kanban', 'eisenhower', 'gantt', 'manpower', 'recursos','log-planos', 'config'].forEach(t => {
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if(btn) btn.classList.toggle('tab-active', t === tab);
     });
+
+    // Cargar sólo lo que esta vista necesita y no esté ya en caché.
+    await fetchVista(tab);
     window.renderView();
 }
 
