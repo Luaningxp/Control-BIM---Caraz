@@ -499,15 +499,13 @@ window.setGanttView = function(mode) {
     ganttState.viewMode = mode;
     if (ganttState.currentGantt) {
         ganttState.currentGantt.change_view_mode(mode);
-        // Al cambiar de vista, se vuelve a renderizar todo para colocar la línea de hoy en el lugar correcto
-        setTimeout(() => {
-            const tareasFiltradas = state.tasksCache.filter(t => t.fecha_inicio_programado && t.fecha_fin);
-            inicializarGantt(tareasFiltradas);
-        }, 300);
-        window.renderView();
-    } else {
-        window.renderView();
     }
+    
+    // En lugar de forzar un redibujado con todas las tareas, 
+    // simplemente re-renderizamos la vista para que respete los filtros actuales.
+    setTimeout(() => {
+        window.renderView();
+    }, 300);
 };
 
 window.toggleGanttFilterDrawer = function() {
