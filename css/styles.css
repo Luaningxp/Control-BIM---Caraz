@@ -128,18 +128,30 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 .login-page::before {
     content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(15,23,42,0.88) 0%, rgba(2,132,199,0.75) 100%);
-    backdrop-filter: blur(6px);
+    /* Degradado mucho más suave y transparente para que se vea el hospital */
+    background: linear-gradient(135deg, rgba(15,23,42,0.45) 0%, rgba(2,132,199,0.3) 100%);
+    backdrop-filter: blur(2px); /* Menos desenfoque para que la foto tenga nitidez */
     z-index: -1;
 }
 
 .login-box {
-    background: rgba(255, 255, 255, 0.98);
+    /* Efecto cristal (Glassmorphism) */
+    background: rgba(255, 255, 255, 0.88); /* Fondo semitransparente */
+    backdrop-filter: blur(16px); /* Desenfoque solo en la caja del login */
+    -webkit-backdrop-filter: blur(16px);
     width: 100%; max-width: 440px;
     border-radius: 1.25rem;
-    box-shadow: 0 30px 60px -12px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.1);
+    /* Sombra más suave para integrarse con la foto */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.25);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Modo oscuro: cristal oscuro */
+.dark .login-box {
+    background: rgba(30, 41, 59, 0.88);
+    border-color: rgba(51, 65, 85, 0.4);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 .login-header {
