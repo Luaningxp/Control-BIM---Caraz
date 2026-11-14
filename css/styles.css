@@ -177,39 +177,58 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 
 /* =========================================
-   MAGIA PARA EL MODO OSCURO
+   MODO OSCURO · OVERRIDES POR VARIABLE
    ========================================= */
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
-.dark .text-slate-900, 
+.dark .text-slate-900,
 .dark .text-slate-800,
 .dark .text-slate-700 {
-    color: #f8fafc !important;
+    color: var(--text-body) !important;
 }
 
 .dark .text-slate-600,
 .dark .text-slate-500,
 .dark .text-slate-400 {
-    color: #cbd5e1 !important;
+    color: var(--text-muted) !important;
 }
 
 .dark .bg-white {
-    background-color: #1e293b !important;
+    background-color: var(--bg-card) !important;
 }
 
 .dark .bg-slate-50,
 .dark .bg-slate-100 {
-    background-color: #0f172a !important;
+    background-color: var(--bg-body) !important;
 }
 
 .dark .border-slate-200,
 .dark .border-slate-100 {
-    border-color: #334155 !important;
+    border-color: var(--border-card) !important;
 }
 
-.dark .card p, 
-.dark .card h4, 
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--border-card);
+}
+
+.dark .card p,
+.dark .card h4,
 .dark .card h3 {
     color: inherit;
+}
+
+/* Inputs, selects y textareas en dark */
+.dark .inp,
+.dark input.inp,
+.dark select.inp,
+.dark textarea.inp {
+    background-color: var(--bg-input) !important;
+    border-color: var(--border-input) !important;
+    color: var(--text-body) !important;
+}
+
+.dark .inp::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
 }
 
 /* =========================================
