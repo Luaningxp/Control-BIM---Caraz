@@ -44,8 +44,13 @@ export function renderKanban(container) {
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
 
-    const filtrosActivos = Object.values(kanbanState).filter(v => v !== '' && v !== false).length;
-
+        const filtrosActivos = Object.entries(kanbanState).filter(([k, v]) => {
+        // Excluir propiedades que no son filtros del drawer
+        if (['search', 'soloAsignadosAMi'].includes(k)) return false;
+        // Contar solo si el valor tiene contenido (ej. arreglos con elementos, textos con letras, true)
+        if (Array.isArray(v)) return v.length > 0;
+        return v !== '' && v !== false;
+    }).length;
     // Aplicar filtros
     const filteredTasks = state.tasksCache.filter(t => {
                const searchLower = (kanbanState.search || '').toLowerCase().trim();
