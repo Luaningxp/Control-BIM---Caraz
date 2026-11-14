@@ -13,6 +13,10 @@ let planosState = {
     showColMenu: false,
     sortBy: 'codigo',
     sortDir: 'asc',
+    // ▼ PROPIEDADES DE PAGINACIÓN AÑADIDAS ▼
+    currentPage: 1,
+    itemsPerPage: 50,
+    // ▲ FIN ▲
     visibleCols: {
         codigo: true, titulo: true, disciplina: true, clasificacion: true,
         revision: true, fecha: true, estado: true, aconex: true,
@@ -153,6 +157,13 @@ export function renderLogPlanos(container) {
         return 0;
     });
 
+    const totalPaginas = Math.ceil(planosFiltrados.length / planosState.itemsPerPage);
+    if (planosState.currentPage > totalPaginas) planosState.currentPage = totalPaginas || 1;
+    
+    const startIndex = (planosState.currentPage - 1) * planosState.itemsPerPage;
+    const endIndex = startIndex + planosState.itemsPerPage;
+    const planosPaginados = planosFiltrados.slice(startIndex, endIndex);
+
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
     const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
         if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir', 'filterCategoria'].includes(k)) return false;
@@ -239,7 +250,7 @@ export function renderLogPlanos(container) {
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
                         ${planosFiltrados.length === 0 ? `<tr><td colspan="13" class="text-center py-8 text-slate-400">No hay planos que coincidan.</td></tr>` : ''}
-                        ${planosFiltrados.map(p => `
+                       ${planosPaginados.map(p => `
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                                 ${planosState.visibleCols.codigo ? `<td data-col="codigo" style="${colStyle('codigo')}" class="p-3 font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate" title="${escapeHtml(p.codigo)}">${escapeHtml(p.codigo)}</td>` : ''}
                                 ${planosState.visibleCols.titulo ? `<td data-col="titulo" style="${colStyle('titulo')}" class="p-3 font-medium text-slate-800 dark:text-slate-200 truncate" title="${escapeHtml(p.titulo)}">${escapeHtml(p.titulo || '-')}</td>` : ''}
@@ -263,6 +274,30 @@ export function renderLogPlanos(container) {
                     </tbody>
                 </table>
             </div>
+                    <!-- Controles de Paginación -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-3 mt-4 text-xs text-slate-600 dark:text-slate-400">
+            <div>
+                Mostrando <b>${planosFiltrados.length === 0 ? 0 : startIndex + 1}</b> al <b>${Math.min(endIndex, planosFiltrados.length)}</b> de <b>${planosFiltrados.length}</b> planos
+            </div>
+            <div class="flex items-center gap-1">
+                <button onclick="window.cambiarPaginaPlanos(${planosState.currentPage - 1})" 
+                        class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        ${planosState.currentPage === 1 ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-left mr-1"></i> Anterior
+                </button>
+                
+                <span class="px-3 py-1.5 font-semibold bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    Página ${planosState.currentPage} de ${totalPaginas || 1}
+                </span>
+
+                <button onclick="window.cambiarPaginaPlanos(${planosState.currentPage + 1})" 
+                        class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        ${planosState.currentPage === totalPaginas || totalPaginas === 0 ? 'disabled' : ''}>
+                    Siguiente <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    `; // <-- Asegúrate de que este cierre de template string sea el final de container.innerHTML
         </div>
     `;
 
@@ -322,6 +357,7 @@ export function renderLogPlanos(container) {
     const inputSearch = document.getElementById('pl-search');
     inputSearch.addEventListener('input', (e) => {
         planosState.search = e.target.value;
+        planosState.currentPage = 1;
         clearTimeout(window.planosSearchTimeout);
         window.planosSearchTimeout = setTimeout(() => {
             window.renderView();
@@ -390,6 +426,7 @@ window.initResizePlanos = initResize;
 
 window.setPlanosCategoria = function(cat) {
     planosState.filterCategoria = planosState.filterCategoria === cat ? '' : cat;
+     planosState.currentPage = 1; 
     window.renderView();
 };
 
@@ -477,3 +514,8 @@ window.handlePlanosUpload = (e) => {
     reader.readAsArrayBuffer(file);
     e.target.value = '';
 };
+window.cambiarPaginaPlanos = function(nuevaPagina) {
+    planosState.currentPage = nuevaPagina;
+    window.renderView();
+};
+
