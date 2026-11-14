@@ -3,6 +3,7 @@ import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getInic
 import { tipoDia } from './roster.js';
 
 let ganttState = {
+    search: '',
     filterGrupo: '',
     filterResp: '',
     filterRecursos: '',
@@ -38,7 +39,7 @@ export function renderGantt(container) {
     t.fecha_fin >= t.fecha_inicio_programado
 );
 
-    let tareas = tareasConFechas.filter(t => {
+        let tareas = tareasConFechas.filter(t => {
         const matchGrupo = !ganttState.filterGrupo || t.grupo === ganttState.filterGrupo;
         const matchResp = !ganttState.filterResp || t.responsable_id === ganttState.filterResp;
         const matchRecursos = !ganttState.filterRecursos || state.actividadRecursosCache.some(r => 
@@ -52,7 +53,34 @@ export function renderGantt(container) {
         const matchVencidas = !ganttState.soloVencidas || semaforo(t) === 'Vencida';
         const matchPorVencer = !ganttState.soloPorVencer || semaforo(t) === 'Por vencer';
         const matchSinFecha = !ganttState.soloSinFecha || semaforo(t) === 'Sin fecha';
-        return matchGrupo && matchResp && matchRecursos && matchEstado &&
+
+        // ▼ LÓGICA DE BÚSQUEDA ▼
+        let matchSearch = true;
+        if (ganttState.search) {
+            const q = ganttState.search.toLowerCase().trim();
+            
+            // 1. Buscar en actividad y código
+            const enTexto = (t.actividad || '').toLowerCase().includes(q) || 
+                            (t.codigo_contenedor || '').toLowerCase().includes(q);
+            
+            // 2. Buscar en el nombre del responsable
+            const respPerfil = state.perfilesCache.find(p => p.id === t.responsable_id);
+            const enResponsable = respPerfil ? nombreFormateado(respPerfil).toLowerCase().includes(q) : false;
+            
+            // 3. Buscar en los nombres de los recursos asignados
+            const enRecursos = (state.actividadRecursosCache || [])
+                .filter(r => r.pendiente_id === t.id)
+                .map(r => {
+                    const p = state.perfilesCache.find(x => x.id === r.usuario_id);
+                    return p ? nombreFormateado(p).toLowerCase() : '';
+                })
+                .join(' ')
+                .includes(q);
+
+            matchSearch = enTexto || enResponsable || enRecursos;
+        }
+
+        return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
                matchIniDesde && matchIniHasta && matchFinDesde && matchFinHasta &&
                matchVencidas && matchPorVencer && matchSinFecha;
     });
@@ -91,6 +119,11 @@ export function renderGantt(container) {
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 flex-wrap">
+                <div class="relative w-full max-w-xs">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="gantt-search" placeholder="Buscar tarea, responsable..." value="${ganttState.search}" 
+                           class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                </div>
                 <button onclick="window.toggleGanttFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
@@ -226,6 +259,24 @@ export function renderGantt(container) {
 
     if (tareas.length > 0) {
         setTimeout(() => inicializarGantt(tareas), 150);
+    }
+    const searchInput = document.getElementById('gantt-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            ganttState.search = e.target.value;
+            clearTimeout(window.ganttSearchTimeout);
+            window.ganttSearchTimeout = setTimeout(() => {
+                window.renderView();
+                // Mantener el foco y el cursor en el input después de re-renderizar
+                const newInput = document.getElementById('gantt-search');
+                if (newInput) {
+                    newInput.focus();
+                    const val = newInput.value;
+                    newInput.value = '';
+                    newInput.value = val;
+                }
+            }, 500); // Espera 500ms después de dejar de escribir
+        });
     }
 }
 
