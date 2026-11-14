@@ -75,7 +75,7 @@ async function initApp(user) {
     document.getElementById('user-display').innerText = user.email;
     document.getElementById('role-display').innerText = state.currentCargo || 'Sin Cargo';
 
-    if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
+    if (!state.isModelador || state.isAdmin || state.isCoordinador || state.isSupervisor) {
         document.getElementById('btn-new-task').classList.remove('hidden');
     }
     if (state.isAdmin) {
