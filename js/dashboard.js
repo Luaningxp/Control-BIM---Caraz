@@ -5,8 +5,6 @@ import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, ge
 export function renderDashboard(container) {
     if (window.guardarSnapshotSemanal) {
         window.guardarSnapshotSemanal().catch(() => {});
-        import { esDiaLaborable as _esDiaLaborable } from './roster.js';
-window.__rosterHelpers = { esDiaLaborable: _esDiaLaborable };
     }
 
     const k = calcularKPIs();
@@ -147,7 +145,7 @@ window.__rosterHelpers = { esDiaLaborable: _esDiaLaborable };
         <div class="card overflow-x-auto mt-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
-                <p class="text-[11px] text-slate-500">Snapshots guardados al abrir el dashboard. La semana actual se actualiza; las anteriores quedan fijas.</p>
+                <p class="text-[11px] text-slate-500">Snapshots congelados al primer acceso semanal. La semana en curso no se reescribe.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -197,8 +195,7 @@ function calcularKPIs() {
     // Import dinámico para no acoplar dashboard.js con roster.js en el top del archivo
     // (roster.js importa db.js; esto evita ciclos si en el futuro cambia).
     // En la práctica es sincrónico porque ya está cargado.
-    const { esDiaLaborable } = window.__rosterHelpers || { esDiaLaborable: () => true };
-
+   
     const total = state.tasksCache.length;
     const abiertas = state.tasksCache.filter(t => !isCerrado(t));
     const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida');
