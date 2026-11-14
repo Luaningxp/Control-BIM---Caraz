@@ -165,8 +165,10 @@ export function renderLogPlanos(container) {
     const planosPaginados = planosFiltrados.slice(startIndex, endIndex);
 
     const todasActivas = Object.values(planosState.visibleCols).every(v => v === true);
-    const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
-        if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir', 'filterCategoria'].includes(k)) return false;
+       const filtrosActivos = Object.entries(planosState).filter(([k, v]) => {
+        // ▼ AÑADIMOS currentPage e itemsPerPage A LA LISTA ▼
+        if (['search', 'showColMenu', 'visibleCols', 'colWidths', 'sortBy', 'sortDir', 'filterCategoria', 'currentPage', 'itemsPerPage'].includes(k)) return false;
+        // ▲ FIN ▲
         return v !== '';
     }).length;
 
