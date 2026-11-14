@@ -150,9 +150,15 @@ export function renderManpower(container) {
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
 
-    const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
-        if (['search', 'soloRegistradosPorMi'].includes(k)) return false;
-        return v !== '';
+        const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
+        // "Registrados por mí" SÍ cuenta como filtro activo
+        if (k === 'soloRegistradosPorMi') return v === true;
+        
+        // El buscador de texto NO cuenta
+        if (k === 'search') return false;
+        
+        // El resto (fechas, grupo, responsable) cuentan si tienen valor
+        return v !== '' && v !== false && v !== null;
     }).length;
     const totalHoras = registros.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
 
