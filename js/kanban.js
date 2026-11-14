@@ -44,12 +44,18 @@ export function renderKanban(container) {
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
 
-        const filtrosActivos = Object.entries(kanbanState).filter(([k, v]) => {
-        // Excluir propiedades que no son filtros del drawer
-        if (['search', 'soloAsignadosAMi'].includes(k)) return false;
-        // Contar solo si el valor tiene contenido (ej. arreglos con elementos, textos con letras, true)
+            const filtrosActivos = Object.entries(kanbanState).filter(([k, v]) => {
+        // 1. Asignados a mí SÍ cuenta si está en true
+        if (k === 'soloAsignadosAMi') return v === true;
+        
+        // 2. El buscador de texto NO cuenta como "filtro" (o lo ignoramos en el badge)
+        if (k === 'search') return false;
+        
+        // 3. Arreglos (como estadosOcultos) cuentan si tienen elementos
         if (Array.isArray(v)) return v.length > 0;
-        return v !== '' && v !== false;
+        
+        // 4. El resto (fechas, grupo, responsable, etc.) cuentan si tienen valor
+        return v !== '' && v !== false && v !== null;
     }).length;
     // Aplicar filtros
     const filteredTasks = state.tasksCache.filter(t => {
