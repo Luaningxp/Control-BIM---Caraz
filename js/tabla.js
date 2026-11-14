@@ -1196,6 +1196,13 @@ export async function saveTask(e) {
         };
     }
     let taskId = id;
+    const { data: validacion, error: errVal } = await supabaseClient.rpc('validar_guardado_tarea', {
+    p_id: id ? parseInt(id) : null,
+    p_payload: payload,
+    p_causas_ids: Array.from(causasSeleccionadas)
+});
+if (errVal) { toast('Error validación: ' + errVal.message); return; }
+if (!validacion?.ok) { toast(validacion.error); return; }
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
         if (error) { 
