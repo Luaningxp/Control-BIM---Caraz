@@ -32,12 +32,18 @@ function isUserInvolved(t) {
 // ============================================================
 // MI TRABAJO
 // ============================================================
-export function renderMiTrabajo(container) {
-    const misTareas = state.tasksCache.filter(t => 
-        t.estado !== 'Cerrado' && 
-        t.estado_cde !== 'Archived' && 
-        isUserInvolved(t)
-    );
+    const hoyStr = today().toISOString().split('T')[0];
+    const misTareas = state.tasksCache.filter(t => {
+        if (t.estado_cde === 'Archived' || !isUserInvolved(t)) return false;
+        
+        // Si está cerrada, que siga apareciendo SOLO si se cerró hoy
+        if (t.estado === 'Cerrado') {
+            return t.fecha_cierre === hoyStr;
+        }
+        
+        // Las tareas abiertas siempre se muestran
+        return true;
+    });
     
     const hoy = new Date();
     hoy.setHours(0,0,0,0);
