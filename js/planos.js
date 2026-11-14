@@ -272,9 +272,11 @@ export function renderLogPlanos(container) {
                             </tr>
                         `).join('')}
                     </tbody>
-                </table>
+                                                </table>
             </div>
-                    <!-- Controles de Paginación -->
+        </div>
+        
+        <!-- Controles de Paginación -->
         <div class="flex flex-col md:flex-row items-center justify-between gap-3 mt-4 text-xs text-slate-600 dark:text-slate-400">
             <div>
                 Mostrando <b>${planosFiltrados.length === 0 ? 0 : startIndex + 1}</b> al <b>${Math.min(endIndex, planosFiltrados.length)}</b> de <b>${planosFiltrados.length}</b> planos
@@ -296,8 +298,6 @@ export function renderLogPlanos(container) {
                     Siguiente <i class="fa-solid fa-chevron-right ml-1"></i>
                 </button>
             </div>
-        </div>
-    `; // <-- Asegúrate de que este cierre de template string sea el final de container.innerHTML
         </div>
     `;
 
