@@ -92,13 +92,29 @@ export async function fetchAll() {
 export async function guardarSnapshotSemanal() {
     try {
         const hoy = new Date();
-        hoy.setHours(0,0,0,0);
+        hoy.setHours(0, 0, 0, 0);
         const dia = hoy.getDay();
         const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
         const lunes = new Date(hoy); lunes.setDate(diff);
+        lunes.setHours(0, 0, 0, 0);
         const semana = lunes.toISOString().split('T')[0];
 
+        // Determinismo: si ya existe un snapshot para esta semana, NO lo sobreescribimos.
+        // Solo se crea la primera vez que alguien abre el dashboard en la semana.
+        const { data: existente, error: errExiste } = await supabaseClient
+            .from('snapshots_semanales')
+            .select('id')
+            .eq('semana', semana)
+            .maybeSingle();
+
+        if (errExiste) {
+            console.error('Snapshot check error:', errExiste);
+            return false;
+        }
+        if (existente) return true; // ya congelado esta semana
+
         const { semaforo, isCerrado } = await import('./utils.js');
+        const { esDiaLaborable } = await import('./roster.js');
 
         const tareas = state.tasksCache || [];
         const abiertas = tareas.filter(t => !isCerrado(t));
@@ -106,10 +122,23 @@ export async function guardarSnapshotSemanal() {
         const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer').length;
         const sinFecha = abiertas.filter(t => !t.fecha_fin).length;
 
-        const finSemana = new Date(lunes); finSemana.setDate(lunes.getDate() + 6); finSemana.setHours(23,59,59,999);
-        const tareasSemana = tareas.filter(t => t.fecha_fin && new Date(t.fecha_fin + 'T00:00:00') >= lunes && new Date(t.fecha_fin + 'T00:00:00') <= finSemana);
-        const cumplidas = tareasSemana.filter(t => t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= finSemana);
-        const ppc = tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null;
+        const finSemana = new Date(lunes);
+        finSemana.setDate(lunes.getDate() + 6);
+        finSemana.setHours(23, 59, 59, 999);
+
+        const tareasSemana = tareas.filter(t => {
+            if (!t.fecha_fin) return false;
+            const f = new Date(t.fecha_fin + 'T00:00:00');
+            if (f < lunes || f > finSemana) return false;
+            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
+            return true;
+        });
+        const cumplidas = tareasSemana.filter(t =>
+            t.fecha_cierre && t.fecha_cierre <= t.fecha_fin
+        );
+        const ppc = tareasSemana.length > 0
+            ? Math.round((cumplidas.length / tareasSemana.length) * 100)
+            : null;
 
         const horasSemana = (state.manpowerCache || []).filter(m => {
             if (!m.fecha) return false;
@@ -134,16 +163,29 @@ export async function guardarSnapshotSemanal() {
             total_tareas: tareas.length,
             abiertas: abiertas.length,
             cerradas: tareas.length - abiertas.length,
-            vencidas, por_vencer: porVencer, sin_fecha: sinFecha,
-            ppc, horas_semana: +horasSemana.toFixed(2),
-            planos_wip: conteo.WIP, planos_shared: conteo.Shared,
-            planos_published: conteo.Published, planos_archived: conteo.Archived,
+            vencidas,
+            por_vencer: porVencer,
+            sin_fecha: sinFecha,
+            ppc,
+            horas_semana: +horasSemana.toFixed(2),
+            planos_wip: conteo.WIP,
+            planos_shared: conteo.Shared,
+            planos_published: conteo.Published,
+            planos_archived: conteo.Archived,
             causas_top: causasTop
         };
 
-        const { error } = await supabaseClient.from('snapshots_semanales').upsert([payload], { onConflict: 'semana' });
-        if (error) console.error('Snapshot error:', error);
-        return !error;
+        // Insert (no upsert): si por condición de carrera otro usuario insertó
+        // primero, el unique sobre `semana` rechaza este y lo ignoramos.
+        const { error } = await supabaseClient
+            .from('snapshots_semanales')
+            .insert([payload]);
+
+        if (error && !String(error.message).toLowerCase().includes('duplicate')) {
+            console.error('Snapshot insert error:', error);
+            return false;
+        }
+        return true;
     } catch (e) {
         console.error('guardarSnapshotSemanal', e);
         return false;
