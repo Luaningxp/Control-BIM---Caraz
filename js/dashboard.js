@@ -270,24 +270,29 @@ function renderCharts(inicioSemana, finSemana) {
     for (let i = 7; i >= 0; i--) {
         const inicio = new Date(inicioSemana);
         inicio.setDate(inicio.getDate() - i * 7);
+        inicio.setHours(0, 0, 0, 0);
         const fin = new Date(inicio);
         fin.setDate(inicio.getDate() + 6);
-        fin.setHours(23,59,59,999);
+        fin.setHours(23, 59, 59, 999);
 
+        // Misma fórmula que calcularKPIs: cierre <= fecha_fin, roster respetado.
         const tareasSemana = state.tasksCache.filter(t => {
             if (!t.fecha_fin) return false;
+            if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
             const f = new Date(t.fecha_fin + 'T00:00:00');
-            return f >= inicio && f <= fin;
+            if (f < inicio || f > fin) return false;
+            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
+            return true;
         });
 
-        const cumplidas = tareasSemana.filter(t => {
-            if (!t.fecha_cierre) return false;
-            const c = new Date(t.fecha_cierre + 'T00:00:00');
-            return c <= fin;
-        });
+        const cumplidas = tareasSemana.filter(t =>
+            t.fecha_cierre && t.fecha_cierre <= t.fecha_fin
+        );
 
-        labelsPPC.push(`Sem ${inicio.getDate()}/${inicio.getMonth()+1}`);
-        dataPPC.push(tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null);
+        labelsPPC.push(`Sem ${inicio.getDate()}/${inicio.getMonth() + 1}`);
+        dataPPC.push(tareasSemana.length > 0
+            ? Math.round((cumplidas.length / tareasSemana.length) * 100)
+            : null);
     }
 
             state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
@@ -486,31 +491,38 @@ function renderPerfTable(inicioSemana, finSemana) {
             map[key].carga += WEIGHT[getCriticidad(t)] || 1;
         }
 
+        // PPC semanal unificado: mismo criterio que calcularKPIs.
         if (t.fecha_fin) {
+            if (t.estado === 'Cancelado' || t.estado === 'Anulado') return;
             const f = new Date(t.fecha_fin + 'T00:00:00');
-            if (f >= inicioSemana && f <= finSemana) {
-                map[key].semanaTareas++;
-                if (t.fecha_cierre && new Date(t.fecha_cierre + 'T00:00:00') <= finSemana) {
-                    map[key].semanaCumplidas++;
-                }
+            if (f < inicioSemana || f > finSemana) return;
+            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return;
+
+            map[key].semanaTareas++;
+            if (t.fecha_cierre && t.fecha_cierre <= t.fecha_fin) {
+                map[key].semanaCumplidas++;
             }
         }
     });
 
-    document.getElementById('perf-table').innerHTML = Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre)).map(m => {
-        const pv = m.a ? Math.round((m.v / m.a) * 100) : 0;
-        const ppc = m.semanaTareas > 0 ? Math.round((m.semanaCumplidas / m.semanaTareas) * 100) : null;
-        return `<tr class="hover:bg-slate-50">
-            <td class="p-3">
-                <div class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</div>
-                <div class="text-[10px] text-slate-500">${escapeHtml(m.cargo || 'Sin cargo')}</div>
-            </td>
-            <td class="p-3">${m.a}</td>
-            <td class="p-3 ${m.v ? 'text-red-600 font-bold' : ''}">${m.v}</td>
-            <td class="p-3 ${pv >= 50 ? 'text-red-600' : pv > 0 ? 'text-amber-600' : ''}">${pv}%</td>
-            <td class="p-3">${m.c}</td>
-            <td class="p-3">${ppc !== null ? `<span class="px-2 py-0.5 rounded font-bold ${ppc >= 80 ? 'bg-teal-100 text-teal-800' : ppc >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}">${ppc}%</span>` : '—'}</td>
-            <td class="p-3 font-bold text-slate-700">${m.carga}</td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>';
+    document.getElementById('perf-table').innerHTML = Object.values(map)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        .map(m => {
+            const pv = m.a ? Math.round((m.v / m.a) * 100) : 0;
+            const ppc = m.semanaTareas > 0
+                ? Math.round((m.semanaCumplidas / m.semanaTareas) * 100)
+                : null;
+            return `<tr class="hover:bg-slate-50">
+                <td class="p-3">
+                    <div class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</div>
+                    <div class="text-[10px] text-slate-500">${escapeHtml(m.cargo || 'Sin cargo')}</div>
+                </td>
+                <td class="p-3">${m.a}</td>
+                <td class="p-3 ${m.v ? 'text-red-600 font-bold' : ''}">${m.v}</td>
+                <td class="p-3 ${pv >= 50 ? 'text-red-600' : pv > 0 ? 'text-amber-600' : ''}">${pv}%</td>
+                <td class="p-3">${m.c}</td>
+                <td class="p-3">${ppc !== null ? `<span class="px-2 py-0.5 rounded font-bold ${ppc >= 80 ? 'bg-teal-100 text-teal-800' : ppc >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}">${ppc}%</span>` : '—'}</td>
+                <td class="p-3 font-bold text-slate-700">${m.carga}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>';
 }
