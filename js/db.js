@@ -37,6 +37,8 @@ export const state = {
         core: false,
         propVals: false,
         manpower: false,
+        planos: false,         
+        planosLigeros: false,   
         planos: false,
         causas: false,
         roster: false,
@@ -101,6 +103,7 @@ export async function fetchManpower() {
 
 export async function fetchPlanos() {
     if (state._loaded.planos) return true;
+    // Carga completa: solo para el Log de Planos
     const [pl, ap] = await Promise.all([
         supabaseClient.from('planos').select('*').order('codigo'),
         supabaseClient.from('actividad_planos').select('*')
@@ -110,6 +113,30 @@ export async function fetchPlanos() {
     state.planosCache = pl.data || [];
     state.actividadPlanosCache = ap.data || [];
     state._loaded.planos = true;
+    return true;
+}
+
+export async function fetchPlanosLigeros() {
+    if (state._loaded.planosLigeros) return true;
+    
+    // 1. Traer solo las vinculaciones
+    const { data: ap, error: apErr } = await supabaseClient.from('actividad_planos').select('*');
+    if (apErr) { console.error('fetchPlanosLigeros vinculaciones:', apErr); return false; }
+    
+    // 2. Obtener los IDs únicos de los planos vinculados
+    const ids = [...new Set((ap || []).map(x => x.plano_id))];
+    
+    // 3. Traer solo esos planos
+    let pl = [];
+    if (ids.length > 0) {
+        const { data: plData, error: plErr } = await supabaseClient.from('planos').select('*').in('id', ids);
+        if (plErr) console.error('fetchPlanosLigeros planos:', plErr);
+        else pl = plData || [];
+    }
+
+    state.planosCache = pl;
+    state.actividadPlanosCache = ap || [];
+    state._loaded.planosLigeros = true;
     return true;
 }
 
@@ -163,39 +190,36 @@ export async function fetchRoster() {
 // Carga por vista: decide qué complementos necesita cada tab.
 // ------------------------------------------------------------------
 export async function fetchVista(tab) {
-    // El roster lo necesita casi todo (para esDiaLaborable).
-    // Lo pedimos siempre excepto si el usuario está en config.
-    if (tab !== 'config') {
-        await fetchRoster();
-    }
+    if (tab !== 'config') await fetchRoster();
 
     switch (tab) {
         case 'mitrabajo':
         case 'manpower':
             await fetchManpower();
+            await fetchPlanosLigeros(); // Para mostrar los chips de planos en modales
             break;
         case 'dashboard':
-            await Promise.all([fetchSnapshots(), fetchPlanos(), fetchCausas(), fetchManpower()]);
+            await Promise.all([fetchSnapshots(), fetchPlanosLigeros(), fetchCausas(), fetchManpower()]);
             break;
         case 'tabla':
-            await Promise.all([fetchPropVals(), fetchPlanos(), fetchCausas()]);
+            await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas()]);
             break;
         case 'kanban':
-            // Kanban lee recursos (ya en core) y estilos. No necesita extras.
+            await fetchPlanosLigeros();
             break;
         case 'eisenhower':
             break;
         case 'gantt':
-            await fetchPlanos();
+            // El Gantt no necesita los datos del plano, solo las tareas
             break;
         case 'log-planos':
+            // AQUÍ SÍ CARGAMOS LOS 5,216
             await fetchPlanos();
             break;
         case 'recursos':
             await fetchManpower();
             break;
         case 'roster':
-            // El roster ya se cargó arriba.
             break;
         case 'config':
             await fetchPropVals();
