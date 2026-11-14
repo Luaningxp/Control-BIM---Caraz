@@ -1,9 +1,12 @@
 import { state } from './db.js';
+import { esDiaLaborable } from './roster.js';
 import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado } from './utils.js';
 
 export function renderDashboard(container) {
     if (window.guardarSnapshotSemanal) {
         window.guardarSnapshotSemanal().catch(() => {});
+        import { esDiaLaborable as _esDiaLaborable } from './roster.js';
+window.__rosterHelpers = { esDiaLaborable: _esDiaLaborable };
     }
 
     const k = calcularKPIs();
@@ -191,37 +194,60 @@ export function renderDashboard(container) {
 }
 
 function calcularKPIs() {
+    // Import dinámico para no acoplar dashboard.js con roster.js en el top del archivo
+    // (roster.js importa db.js; esto evita ciclos si en el futuro cambia).
+    // En la práctica es sincrónico porque ya está cargado.
+    const { esDiaLaborable } = window.__rosterHelpers || { esDiaLaborable: () => true };
+
     const total = state.tasksCache.length;
     const abiertas = state.tasksCache.filter(t => !isCerrado(t));
     const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida');
     const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
     const sinFecha = abiertas.filter(t => !t.fecha_fin);
 
+    // Rango de la semana actual (lunes a domingo)
     const hoy = new Date();
-    hoy.setHours(0,0,0,0);
+    hoy.setHours(0, 0, 0, 0);
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0,0,0,0);
+    inicioSemana.setHours(0, 0, 0, 0);
     const finSemana = new Date(inicioSemana);
     finSemana.setDate(inicioSemana.getDate() + 6);
-    finSemana.setHours(23,59,59,999);
+    finSemana.setHours(23, 59, 59, 999);
 
-    const tareasDeEstaSemana = state.tasksCache.filter(t => {
+    // PPC correcto:
+    //  - Universo: tareas con fecha_fin DENTRO de la semana actual.
+    //  - Se excluyen las canceladas/anuladas si existiera un estado así.
+    //    (Hoy no existe, pero dejamos el filtro por robustez.)
+    //  - Una tarea cuenta como "cumplida" si su fecha_cierre cae ANTES
+    //    o EL MISMO día que fecha_fin (no "antes del domingo").
+    //    Cerrar el viernes una tarea que vencía el miércoles NO es cumplir.
+    //  - Se respeta el roster: si el día de fecha_fin NO era laborable
+    //    para el responsable, la tarea no entra al denominador
+    //    (no se puede incumplir un plazo en día no laborable).
+    const tareasSemana = state.tasksCache.filter(t => {
         if (!t.fecha_fin) return false;
-        const f = new Date(t.fecha_fin + 'T00:00:00');
-        return f >= inicioSemana && f <= finSemana;
+        if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
+
+        const fin = new Date(t.fecha_fin + 'T00:00:00');
+        if (fin < inicioSemana || fin > finSemana) return false;
+
+        // Respetar roster solo si tenemos el helper y responsable_id
+        if (t.responsable_id && typeof esDiaLaborable === 'function') {
+            if (!esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
+        }
+        return true;
     });
 
-    const cumplidas = tareasDeEstaSemana.filter(t => {
+    const cumplidas = tareasSemana.filter(t => {
         if (!t.fecha_cierre) return false;
-        const c = new Date(t.fecha_cierre + 'T00:00:00');
-        return c <= finSemana;
+        return t.fecha_cierre <= t.fecha_fin; // cierre antes o igual al fin programado
     });
 
-    const ppc = tareasDeEstaSemana.length > 0 
-        ? Math.round((cumplidas.length / tareasDeEstaSemana.length) * 100) 
+    const ppc = tareasSemana.length > 0
+        ? Math.round((cumplidas.length / tareasSemana.length) * 100)
         : null;
 
     return {
@@ -231,7 +257,7 @@ function calcularKPIs() {
         porVencer: porVencer.length,
         sinFecha: sinFecha.length,
         ppc,
-        ppcTotal: tareasDeEstaSemana.length,
+        ppcTotal: tareasSemana.length,
         ppcEnPlazo: cumplidas.length
     };
 }
