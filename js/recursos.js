@@ -52,9 +52,7 @@ function buildSeries(registros, semanas, keyFn) {
 }
 
 export function renderRecursos(container) {
-    const registros = state.manpowerCache.filter(m => 
-        state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
-    );
+    const registros = state.manpowerCache;
 
     if (registros.length === 0) {
         container.innerHTML = `<div class="card p-8 text-center text-slate-500">
