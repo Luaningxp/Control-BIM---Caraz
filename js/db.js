@@ -221,8 +221,11 @@ export async function fetchVista(tab) {
             break;
         case 'roster':
             break;
-        case 'config':
-            await fetchPropVals();
+                case 'config':
+            await Promise.all([
+                fetchPropVals(),
+                fetchCausas() // <-- AÑADIR ESTO para que traiga las causas de incumplimiento
+            ]);
             break;
     }
     return true;
