@@ -51,15 +51,26 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 async function initApp(user) {
     state.currentUser = user;
     
-    const { data: perfil } = await supabaseClient.from('perfiles').select('rol,cargo').eq('id', user.id).maybeSingle();
-    
-    state.currentRol = (perfil?.rol ? String(perfil.rol).trim().toLowerCase() : 'operador');
-    state.currentCargo = (perfil?.cargo ? String(perfil.cargo).trim() : '');
-    
-    state.isAdmin = state.currentRol === 'admin' || state.currentCargo === 'BIM Manager';
-    state.isCoordinador = state.currentRol === 'coordinador_bim' || state.currentCargo === 'Coordinador BIM';
-    state.isSupervisor = state.currentCargo === 'Supervisor BIM';
-    state.isModelador = !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
+        const { data: perfil } = await supabaseClient
+        .from('perfiles')
+        .select('rol,cargo')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    // Normalización estricta del rol.
+    // El rol de autorización SOLO viene de `rol`. `cargo` es etiqueta de UI.
+    // Si `rol` está vacío o desconocido, se degrada a operador (mínimo privilegio).
+    const ROLES_VALIDOS = ['admin', 'coordinador_bim', 'supervisor_bim', 'operador'];
+    const rolRaw = perfil?.rol ? String(perfil.rol).trim().toLowerCase() : '';
+    state.currentRol = ROLES_VALIDOS.includes(rolRaw) ? rolRaw : 'operador';
+    state.currentCargo = perfil?.cargo ? String(perfil.cargo).trim() : '';
+
+    // Autorización por rol EXCLUSIVAMENTE.
+    // `cargo` NO otorga permisos. Solo se usa para mostrar en UI.
+    state.isAdmin        = state.currentRol === 'admin';
+    state.isCoordinador  = state.currentRol === 'coordinador_bim';
+    state.isSupervisor   = state.currentRol === 'supervisor_bim';
+    state.isModelador    = state.currentRol === 'operador';
 
     document.getElementById('user-display').innerText = user.email;
     document.getElementById('role-display').innerText = state.currentCargo || 'Sin Cargo';
