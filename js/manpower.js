@@ -204,7 +204,7 @@ export function renderManpower(container) {
                         <th class="p-3">% Día</th>
                         <th class="p-3">Horas</th>
                         <th class="p-3">Nota</th>
-                        ${state.isAdmin ? '<th class="p-3 text-center">Acciones</th>' : ''}
+                        ${(state.isAdmin || state.isCoordinador) ? '<th class="p-3 text-center">Acciones</th>' : ''}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -221,7 +221,7 @@ export function renderManpower(container) {
                             <td class="p-3 text-slate-500">${pct.toFixed(1)}%</td>
                             <td class="p-3 font-bold text-sky-600">${horas.toFixed(2)} h</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
-                            ${state.isAdmin ? `
+                            ${(state.isAdmin || state.isCoordinador) ? `
                                 <td class="p-3 text-center whitespace-nowrap">
                                     <button onclick="window.deleteManpower(${r.id})" class="text-red-500 hover:text-red-700" title="Eliminar registro">
                                         <i class="fa-solid fa-trash"></i>
@@ -447,7 +447,7 @@ export async function saveManpower(e) {
 // ELIMINAR REGISTRO (solo admin)
 // ============================================================
 window.deleteManpower = async function(id) {
-    if (!state.isAdmin) { toast('Solo los administradores pueden eliminar registros.'); return; }
+    if (!state.isAdmin && !state.isCoordinador) { toast('Solo administradores o coordinadores pueden eliminar registros.'); return; }
     
     const r = state.manpowerCache.find(x => x.id === id);
     if (!r) return;
