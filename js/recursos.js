@@ -270,7 +270,7 @@ export function renderRecursos(container) {
 
         // === SOBRECARGA POR MODELADOR (REPARTO GESTIÓN / EJECUCIÓN) ===
     const CAPACIDAD_SEMANAL_H = 40;
-    const PESO_IMPORTANCIA = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
+    const PESO_IMPORTANCIA = { 'Muy alto': 1.65, 'Alto': 1.4, 'Medio': 1.2, 'Bajo': 1.0 };
     const hoyStrCap = new Date().toISOString().split('T')[0];
 
     const cargaPorModelador = {};
@@ -341,7 +341,7 @@ export function renderRecursos(container) {
         // Asignar al responsable
         if (t.responsable_id && cargaPorModelador[t.responsable_id]) {
             cargaPorModelador[t.responsable_id].tareas += 1;
-            cargaPorModelador[t.responsable_id].dias += esfuerzoResponsable / (8 * peso); // Días equivalentes
+            cargaPorModelador[t.responsable_id].dias += esfuerzoResponsable / 8;
             cargaPorModelador[t.responsable_id].horasEstimadas += esfuerzoResponsable;
             if (esVencida) cargaPorModelador[t.responsable_id].tareasVencidas += 1;
         }
@@ -353,7 +353,7 @@ export function renderRecursos(container) {
             if (uid === t.responsable_id) return; 
             
             cargaPorModelador[uid].tareas += 1;
-            cargaPorModelador[uid].dias += esfuerzoPorRecurso / (8 * peso);
+            cargaPorModelador[uid].dias += esfuerzoPorRecurso / 8; 
             cargaPorModelador[uid].horasEstimadas += esfuerzoPorRecurso;
             if (esVencida) cargaPorModelador[uid].tareasVencidas += 1;
         });
