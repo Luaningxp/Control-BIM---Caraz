@@ -471,7 +471,37 @@ window.handlePlanosUpload = (e) => {
                     titulo: getVal(['Titulo de entregable', 'Título de entregable', 'titulo']),
                     disciplina: getVal(['Disciplina']),
                     clasificacion: getVal(['Clasificacion', 'Clasificación']),
-                    fecha: getVal(['Fecha']) ? new Date(row['Fecha']).toISOString().split('T')[0] : null,
+                    fecha: (() => {
+    const valFecha = getVal(['Fecha']);
+    if (!valFecha) return null;
+
+    // 1. Si Excel ya lo mandó como número (fecha serial de Excel)
+    if (typeof valFecha === 'number' || !isNaN(Number(valFecha))) {
+        const num = Number(valFecha);
+        // Las fechas de Excel empiezan en 1899-12-30
+        const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+        return date.toISOString().split('T')[0];
+    }
+
+    // 2. Si viene como string "DD/MM/YYYY"
+    const str = String(valFecha).trim();
+    if (str.includes('/')) {
+        const partes = str.split('/');
+        if (partes.length === 3) {
+            // Asumimos DD/MM/YYYY (formato peruano)
+            let dia = partes[0].padStart(2, '0');
+            let mes = partes[1].padStart(2, '0');
+            let anio = partes[2];
+            // Si el año viene con 2 dígitos, lo asumimos 20XX
+            if (anio.length === 2) anio = '20' + anio;
+            return `${anio}-${mes}-${dia}`; // Formato para Supabase (YYYY-MM-DD)
+        }
+    }
+
+    // 3. Si viene en formato YYYY-MM-DD o como Date
+    const d = new Date(str);
+    return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
+})(),
                     estado: getVal(['Estado']),
                     aconex: getVal(['Aconex']),
                     responsable: getVal(['Responsable']),
