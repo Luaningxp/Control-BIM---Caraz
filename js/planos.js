@@ -9,6 +9,11 @@ let planosState = {
     filterRevision: '',
     filterEstado: '',
     filterAconex: '',
+    filterClasificacion: '',
+    filterResponsable: '',
+    filterEstatusBim: '',
+    filterModeloBim: '',
+    filterAgrupacion: '',
     filterCategoria: '',
     showColMenu: false,
     sortBy: 'codigo',
@@ -112,7 +117,7 @@ export function renderLogPlanos(container) {
     const revisiones = [...new Set(planos.map(p => p.revision).filter(Boolean))].sort();
     const estados = [...new Set(planos.map(p => p.estado).filter(Boolean))].sort();
 
-    const baseFiltrada = planos.filter(p => {
+        const baseFiltrada = planos.filter(p => {
         const matchSearch = !planosState.search || 
             (p.codigo || '').toLowerCase().includes(planosState.search.toLowerCase()) ||
             (p.titulo || '').toLowerCase().includes(planosState.search.toLowerCase());
@@ -122,7 +127,17 @@ export function renderLogPlanos(container) {
         const matchRev = !planosState.filterRevision || p.revision === planosState.filterRevision;
         const matchEst = !planosState.filterEstado || p.estado === planosState.filterEstado;
         const matchAcx = !planosState.filterAconex || (p.aconex || '').toLowerCase().includes(planosState.filterAconex.toLowerCase());
-        return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx;
+        
+        // ▼ NUEVOS FILTROS ▼
+        const matchClasif = !planosState.filterClasificacion || (p.clasificacion || '').toLowerCase().includes(planosState.filterClasificacion.toLowerCase());
+        const matchResp = !planosState.filterResponsable || (p.responsable || '').toLowerCase().includes(planosState.filterResponsable.toLowerCase());
+        const matchEstatus = !planosState.filterEstatusBim || (p.estatus_bim || '').toLowerCase().includes(planosState.filterEstatusBim.toLowerCase());
+        const matchModelo = !planosState.filterModeloBim || (p.modelo_bim || '').toLowerCase().includes(planosState.filterModeloBim.toLowerCase());
+        const matchAgrup = !planosState.filterAgrupacion || (p.agrupacion || '').toLowerCase().includes(planosState.filterAgrupacion.toLowerCase());
+        // ▲ FIN NUEVOS FILTROS ▲
+
+        return matchSearch && matchTitulo && matchCodigo && matchDisc && matchRev && matchEst && matchAcx &&
+               matchClasif && matchResp && matchEstatus && matchModelo && matchAgrup;
     });
 
     const conteoContractual = baseFiltrada.filter(p => p.categoria === 'contractual').length;
@@ -323,6 +338,26 @@ export function renderLogPlanos(container) {
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Aconex</label>
                         <input type="text" id="drw-pl-aconex" value="${planosState.filterAconex}" oninput="window.applyPlanosFilter('filterAconex', this.value)" class="inp">
+                        <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Clasificación</label>
+                        <input type="text" value="${planosState.filterClasificacion}" oninput="window.applyPlanosFilter('filterClasificacion', this.value)" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Responsable</label>
+                        <input type="text" value="${planosState.filterResponsable}" oninput="window.applyPlanosFilter('filterResponsable', this.value)" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Estatus BIM</label>
+                        <input type="text" value="${planosState.filterEstatusBim}" oninput="window.applyPlanosFilter('filterEstatusBim', this.value)" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Modelo BIM</label>
+                        <input type="text" value="${planosState.filterModeloBim}" oninput="window.applyPlanosFilter('filterModeloBim', this.value)" class="inp">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Agrupación</label>
+                        <input type="text" value="${planosState.filterAgrupacion}" oninput="window.applyPlanosFilter('filterAgrupacion', this.value)" class="inp">
+                    </div>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Disciplina</label>
@@ -399,14 +434,20 @@ window.clearPlanosFilters = function() {
     planosState.filterRevision = '';
     planosState.filterEstado = '';
     planosState.filterAconex = '';
+    // ▼ Añadir los nuevos ▼
+    planosState.filterClasificacion = '';
+    planosState.filterResponsable = '';
+    planosState.filterEstatusBim = '';
+    planosState.filterModeloBim = '';
+    planosState.filterAgrupacion = '';
+    // ▲ Fin de los nuevos ▲
     planosState.filterCategoria = '';
+    planosState.currentPage = 1;
 
-    // ▼ Añadir esta línea ▼
     const drawer = document.getElementById('planos-filter-drawer');
     if (drawer) drawer.remove();
     const overlay = document.getElementById('planos-filter-drawer-overlay');
     if (overlay) overlay.remove();
-    // ▲ Añadir esta línea ▲
 
     window.renderView();
 };
