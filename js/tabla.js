@@ -404,7 +404,7 @@ export function canEdit(t) {
     }
     return false;
 }
-export function canDelete() { return state.isAdmin || state.isCoordinador; }
+export function canDelete() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 
 function esMia(t) {
