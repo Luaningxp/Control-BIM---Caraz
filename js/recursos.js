@@ -64,6 +64,9 @@ export function renderRecursos(container) {
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
+        const modeladores = state.perfilesCache.filter(p =>
+        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
+    );
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
         // Calculamos los días hábiles REALES de este modelador en el mes (según roster)
