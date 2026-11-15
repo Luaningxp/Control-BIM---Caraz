@@ -185,7 +185,7 @@ export function renderKanban(container) {
                                         <span class="font-bold ${critColor(crit)}">${crit}</span>
                                     </div>
 
-                                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
                                         <div class="flex -space-x-1.5">
                                             ${equipo.map(r => {
                                                 const p = state.perfilesCache.find(x => x.id === r.usuario_id);
@@ -193,8 +193,24 @@ export function renderKanban(container) {
                                                 return `<div class="w-5 h-5 rounded-full ${colorAvatar(p.id)} text-white text-[8px] font-bold flex items-center justify-center ring-2 ring-white" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`;
                                             }).join('')}
                                         </div>
-                                        <div class="text-[10px] ${d !== null && d < 0 ? 'text-red-600 font-bold' : d !== null && d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
-                                            <i class="fa-regular fa-calendar mr-1"></i>${t.fecha_fin ? fmtDate(t.fecha_fin) : 'Sin fecha'}
+                                        
+                                        <div class="flex items-center gap-2">
+                                            <div class="text-[10px] ${d !== null && d < 0 ? 'text-red-600 font-bold' : d !== null && d <= 7 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">
+                                                <i class="fa-regular fa-calendar mr-1"></i>${t.fecha_fin ? fmtDate(t.fecha_fin) : 'Sin fecha'}
+                                            </div>
+                                            
+                                            <!-- ▼ BOTONES PARA ADMIN/COORDINADOR ▼ -->
+                                            ${(state.isAdmin || state.isCoordinador) ? `
+                                                <div class="flex items-center gap-1 ml-1 pl-1 border-l border-slate-200">
+                                                    <button onclick="event.stopPropagation(); window.duplicateTask(${t.id})" class="text-indigo-500 hover:text-indigo-700 p-0.5 rounded transition" title="Duplicar">
+                                                        <i class="fa-solid fa-copy text-[11px]"></i>
+                                                    </button>
+                                                    <button onclick="event.stopPropagation(); window.deleteTask(${t.id})" class="text-red-500 hover:text-red-700 p-0.5 rounded transition" title="Eliminar">
+                                                        <i class="fa-solid fa-trash text-[11px]"></i>
+                                                    </button>
+                                                </div>
+                                            ` : ''}
+                                            <!-- ▲ FIN DE LOS BOTONES ▲ -->
                                         </div>
                                     </div>
                                 </div>
