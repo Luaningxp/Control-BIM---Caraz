@@ -64,35 +64,23 @@ export function renderRecursos(container) {
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const diaSemana = hoy.getDay();
-    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0, 0, 0, 0);
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-
-    const pctPorUsuarioDia = {};
-    registros.forEach(r => {
-        const key = `${r.usuario_id}|${r.fecha}`;
-        pctPorUsuarioDia[key] = (pctPorUsuarioDia[key] || 0) + parseFloat(r.porcentaje_dia || 0);
-    });
-
-    const modeladores = state.perfilesCache.filter(p =>
-        (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
-    );
-
-    const diasDelMes = [];
-    const cursor = new Date(inicioMes);
-    while (cursor <= hoy) {
-        if (cursor.getDay() !== 0) diasDelMes.push(cursor.toISOString().split('T')[0]);
-        cursor.setDate(cursor.getDate() + 1);
-    }
-
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
+        // Calculamos los días hábiles REALES de este modelador en el mes (según roster)
+        const diasDelMes = [];
+        const cursor = new Date(inicioMes);
+        while (cursor <= hoy) {
+            const fechaStr = cursor.toISOString().split('T')[0];
+            if (esDiaLaborable(p.id, fechaStr)) {
+                diasDelMes.push(fechaStr);
+            }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
         const diasCumplidos = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
         const diasRegistrados = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
         const horasTotales = registros.filter(r => r.usuario_id === p.id).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
+        
         cumplimientoPorModelador[p.id] = {
             nombre: nombreFormateado(p),
             avatar: p.id,
