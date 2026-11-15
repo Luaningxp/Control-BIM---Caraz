@@ -162,7 +162,61 @@ export function renderDashboard(container) {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    ${(state.snapshotsCache || []).slice(0, 8).map((s, i, arr) => {
+                    ${(() => {
+    // 1. Calcular la semana actual en vivo (igual que la tarjeta de arriba)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const dia = hoy.getDay();
+    const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
+    const lunes = new Date(hoy); lunes.setDate(diff);
+    const semanaActualStr = lunes.toISOString().split('T')[0];
+    
+    // 2. Filtrar los snapshots históricos (quitar la semana actual si existe)
+    const snapshotsHistoricos = (state.snapshotsCache || []).filter(s => s.semana !== semanaActualStr);
+    
+    // 3. Crear el objeto virtual para la semana actual
+    const snapshotActual = {
+        semana: semanaActualStr,
+        total_tareas: k.total,
+        abiertas: k.abiertas,
+        vencidas: k.vencidas,
+        por_vencer: k.porVencer,
+        ppc: k.ppc,
+        horas_semana: state.manpowerCache.filter(m => {
+            if(!m.fecha) return false;
+            const f = new Date(m.fecha + 'T00:00:00');
+            const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
+            return f >= lunes && f <= finSem;
+        }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0),
+        planos_wip: 0, // Podrías calcularlo si quieres, pero para el gráfico no es vital
+        planos_shared: 0
+    };
+
+    // 4. Unir la semana actual + los históricos (hasta 8 en total)
+    const listaFinal = [snapshotActual, ...snapshotsHistoricos].slice(0, 8);
+
+    // 5. Renderizar las filas
+    return listaFinal.map((s, i, arr) => {
+        const prev = arr[i + 1];
+        const delta = (val, prevVal) => {
+            if (prevVal === undefined || prevVal === null) return '';
+            const d = val - prevVal;
+            if (d === 0) return '<span class="text-slate-400">=</span>';
+            return d > 0 ? `<span class="text-red-600">▲${d}</span>` : `<span class="text-emerald-600">▼${Math.abs(d)}</span>`;
+        };
+        return `<tr class="hover:bg-slate-50">
+            <td class="p-3 font-mono font-bold text-sky-700">${fmtDate(s.semana)}</td>
+            <td class="p-3">${s.total_tareas}</td>
+            <td class="p-3">${s.abiertas} ${delta(s.abiertas, prev?.abiertas)}</td>
+            <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${s.vencidas} ${delta(s.vencidas, prev?.vencidas)}</td>
+            <td class="p-3">${s.por_vencer} ${delta(s.por_vencer, prev?.por_vencer)}</td>
+            <td class="p-3 font-bold">${s.ppc !== null ? s.ppc + '%' : '—'} ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
+            <td class="p-3">${s.horas_semana?.toFixed(1) || '0.0'} h</td>
+            <td class="p-3">${s.planos_wip}</td>
+            <td class="p-3">${s.planos_shared}</td>
+        </tr>`;
+    }).join('');
+})() || '<tr><td colspan="9" class="text-center py-4 text-slate-400">Aún no hay datos.</td></tr>'}
                         const prev = arr[i + 1];
                         const delta = (val, prevVal) => {
                             if (prevVal === undefined || prevVal === null) return '';
