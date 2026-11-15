@@ -3,11 +3,10 @@ import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getInic
 import { tipoDia } from './roster.js';
 
 let ganttState = {
-    search: '',
     filterGrupo: '',
     filterResp: '',
     filterRecursos: '',
-    estadosOcultos: [],
+    estadosOcultos: ['Cerrado'],
     iniDesde: '',
     iniHasta: '',
     finDesde: '',
@@ -15,7 +14,7 @@ let ganttState = {
     soloVencidas: false,
     soloPorVencer: false,
     soloSinFecha: false,
-    viewMode: 'Week',
+    viewMode: 'Day',
     currentGantt: null
 };
 
