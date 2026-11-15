@@ -200,7 +200,7 @@ export function renderKanban(container) {
                                             </div>
                                             
                                             <!-- ▼ BOTONES PARA ADMIN/COORDINADOR ▼ -->
-                                            ${(state.isAdmin || state.isCoordinador) ? `
+                                            ${(state.isAdmin || state.isCoordinador || state.isSupervisor) ? `
                                                 <div class="flex items-center gap-1 ml-1 pl-1 border-l border-slate-200">
                                                     <button onclick="event.stopPropagation(); window.duplicateTask(${t.id})" class="text-indigo-500 hover:text-indigo-700 p-0.5 rounded transition" title="Duplicar">
                                                         <i class="fa-solid fa-copy text-[11px]"></i>
