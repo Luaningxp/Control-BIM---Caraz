@@ -70,6 +70,7 @@ export function renderRecursos(container) {
     inicioSemana.setDate(diffLunes);
     inicioSemana.setHours(0, 0, 0, 0);
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0); // Último día del mes
 
     const pctPorUsuarioDia = {};
     registros.forEach(r => {
@@ -83,20 +84,31 @@ export function renderRecursos(container) {
 
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
-        // Calculamos los días hábiles REALES de este modelador en el mes (según roster)
         const diasDelMes = [];
+        const diasRestantes = [];
         const cursor = new Date(inicioMes);
-        while (cursor <= hoy) {
+
+        while (cursor <= finMes) {
             const fechaStr = cursor.toISOString().split('T')[0];
             if (esDiaLaborable(p.id, fechaStr)) {
-                diasDelMes.push(fechaStr);
+                if (cursor <= hoy) {
+                    diasDelMes.push(fechaStr); // Días hábiles hasta hoy
+                } else {
+                    diasRestantes.push(fechaStr); // Días hábiles que faltan
+                }
             }
             cursor.setDate(cursor.getDate() + 1);
         }
 
         const diasCumplidos = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
         const diasRegistrados = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
-        const horasTotales = registros.filter(r => r.usuario_id === p.id).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
+        
+        // Solo sumar las horas de este mes
+        const horasTotales = registros.filter(r => {
+            if (r.usuario_id !== p.id || !r.fecha) return false;
+            const f = new Date(r.fecha + 'T00:00:00');
+            return f >= inicioMes && f <= hoy;
+        }).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
         
         cumplimientoPorModelador[p.id] = {
             nombre: nombreFormateado(p),
@@ -104,6 +116,7 @@ export function renderRecursos(container) {
             cumplidos: diasCumplidos,
             registrados: diasRegistrados,
             totalDias: diasDelMes.length,
+            diasRestantesQty: diasRestantes.length,
             horasTotales
         };
     });
@@ -666,17 +679,18 @@ export function renderRecursos(container) {
         <div class="card overflow-x-auto">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Cumplimiento y horas por modelador (mes)</h4>
-                <p class="text-[11px] text-slate-500">Días al 100% del mes y horas totales acumuladas.</p>
+                <p class="text-[11px] text-slate-500">Días trabajados a la fecha, horas acumuladas y días restantes del mes.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
                     <tr>
                         <th class="p-3">Modelador</th>
-                        <th class="p-3">Días al 100%</th>
-                        <th class="p-3">Días con registro</th>
-                        <th class="p-3">Total días hábiles</th>
+                        <th class="p-3 text-center">Días transcurridos</th>
+                        <th class="p-3 text-center">Días al 100%</th>
+                        <th class="p-3 text-center">Días con registro</th>
+                        <th class="p-3 text-center">Días Restantes</th>
                         <th class="p-3">Horas Totales</th>
-                        <th class="p-3">Cumplimiento</th>
+                        <th class="p-3">Cumplimiento a la fecha</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -688,9 +702,10 @@ export function renderRecursos(container) {
                                 <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar || m.nombre)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
                                 <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
                             </td>
-                            <td class="p-3 font-bold ${color}">${m.cumplidos}</td>
-                            <td class="p-3">${m.registrados}</td>
-                            <td class="p-3">${m.totalDias}</td>
+                            <td class="p-3 font-semibold text-center text-slate-600">${m.totalDias}</td>
+                            <td class="p-3 font-bold text-center ${color}">${m.cumplidos}</td>
+                            <td class="p-3 text-center text-slate-600">${m.registrados}</td>
+                            <td class="p-3 text-center text-slate-400 font-medium">${m.diasRestantesQty}</td>
                             <td class="p-3 font-bold text-sky-700">${m.horasTotales.toFixed(1)} h</td>
                             <td class="p-3">
                                 <div class="flex items-center gap-2">
