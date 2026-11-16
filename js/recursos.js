@@ -64,9 +64,23 @@ export function renderRecursos(container) {
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-        const modeladores = state.perfilesCache.filter(p =>
+    const diaSemana = hoy.getDay();
+    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(diffLunes);
+    inicioSemana.setHours(0, 0, 0, 0);
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+    const pctPorUsuarioDia = {};
+    registros.forEach(r => {
+        const key = `${r.usuario_id}|${r.fecha}`;
+        pctPorUsuarioDia[key] = (pctPorUsuarioDia[key] || 0) + parseFloat(r.porcentaje_dia || 0);
+    });
+
+    const modeladores = state.perfilesCache.filter(p =>
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
+
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
         // Calculamos los días hábiles REALES de este modelador en el mes (según roster)
@@ -259,7 +273,7 @@ export function renderRecursos(container) {
     const PENALIZACION_MINIMA = latenciaPromedio > 0 ? latenciaPromedio : 3;
     // === FIN LATENCIA ===
 
-        // === SOBRECARGA POR MODELADOR (REPARTO GESTIÓN / EJECUCIÓN) ===
+    // === SOBRECARGA POR MODELADOR (REPARTO GESTIÓN / EJECUCIÓN) ===
     const CAPACIDAD_SEMANAL_H = 40;
     const PESO_IMPORTANCIA = { 'Muy alto': 1.65, 'Alto': 1.4, 'Medio': 1.2, 'Bajo': 1.0 };
     const hoyStrCap = new Date().toISOString().split('T')[0];
@@ -275,15 +289,12 @@ export function renderRecursos(container) {
         };
     });
 
-    // 1. Calcular la carga de supervisión de cada responsable (N tareas a cargo)
     const tareasPorResponsable = {};
     state.tasksCache.filter(t => t.estado !== 'Cerrado' && t.responsable_id).forEach(t => {
         tareasPorResponsable[t.responsable_id] = (tareasPorResponsable[t.responsable_id] || 0) + 1;
     });
 
-    // 2. Calcular esfuerzo por tarea y repartirlo
     state.tasksCache.filter(t => t.estado !== 'Cerrado').forEach(t => {
-        // Calcular días (con penalización por retraso)
         let dias = 0;
         let esVencida = false;
         if (t.fecha_fin) {
@@ -304,32 +315,26 @@ export function renderRecursos(container) {
         const peso = PESO_IMPORTANCIA[t.importancia] || 1;
         const esfuerzoTotal = dias * 8 * peso;
 
-        // Identificar asignados únicos
         const recursosIds = [...new Set(
             (state.actividadRecursosCache || [])
                 .filter(r => r.pendiente_id === t.id)
                 .map(r => r.usuario_id)
         )];
         
-        // REPARTO
         let esfuerzoResponsable = 0;
         let esfuerzoPorRecurso = 0;
 
         if (t.responsable_id && recursosIds.length > 0) {
-            // Caso A: Hay responsable y hay recursos
             const N = tareasPorResponsable[t.responsable_id] || 1;
             esfuerzoResponsable = esfuerzoTotal / N;
             const remanente = esfuerzoTotal - esfuerzoResponsable;
             esfuerzoPorRecurso = remanente / recursosIds.length;
         } else if (t.responsable_id && recursosIds.length === 0) {
-            // Caso B: Solo responsable (asume todo)
             esfuerzoResponsable = esfuerzoTotal;
         } else if (!t.responsable_id && recursosIds.length > 0) {
-            // Caso C: Sin responsable, solo recursos
             esfuerzoPorRecurso = esfuerzoTotal / recursosIds.length;
         }
 
-        // Asignar al responsable
         if (t.responsable_id && cargaPorModelador[t.responsable_id]) {
             cargaPorModelador[t.responsable_id].tareas += 1;
             cargaPorModelador[t.responsable_id].dias += esfuerzoResponsable / 8;
@@ -337,10 +342,8 @@ export function renderRecursos(container) {
             if (esVencida) cargaPorModelador[t.responsable_id].tareasVencidas += 1;
         }
 
-        // Asignar a los recursos
         recursosIds.forEach(uid => {
             if (!cargaPorModelador[uid]) return;
-            // Evitar doble conteo si el responsable es también recurso
             if (uid === t.responsable_id) return; 
             
             cargaPorModelador[uid].tareas += 1;
@@ -350,14 +353,12 @@ export function renderRecursos(container) {
         });
     });
 
-    // 3. Sumar horas reales de manpower
     registros.forEach(r => {
         if (cargaPorModelador[r.usuario_id]) {
             cargaPorModelador[r.usuario_id].horasReales += pctAHoras(r.porcentaje_dia);
         }
     });
 
-    // 4. Calcular semanas equivalentes y estado
     const listaCarga = Object.values(cargaPorModelador).map(m => {
         const semanasEquivalentes = m.horasEstimadas / CAPACIDAD_SEMANAL_H;
         let estado, color;
@@ -369,7 +370,7 @@ export function renderRecursos(container) {
     }).sort((a, b) => b.semanasEquivalentes - a.semanasEquivalentes);
     // === FIN SOBRECARGA ===
 
-        // === CONCENTRACIÓN DE RIESGO (REPARTO) ===
+    // === CONCENTRACIÓN DE RIESGO (REPARTO) ===
     const PESO_CRITICO = { 'Muy alto': 3, 'Alto': 2 };
     const hoyStrRiesgo = new Date().toISOString().split('T')[0];
 
@@ -379,7 +380,6 @@ export function renderRecursos(container) {
     });
 
     state.tasksCache.filter(t => t.estado !== 'Cerrado' && PESO_CRITICO[t.importancia]).forEach(t => {
-        // Calcular días con penalización
         let dias = 0;
         if (t.fecha_fin) {
             const fin = new Date(t.fecha_fin + 'T00:00:00');
