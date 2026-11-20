@@ -454,6 +454,8 @@ export function renderRecursos(container) {
     const concentracionTop2 = concentracionValidos.slice(0, 2).reduce((sum, m) => sum + m.pct, 0);
     // === FIN CONCENTRACIÓN DE RIESGO ===
 
+    window.__debugRiesgo = { concentracionRiesgo, totalHorasCriticas, concentracionTop1, concentracionTop2 };
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div>
