@@ -448,8 +448,10 @@ export function renderRecursos(container) {
         return { ...m, pct, nivel, color };
     }).sort((a, b) => b.horasCriticas - a.horasCriticas);
 
-    const concentracionTop1 = concentracionRiesgo[0]?.pct || 0;
-    const concentracionTop2 = (concentracionRiesgo[0]?.pct || 0) + (concentracionRiesgo[1]?.pct || 0);
+    // Filtramos solo a los que realmente tienen horas críticas para que no ensucien el Top
+    const concentracionValidos = concentracionRiesgo.filter(m => m.horasCriticas > 0);
+    const concentracionTop1 = concentracionValidos[0]?.pct || 0;
+    const concentracionTop2 = concentracionValidos.slice(0, 2).reduce((sum, m) => sum + m.pct, 0);
     // === FIN CONCENTRACIÓN DE RIESGO ===
 
     container.innerHTML = `
