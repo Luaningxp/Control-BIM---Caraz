@@ -258,7 +258,7 @@ export function renderDashboard(container) {
                         }
 
                         // Renderizar las filas
-                        return listaSemanas.map((s, i, arr) => {
+                        return listaSemanas.filter(s => s.ppc !== null).map((s, i, arr) => {
                             const prev = arr[i + 1];
                             const delta = (val, prevVal) => {
                                 if (val === null || prevVal === undefined || prevVal === null) return '';
@@ -276,7 +276,7 @@ export function renderDashboard(container) {
                                 <td class="p-3">${valOrDash(s.abiertas)} ${delta(s.abiertas, prev?.abiertas)}</td>
                                 <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${valOrDash(s.vencidas)} ${delta(s.vencidas, prev?.vencidas)}</td>
                                 <td class="p-3">${valOrDash(s.por_vencer)} ${delta(s.por_vencer, prev?.por_vencer)}</td>
-                                <td class="p-3 font-bold">${s.ppc !== null ? s.ppc + '%' : '—'} ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
+                                <td class="p-3 font-bold">${s.ppc}% ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
                                 <td class="p-3">${s.horas_semana !== null ? s.horas_semana.toFixed(1) + ' h' : '<span class="text-slate-300">—</span>'}</td>
                                 <td class="p-3">${valOrDash(s.planos_wip)}</td>
                                 <td class="p-3">${valOrDash(s.planos_shared)}</td>
