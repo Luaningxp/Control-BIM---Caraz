@@ -180,14 +180,23 @@ window.generarInformeWord = async function() {
         primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
         primerDomingo.setHours(23, 59, 59, 999);
 
-                // 1. Recolectar datos para la plantilla
+                        // 1. Recolectar datos para la plantilla
         const semanasData = [];
         let inicioSemana = new Date(fechaInicio);
         inicioSemana.setHours(0, 0, 0, 0);
-        let finSemana = new Date(primerDomingo);
         let contadorSemana = 1;
 
         while (inicioSemana <= hoy) {
+            // Calculamos el fin de semana como 6 días después del inicio
+            let finSemana = new Date(inicioSemana);
+            finSemana.setDate(inicioSemana.getDate() + 6);
+            finSemana.setHours(23, 59, 59, 999);
+
+            // Si el fin de semana se pasa del día de hoy, lo recortamos a hoy
+            if (finSemana > hoy) {
+                finSemana = new Date(hoy);
+            }
+
             const strIni = inicioSemana.toISOString().split('T')[0];
             const strFin = finSemana.toISOString().split('T')[0];
 
@@ -224,16 +233,15 @@ window.generarInformeWord = async function() {
                     numero: idx + 1,
                     nombre: act.tarea.actividad,
                     descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
-                    // Datos para la tabla de entregables
                     estado: act.tarea.estado,
                     fechaEjecucion: `${fmtDate(strIni)} - ${fmtDate(strFin)}`
                 }));
             }
 
             semanasData.push(semanaObj);
+            
+            // Avanzamos exactamente 7 días para la siguiente semana
             inicioSemana.setDate(inicioSemana.getDate() + 7);
-            finSemana.setDate(finSemana.getDate() + 7);
-            if (finSemana > hoy) finSemana = new Date(hoy);
             contadorSemana++;
         }
 
