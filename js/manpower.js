@@ -36,13 +36,7 @@ export function renderMiTrabajo(container) {
     const hoyStr = today().toISOString().split('T')[0];
     const misTareas = state.tasksCache.filter(t => {
         if (t.estado_cde === 'Archived' || !isUserInvolved(t)) return false;
-        
-        // Si está cerrada, que siga apareciendo SOLO si se cerró hoy
-        if (t.estado === 'Cerrado') {
-            return t.fecha_cierre === hoyStr;
-        }
-        
-        // Las tareas abiertas siempre se muestran
+        if (t.estado === 'Cerrado') return t.fecha_cierre === hoyStr;
         return true;
     });
     
@@ -58,7 +52,6 @@ export function renderMiTrabajo(container) {
         m.fecha === ayerStr
     );
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    const ayerEraLaborable = esDiaLaborable(state.currentUser.id, ayerStr);
     const esModeladorPuro = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
     const noLlenoAyer = esModeladorPuro && porcentajeAyer < 100;
 
@@ -75,12 +68,17 @@ export function renderMiTrabajo(container) {
             </div>
         ` : ''}
 
-        <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div>
                 <h3 class="font-bold text-sm text-slate-800">Mi Trabajo Pendiente</h3>
                 <p class="text-[11px] text-slate-500">Registra tu % del día para cada actividad.</p>
             </div>
-            <button onclick="window.openManpowerModal()" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700"><i class="fa-solid fa-plus mr-1"></i> Registrar % del Día</button>
+            <div class="flex gap-2">
+                <button onclick="window.openInformeModal()" class="text-xs bg-sky-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-sky-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-word"></i> Generar Informe Word
+                </button>
+                <button onclick="window.openManpowerModal()" class="text-xs bg-slate-800 text-white px-3 py-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-plus mr-1"></i> Registrar %</button>
+            </div>
         </div>
         <div class="grid gap-3">
             ${misTareas.length === 0 ? '<div class="card p-6 text-center text-slate-500 text-sm">No tienes actividades pendientes.</div>' : ''}
@@ -118,6 +116,178 @@ export function renderMiTrabajo(container) {
         </div>
     `;
 }
+
+// ============================================================
+// GENERADOR DE INFORME WORD
+// ============================================================
+window.openInformeModal = function() {
+    if (!document.getElementById('modal-informe')) {
+        const modalHtml = `
+            <div id="modal-informe" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h3 class="font-bold text-sm text-slate-800">Generar Informe de Actividades</h3>
+                        <button onclick="document.getElementById('modal-informe').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Nombre completo (para el documento)</label>
+                            <input type="text" id="inf-nombre" class="inp" value="${nombreFormateado(state.currentUser)}" placeholder="Ej. Ing. Carlos Tunuque">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Fecha de Inicio de Reporte</label>
+                            <input type="date" id="inf-fecha-inicio" class="inp">
+                            <p class="text-[10px] text-slate-500 mt-1">El sistema calculará las semanas hasta la fecha actual.</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-3 border-t">
+                        <button onclick="document.getElementById('modal-informe').classList.add('hidden')" class="px-3 py-1.5 border rounded text-slate-600">Cancelar</button>
+                        <button onclick="window.generarInformeWord()" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Generar Word</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    document.getElementById('inf-fecha-inicio').value = new Date().toISOString().split('T')[0];
+    document.getElementById('modal-informe').classList.remove('hidden');
+    document.getElementById('modal-informe').classList.add('flex');
+};
+
+window.generarInformeWord = function() {
+    const nombre = document.getElementById('inf-nombre').value.trim();
+    const fechaInicioStr = document.getElementById('inf-fecha-inicio').value;
+    
+    if (!nombre || !fechaInicioStr) {
+        toast('Por favor, ingresa tu nombre y la fecha de inicio.');
+        return;
+    }
+
+    document.getElementById('modal-informe').classList.add('hidden');
+
+    const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999);
+
+    // Calcular domingo inmediato
+    const diaInicio = fechaInicio.getDay();
+    const diffDomingo = diaInicio === 0 ? 0 : 7 - diaInicio;
+    const primerDomingo = new Date(fechaInicio);
+    primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
+    primerDomingo.setHours(23, 59, 59, 999);
+
+    const semanas = [];
+    let inicioSemana = new Date(fechaInicio);
+    inicioSemana.setHours(0, 0, 0, 0);
+    let finSemana = new Date(primerDomingo);
+    let contadorSemanas = 1;
+
+    while (inicioSemana <= hoy) {
+        const registrosSemana = state.manpowerCache.filter(m => {
+            if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
+            const f = new Date(m.fecha + 'T00:00:00');
+            return f >= inicioSemana && f <= finSemana;
+        });
+
+        const actividadesMap = {};
+        registrosSemana.forEach(r => {
+            if (!r.pendiente_id) return;
+            const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+            if (!t) return;
+
+            if (!actividadesMap[t.id]) {
+                actividadesMap[t.id] = {
+                    codigo: t.codigo_contenedor || '',
+                    nombre: t.actividad,
+                    descripciones: [],
+                    horas: 0
+                };
+            }
+            actividadesMap[t.id].horas += pctAHoras(r.porcentaje_dia);
+            if (r.descripcion && r.descripcion.trim() !== '') {
+                if (!actividadesMap[t.id].descripciones.includes(r.descripcion.trim())) {
+                    actividadesMap[t.id].descripciones.push(r.descripcion.trim());
+                }
+            }
+        });
+
+        semanas.push({
+            numero: contadorSemanas,
+            inicio: new Date(inicioSemana),
+            fin: new Date(finSemana),
+            actividades: Object.values(actividadesMap)
+        });
+
+        inicioSemana.setDate(inicioSemana.getDate() + 7);
+        finSemana.setDate(finSemana.getDate() + 7);
+        if (finSemana > hoy) finSemana = new Date(hoy);
+        contadorSemanas++;
+        if (contadorSemanas > 20) break;
+    }
+
+    // --- GENERACIÓN DEL HTML PARA WORD ---
+    const cargo = state.currentCargo || 'Modelador BIM';
+    const ultimaSemana = semanas[semanas.length - 1];
+    const mes = ultimaSemana ? ultimaSemana.fin.toLocaleString('es-ES', { month: 'long' }).toUpperCase() : '';
+    const rangoSemanas = semanas.length > 0 ? `${semanas[0].inicio.toLocaleDateString()} – ${ultimaSemana.fin.toLocaleDateString()}` : '';
+
+    let htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>Informe</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 40px;">
+            <!-- PORTADA -->
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h1 style="font-size: 24px;">INFORME MENSUAL DE ACTIVIDADES</h1>
+                <br><br><br>
+                <p style="font-size: 18px;"><strong>Nombre:</strong> ${nombre}</p>
+                <p style="font-size: 18px;"><strong>Cargo:</strong> ${cargo}</p>
+                <br><br><br>
+                <p style="font-size: 16px;"><strong>Mes:</strong> ${mes}</p>
+                <p style="font-size: 16px;"><strong>Semanas:</strong> ${rangoSemanas}</p>
+                <br><br><br><br><br><br>
+                <p style="font-size: 14px;">Consorcio SUYAY II - Hospital Caraz II-1</p>
+            </div>
+            
+            <div style="page-break-after: always;"></div>
+            
+            <!-- SALTO DE PÁGINA PARA EMPEZAR EL CONTENIDO -->
+            <h2 style="font-size: 18px;">CONTENIDO</h2>
+            <hr>
+            <br>
+    `;
+
+    semanas.forEach(s => {
+        htmlContent += `
+            <h3 style="font-size: 16px; background-color: #f0f0f0; padding: 5px;">Actividades semana ${s.inicio.toLocaleDateString()} al ${s.fin.toLocaleDateString()}</h3>
+        `;
+        
+        s.actividades.forEach((a, idx) => {
+            const desc = a.descripciones.length > 0 ? a.descripciones.join(' | ') : '(Sin descripción registrada)';
+            htmlContent += `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-size: 14px;"><strong>Actividad ${idx + 1}:</strong> ${a.nombre} (${a.codigo})</h4>
+                    <p style="font-size: 12px;"><strong>Descripción de la actividad:</strong> ${desc}</p>
+                    <p style="font-size: 12px;"><strong>Metodología y Herramientas Utilizadas:</strong> Revit 2024</p>
+                    <p style="font-size: 12px;"><strong>Resultados y Logros Obtenidos:</strong> (mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)</p>
+                </div>
+            `;
+        });
+    });
+
+    htmlContent += `</body></html>`;
+
+    // --- DESCARGA DEL ARCHIVO ---
+    const converted = window.htmlDocx.asBlob(htmlContent);
+    const url = window.URL.createObjectURL(converted);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Informe_${nombre.replace(/ /g, '_')}_${mes}.docx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast('Informe Word generado correctamente.');
+};
 
 // ============================================================
 // MANPOWER (listado con filtros + conversión a horas)
