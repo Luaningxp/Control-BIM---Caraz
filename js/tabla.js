@@ -1176,7 +1176,7 @@ export async function saveTask(e) {
     if (soloModelador && id) {
         payload = {
             estado: estado,
-            fecha_cierre: fechaCierre || null,
+            fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
             nota: document.getElementById('task-nota').value
         };
     } else {
@@ -1190,7 +1190,7 @@ export async function saveTask(e) {
             estado: estado,
             fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
             fecha_fin: fechaFinProgramada || null,
-            fecha_cierre: fechaCierre || null,
+            fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
             nota: document.getElementById('task-nota').value,
             subcontrata: document.getElementById('task-subcontrata')?.value || null
         };
