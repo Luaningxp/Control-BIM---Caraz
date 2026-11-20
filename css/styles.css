@@ -1,29 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* Variables globales para los colores */
+/* =========================================
+   PALETA 60-30-10: MARINO & AZAFRÁN
+   ========================================= */
+
+/* MODO CLARO */
 :root {
-    --bg-body: #f8fafc;
-    --text-body: #1e293b;
-    --bg-card: #ffffff;
-    --border-card: #e2e8f0;
-    --bg-input: #ffffff;
-    --border-input: #cbd5e1;
-    --text-muted: #64748b;
-    --bg-table-head: #f1f5f9;
-    --bg-table-row: #f1f5f9;
+    /* 60% - Fondo principal */
+    --bg-body: #FAF9F5;          /* Blanco Marfil Suave */
+    
+    /* 30% - Estructura / Superficies */
+    --bg-card: #FFFFFF;          /* Blanco Puro para tarjetas */
+    --bg-table-head: #F3F1EC;    /* Arena Clara para cabeceras */
+    --bg-table-row: #FFFFFF;     /* Filas blancas */
+    
+    /* Textos */
+    --text-body: #0F1D30;        /* Marino Carbón (Texto principal) */
+    --text-muted: #475569;       /* Gris Pizarra Medio (Texto secundario) */
+    
+    /* Bordes */
+    --border-card: #E2DFD7;      /* Línea Piedra Clara */
+    --border-input: #CBD5E1;     /* Gris Acero Claro */
+    
+    /* Inputs */
+    --bg-input: #FFFFFF;
 }
 
-/* Variables para Modo Oscuro */
+/* MODO OSCURO */
 .dark {
-    --bg-body: #0f172a;
-    --text-body: #f1f5f9;
-    --bg-card: #1e293b;
-    --border-card: #334155;
-    --bg-input: #0f172a;
-    --border-input: #475569;
-    --text-muted: #94a3b8;
-    --bg-table-head: #1e293b;
-    --bg-table-row: #334155;
+    /* 60% - Fondo principal (Marino Profundo) */
+    --bg-body: #0B121E;          
+    
+    /* 30% - Estructura / Superficies (Marino Ejecutivo) */
+    --bg-card: #14253D;          
+    --bg-table-head: #1A2F4C;    
+    --bg-table-row: #14253D;     
+    
+    /* Textos */
+    --text-body: #F8FAFC;        
+    --text-muted: #94A3B8;       
+    
+    /* Bordes */
+    --border-card: #233754;      
+    --border-input: #334155;     
+    
+    /* Inputs */
+    --bg-input: #0F1D30;         
 }
 
 body { 
@@ -43,7 +65,7 @@ body {
     color: var(--text-body);
     transition: all 0.2s; 
 }
-.inp:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15); }
+.inp:focus { outline: none; border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15); }
 
 .card { 
     background: var(--bg-card); 
@@ -76,7 +98,8 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 
 .badge-cde { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em; }
 
-.tab-active { border-color: #0284c7 !important; color: #0284c7 !important; }
+/* Navegación activa usando el Azafrán */
+.tab-active { border-color: #F59E0B !important; color: #F59E0B !important; }
 
 .kb-col { 
     background: var(--bg-table-head); 
@@ -86,8 +109,8 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     flex-direction: column; 
     transition: background-color 0.3s ease;
 }
-.kb-col.drag-over { background: #e0f2fe; outline: 2px dashed #0284c7; outline-offset: -4px; }
-.dark .kb-col.drag-over { background: #0c4a6e; }
+.kb-col.drag-over { background: #FEF3C7; outline: 2px dashed #F59E0B; outline-offset: -4px; }
+.dark .kb-col.drag-over { background: #78350F; outline: 2px dashed #F59E0B; }
 
 .kb-card { 
     cursor: grab; 
@@ -116,7 +139,6 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ==== LOGIN MEJORADO ==== */
-/* ==== LOGIN MEJORADO ==== */
 .login-page {
     position: fixed; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -128,37 +150,36 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 .login-page::before {
     content: ''; position: absolute; inset: 0;
-    /* Degradado mucho más suave y transparente para que se vea el hospital */
-    background: linear-gradient(135deg, rgba(15,23,42,0.45) 0%, rgba(2,132,199,0.3) 100%);
-    backdrop-filter: blur(2px); /* Menos desenfoque para que la foto tenga nitidez */
+    background: linear-gradient(135deg, rgba(15,23,42,0.45) 0%, rgba(245,158,11,0.2) 100%);
+    backdrop-filter: blur(2px);
     z-index: -1;
 }
 
 .login-box {
-    /* Efecto cristal (Glassmorphism) */
-    background: rgba(255, 255, 255, 0.88); /* Fondo semitransparente */
-    backdrop-filter: blur(16px); /* Desenfoque solo en la caja del login */
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     width: 100%; max-width: 440px;
     border-radius: 1.25rem;
-    /* Sombra más suave para integrarse con la foto */
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-/* Modo oscuro: cristal oscuro */
 .dark .login-box {
-    background: rgba(30, 41, 59, 0.88);
+    background: rgba(20, 37, 61, 0.92);
     border-color: rgba(51, 65, 85, 0.4);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 .login-header {
-    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    background: transparent;
     padding: 2.25rem 1.5rem 1.75rem;
     text-align: center;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid rgba(226, 223, 215, 0.5);
+}
+.dark .login-header {
+    border-bottom-color: rgba(51, 65, 85, 0.5);
 }
 
 .login-logos {
@@ -174,7 +195,7 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 
 .login-logos .separator {
-    width: 1px; height: 40px; background: #cbd5e1;
+    width: 1px; height: 40px; background: var(--border-card);
 }
 
 .login-body {
@@ -182,7 +203,7 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 
 .login-error {
-    background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+    background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;
     padding: 0.625rem; border-radius: 0.75rem; font-size: 0.75rem;
     text-align: center; margin-bottom: 1rem; display: none;
     font-weight: 500;
@@ -228,7 +249,6 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     color: inherit;
 }
 
-/* Inputs, selects y textareas en dark */
 .dark .inp,
 .dark input.inp,
 .dark select.inp,
@@ -251,7 +271,7 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
 }
 
 .dark .eis-q.bg-red-50 { background-color: rgba(220, 38, 38, 0.15) !important; border-color: rgba(220, 38, 38, 0.4) !important; }
-.dark .eis-q.bg-sky-50 { background-color: rgba(2, 132, 199, 0.15) !important; border-color: rgba(2, 132, 199, 0.4) !important; }
+.dark .eis-q.bg-sky-50 { background-color: rgba(245, 158, 11, 0.15) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
 .dark .eis-q.bg-amber-50 { background-color: rgba(245, 158, 11, 0.15) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
 .dark .eis-q.bg-slate-50 { background-color: rgba(100, 116, 139, 0.15) !important; border-color: rgba(100, 116, 139, 0.4) !important; }
 
@@ -277,57 +297,37 @@ tr:hover { background-color: rgba(0, 0, 0, 0.02); }
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    background-color: #e0e7ff;
-    color: #3730a3;
+    background-color: #FEF3C7;
+    color: #92400E;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
     font-size: 11px;
     font-weight: 500;
 }
 .dark .plano-chip {
-    background-color: rgba(49, 46, 129, 0.5);
-    color: #c7d2fe;
+    background-color: rgba(120, 53, 15, 0.5);
+    color: #FDE68A;
 }
 
 /* =========================================
    FIX PARA CHIPS DE PLANOS
    ========================================= */
-#planos-chips {
-    position: relative;
-    z-index: 10;
-}
-
-#planos-chips button {
-    position: relative;
-    z-index: 20;
-    cursor: pointer !important;
-}
-
-#planos-dropdown {
-    z-index: 30;
-}
+#planos-chips { position: relative; z-index: 10; }
+#planos-chips button { position: relative; z-index: 20; cursor: pointer !important; }
+#planos-dropdown { z-index: 30; }
 
 /* =========================================
-   COLUMNA DE ACCIONES STICKY
+   COLUMNAS STICKY (Fijas)
    ========================================= */
-th.sticky, td.sticky {
-    position: sticky !important;
-    right: 0 !important;
-}
-th.sticky {
-    background-color: var(--bg-table-head) !important;
-    z-index: 30 !important;
-}
-td.sticky {
-    background-color: var(--bg-card) !important;
-    z-index: 10 !important;
-}
-tr:hover td.sticky {
-    background-color: #f8fafc !important;
-}
-.dark tr:hover td.sticky {
-    background-color: #334155 !important;
-}
+th.sticky, td.sticky { position: sticky !important; right: 0 !important; }
+th.sticky { background-color: var(--bg-table-head) !important; z-index: 30 !important; }
+td.sticky { background-color: var(--bg-card) !important; z-index: 10 !important; }
+tr:hover td.sticky { background-color: var(--bg-body) !important; }
+.dark tr:hover td.sticky { background-color: var(--bg-card) !important; }
+
+td.sticky.left-0, th.sticky.left-0 { background-color: var(--bg-card) !important; z-index: 20 !important; }
+th.sticky { z-index: 40 !important; }
+
 /* =========================================
    GANTT · MODO OSCURO
    ========================================= */
@@ -335,147 +335,72 @@ tr:hover td.sticky {
     background: var(--bg-card) !important;
     color: var(--text-body) !important;
 }
+.dark .gantt { background: var(--bg-card) !important; }
+.dark .gantt .grid-header { fill: var(--bg-body) !important; stroke: var(--border-card) !important; }
+.dark .gantt .grid-row { fill: var(--bg-card) !important; }
+.dark .gantt .grid-row:nth-child(even) { fill: #182A42 !important; }
+.dark .gantt .row-line { stroke: var(--border-card) !important; }
+.dark .gantt .tick { stroke: var(--border-card) !important; stroke-width: 0.4 !important; }
+.dark .gantt .tick.thick { stroke: var(--border-input) !important; stroke-width: 0.8 !important; }
+.dark .gantt .today-highlight { fill: rgba(245, 158, 11, 0.1) !important; }
+.dark .gantt .arrow { stroke: var(--text-muted) !important; }
+.dark .gantt .bar-label { fill: var(--text-body) !important; font-weight: 600 !important; }
+.dark .gantt .bar-label.big { fill: var(--text-body) !important; }
+.dark .gantt .lower-text, .dark .gantt .upper-text { fill: var(--text-muted) !important; }
+.dark .gantt .upper-text { font-weight: 700 !important; }
+.dark .gantt-container .popup-wrapper { background: var(--bg-card) !important; border-color: var(--border-card) !important; color: var(--text-body) !important; }
+.dark .gantt .side-header { background: var(--bg-body) !important; color: var(--text-muted) !important; border-color: var(--border-card) !important; }
+.dark .gantt .date-highlight { background: #F59E0B !important; color: #fff !important; }
 
-.dark .gantt {
-    background: #1e293b !important;
-}
-
-.dark .gantt .grid-header {
-    fill: #0f172a !important;
-    stroke: #334155 !important;
-}
-
-.dark .gantt .grid-row {
-    fill: #1e293b !important;
-}
-
-.dark .gantt .grid-row:nth-child(even) {
-    fill: #172033 !important;
-}
-
-.dark .gantt .row-line {
-    stroke: #334155 !important;
-}
-
-.dark .gantt .tick {
-    stroke: #334155 !important;
-    stroke-width: 0.4 !important;
-}
-
-.dark .gantt .tick.thick {
-    stroke: #475569 !important;
-    stroke-width: 0.8 !important;
-}
-
-.dark .gantt .today-highlight {
-    fill: rgba(56, 189, 248, 0.1) !important;
-}
-
-.dark .gantt .arrow {
-    stroke: #94a3b8 !important;
-}
-
-.dark .gantt .bar-label {
-    fill: #f1f5f9 !important;
-    font-weight: 600 !important;
-}
-
-.dark .gantt .bar-label.big {
-    fill: #f1f5f9 !important;
-}
-
-.dark .gantt .lower-text,
-.dark .gantt .upper-text {
-    fill: #cbd5e1 !important;
-}
-
-.dark .gantt .upper-text {
-    font-weight: 700 !important;
-}
-
-.dark .gantt-container .popup-wrapper {
-    background: #1e293b !important;
-    border-color: #334155 !important;
-    color: #f1f5f9 !important;
-}
-
-.dark .gantt .side-header {
-    background: #0f172a !important;
-    color: #cbd5e1 !important;
-    border-color: #334155 !important;
-}
-
-.dark .gantt .date-highlight {
-    background: #0284c7 !important;
-    color: #fff !important;
-}
 /* =========================================
    INPUT DATE · ÍCONO CALENDARIO
    ========================================= */
-input[type="date"] {
-    color-scheme: light;
-}
+input[type="date"] { color-scheme: light; }
+input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.7; transition: opacity 0.2s; }
+input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
-}
-
-/* Modo oscuro: ícono en celeste claro, legible sobre azul y gris oscuro */
-.dark input[type="date"] {
-    color-scheme: dark;
-}
-
+.dark input[type="date"] { color-scheme: dark; }
 .dark input[type="date"]::-webkit-calendar-picker-indicator {
     filter: brightness(0) saturate(100%) invert(78%) sepia(18%) saturate(1200%) hue-rotate(170deg) brightness(95%) contrast(90%);
     opacity: 0.9;
 }
-
 .dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
     filter: brightness(0) saturate(100%) invert(90%) sepia(10%) saturate(800%) hue-rotate(170deg) brightness(105%) contrast(95%);
 }
 
-.gantt-corte {
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
+.gantt-corte { opacity: 0 !important; pointer-events: none !important; }
+
 /* =========================================
-   COLUMNAS FIJAS: CÓDIGO Y ACTIVIDAD
+   TRANSFORMACIÓN DE ACENTOS Y BOTONES
    ========================================= */
-td.sticky.left-0, th.sticky.left-0 {
-    background-color: var(--bg-card) !important;
-    z-index: 20 !important;
-}
-td.sticky, th.sticky {
-    z-index: 20 !important;
-}
-th.sticky {
-    background-color: var(--bg-table-head) !important;
-    z-index: 40 !important;
-}
-.dark td.sticky.left-0 {
-    background-color: var(--bg-card) !important;
+
+/* Botones principales y secundarios pasan a Azafrán */
+.bg-sky-600, .bg-sky-500, .bg-teal-600, .bg-slate-800, .bg-indigo-600 {
+    background-color: #F59E0B !important;
+    color: #FFFFFF !important;
+    transition: background-color 0.2s ease;
 }
 
-.dark .login-box {
-    background: rgba(30, 41, 59, 0.98);
-    border-color: rgba(51, 65, 85, 0.6);
+.hover\:bg-sky-700:hover, .hover\:bg-teal-700:hover, .hover\:bg-slate-700:hover, .hover\:bg-indigo-700:hover {
+    background-color: #B45309 !important; /* Azafrán Profundo */
 }
-.dark .login-header {
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-    border-bottom-color: #334155;
+
+/* Enlaces y textos de acción toman el azafrán */
+.text-sky-600, .text-teal-600, .text-sky-500 {
+    color: #F59E0B !important;
 }
-.dark .login-logos .separator {
-    background: #475569;
+
+/* PERO los textos de los KPIs y números se mantienen en tonos marino/gris para legibilidad */
+.text-sky-700 {
+    color: #14253D !important; 
 }
-.dark .login-error {
-    background: rgba(127, 29, 29, 0.3);
-    color: #fca5a5;
-    border-color: #7f1d1d;
+.dark .text-sky-700 {
+    color: #F8FAFC !important;
 }
+
+/* Mantener verde y rojo para estados reales */
+.text-emerald-600, .text-emerald-500, .text-emerald-700 { color: #059669 !important; }
+.dark .text-emerald-400 { color: #34D399 !important; }
+.text-red-500, .text-red-600, .text-red-700 { color: #DC2626 !important; }
+.dark .text-red-400 { color: #F87171 !important; }
