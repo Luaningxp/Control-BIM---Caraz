@@ -168,10 +168,6 @@ window.generarInformeWord = async function() {
         toast('Por favor, ingresa tu nombre y el rango de fechas.');
         return;
     }
-    if (fechaFinStr < fechaInicioStr) {
-        toast('La fecha de fin no puede ser anterior a la fecha de inicio.');
-        return;
-    }
 
     toast('Generando informe, por favor espera...');
     document.getElementById('modal-informe').classList.add('hidden');
@@ -198,11 +194,6 @@ window.generarInformeWord = async function() {
         let contadorSemana = 1;
         const strPrimerLunes = formatDateStr(inicioSemana);
 
-        // ARMAMOS EL HTML CON LOS ESTILOS DE TÍTULO NATIVOS DE WORD
-        let htmlCuerpo = '<h1>1. Funciones desempeñadas</h1>';
-        htmlCuerpo += '<h2>1.1 Descripción general</h2>';
-        htmlCuerpo += '<p>Mis actividades se centraron en la gestión BIM general del proyecto, llevando reuniones, controles, estandarización, revisiones, auditorías y acompañamiento de diseño e ingeniería a las diferentes áreas del proyecto.</p><br>';
-
         while (inicioSemana <= fechaFinInput) {
             let finSemana = new Date(inicioSemana);
             finSemana.setDate(inicioSemana.getDate() + 6);
@@ -216,13 +207,14 @@ window.generarInformeWord = async function() {
                 d.usuario_id === state.currentUser.id && d.fecha_inicio <= strFin && d.fecha_fin >= strIni
             );
 
-            if (descanso) {
-                // H2 para descansos
-                htmlCuerpo += `<h2>Semana de descanso desde ${fmtDate(descanso.fecha_inicio)} al ${fmtDate(descanso.fecha_fin)}</h2>`;
-            } else {
-                // H2 para el título de la semana
-                htmlCuerpo += `<h2>Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}</h2>`;
-                
+            const semanaObj = {
+                esDescanso: !!descanso,
+                textoDescanso: descanso ? `Semana de descanso desde ${fmtDate(descanso.fecha_inicio)} al ${fmtDate(descanso.fecha_fin)}` : '',
+                tituloSemana: descanso ? '' : `Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}`,
+                actividades: []
+            };
+
+            if (!descanso) {
                 const registros = state.manpowerCache.filter(m => {
                     if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
                     return m.fecha >= strIni && m.fecha <= strFin;
@@ -237,34 +229,29 @@ window.generarInformeWord = async function() {
                     if (r.descripcion && r.descripcion.trim()) mapAct[t.id].notas.push(r.descripcion.trim());
                 });
 
-                Object.values(mapAct).forEach((act, idx) => {
-                    const desc = act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)';
-                    
-                    // H3 para la actividad (Título 3)
-                    htmlCuerpo += `<h3>Actividad ${contadorSemana}.${idx + 1}: ${act.tarea.actividad}</h3>`;
-                    htmlCuerpo += `<p><strong>Descripción de la actividad:</strong><br>${desc}</p>`;
-                    htmlCuerpo += `<p><strong>Metodología y herramientas utilizadas:</strong><br>• Revit 2024</p>`;
-                    htmlCuerpo += `<p><strong>Resultados y logros obtenidos:</strong><br>(Mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)</p>`;
-                    htmlCuerpo += `<br>`;
-                });
+                semanaObj.actividades = Object.values(mapAct).map((act, idx) => ({
+                    numero: `${contadorSemana}.${idx + 1}`, 
+                    nombre: act.tarea.actividad,
+                    descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
+                    estado: act.tarea.estado,
+                    fechaEjecucion: `${fmtDate(strIni)} - ${fmtDate(strFin)}`
+                }));
             }
 
+            semanasData.push(semanaObj);
             inicioSemana.setDate(inicioSemana.getDate() + 7);
             contadorSemana++;
         }
 
-        // CARGAR PLANTILLA Y REEMPLAZAR
         const response = await fetch('assets/templates/FORMATO.docx');
         if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
         
         const arrayBuffer = await response.arrayBuffer();
         const zip = new PizZip(arrayBuffer);
         
-        // Usamos el módulo HTML para que interprete los <h1>, <h2>, <h3>
         const doc = new window.docxtemplater(zip, {
             paragraphLoop: true,
-            linebreaks: true,
-            modules: [new window.docxtemplaterHtmlModule()]
+            linebreaks: true
         });
 
         doc.render({
@@ -272,7 +259,7 @@ window.generarInformeWord = async function() {
             CARGO: state.currentCargo || 'Modelador BIM',
             MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
             SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`,
-            CUERPO_INFORME: htmlCuerpo 
+            semanas: semanasData 
         });
 
         const out = doc.getZip().generate({
@@ -290,7 +277,7 @@ window.generarInformeWord = async function() {
 
     } catch (error) {
         console.error(error);
-        alert('Hubo un error al generar el Word. Revisa que el módulo HTML esté cargado en el index.html.');
+        alert('Hubo un error al generar el Word. Revisa la consola.');
     }
 };
 
