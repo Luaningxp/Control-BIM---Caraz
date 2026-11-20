@@ -170,7 +170,7 @@ export function renderDashboard(container) {
                         const lunes = new Date(hoy); lunes.setDate(diff);
                         const semanaActualStr = lunes.toISOString().split('T')[0];
                         
-                        const snapshotsHistoricos = (state.snapshotsCache || []).filter(s => s.semana !== semanaActualStr);
+                                                const snapshotsHistoricos = (state.snapshotsCache || []).filter(s => s.semana !== semanaActualStr);
                         
                         const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
                         const horasSem = state.manpowerCache.filter(m => {
@@ -179,18 +179,20 @@ export function renderDashboard(container) {
                             return f >= lunes && f <= finSem;
                         }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
 
+                        // Forzamos a que la semana actual use exactamente el mismo objeto k del KPI
                         const snapshotActual = {
                             semana: semanaActualStr,
                             total_tareas: k.total,
                             abiertas: k.abiertas,
                             vencidas: k.vencidas,
                             por_vencer: k.porVencer,
-                            ppc: k.ppc,
+                            ppc: k.ppc, // <-- Este es el mismo valor de la tarjeta superior
                             horas_semana: horasSem,
                             planos_wip: 0,
                             planos_shared: 0
                         };
 
+                        // Juntamos la actual con las pasadas
                         const listaFinal = [snapshotActual, ...snapshotsHistoricos].slice(0, 8);
 
                         return listaFinal.map((s, i, arr) => {
