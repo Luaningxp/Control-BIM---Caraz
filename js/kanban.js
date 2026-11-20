@@ -414,8 +414,13 @@ export async function onDrop(e, nuevoEstado) {
 
     // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
     if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
-        toast('Para cerrar una tarea, asigna una fecha de cierre en el modal.');
+        toast('Para cerrar la actividad registra primero la Fecha de Cierre Real.');
         window.editTask(id);
+        setTimeout(() => {
+            const sel = document.getElementById('task-estado');
+            if (sel) sel.value = 'Cerrado';
+            document.getElementById('task-fecha-cierre')?.focus();
+        }, 50);
         return;
     }
     
