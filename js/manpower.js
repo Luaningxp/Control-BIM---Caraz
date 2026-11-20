@@ -155,7 +155,7 @@ window.openInformeModal = function() {
     document.getElementById('modal-informe').classList.add('flex');
 };
 
-window.generarInformeWord = function() {
+window.generarInformeWord = async function() {
     const nombre = document.getElementById('inf-nombre').value.trim();
     const fechaInicioStr = document.getElementById('inf-fecha-inicio').value;
     
@@ -164,129 +164,156 @@ window.generarInformeWord = function() {
         return;
     }
 
+    // Mostrar indicador de carga
+    toast('Generando informe, por favor espera...');
     document.getElementById('modal-informe').classList.add('hidden');
 
-    const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
-    const hoy = new Date();
-    hoy.setHours(23, 59, 59, 999);
+    try {
+        const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999);
 
-    // Calcular domingo inmediato
-    const diaInicio = fechaInicio.getDay();
-    const diffDomingo = diaInicio === 0 ? 0 : 7 - diaInicio;
-    const primerDomingo = new Date(fechaInicio);
-    primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
-    primerDomingo.setHours(23, 59, 59, 999);
+        // Calcular domingo inmediato
+        const diaInicio = fechaInicio.getDay();
+        const diffDomingo = diaInicio === 0 ? 0 : 7 - diaInicio;
+        const primerDomingo = new Date(fechaInicio);
+        primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
+        primerDomingo.setHours(23, 59, 59, 999);
 
-    const semanas = [];
-    let inicioSemana = new Date(fechaInicio);
-    inicioSemana.setHours(0, 0, 0, 0);
-    let finSemana = new Date(primerDomingo);
-    let contadorSemanas = 1;
+        const semanas = [];
+        let inicioSemana = new Date(fechaInicio);
+        inicioSemana.setHours(0, 0, 0, 0);
+        let finSemana = new Date(primerDomingo);
+        
+        let htmlCuerpo = '';
+        let filasTabla = '';
 
-    while (inicioSemana <= hoy) {
-        const registrosSemana = state.manpowerCache.filter(m => {
-            if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
-            const f = new Date(m.fecha + 'T00:00:00');
-            return f >= inicioSemana && f <= finSemana;
-        });
+        while (inicioSemana <= hoy) {
+            const strIni = inicioSemana.toISOString().split('T')[0];
+            const strFin = finSemana.toISOString().split('T')[0];
 
-        const actividadesMap = {};
-        registrosSemana.forEach(r => {
-            if (!r.pendiente_id) return;
-            const t = state.tasksCache.find(x => x.id === r.pendiente_id);
-            if (!t) return;
+            // 1. Buscar descansos del Roster para esta semana
+            const descansos = state.descansosCache.filter(d => {
+                if (d.usuario_id !== state.currentUser.id) return false;
+                return d.fecha_inicio <= strFin && d.fecha_fin >= strIni;
+            });
 
-            if (!actividadesMap[t.id]) {
-                actividadesMap[t.id] = {
-                    codigo: t.codigo_contenedor || '',
-                    nombre: t.actividad,
-                    descripciones: [],
-                    horas: 0
-                };
-            }
-            actividadesMap[t.id].horas += pctAHoras(r.porcentaje_dia);
-            if (r.descripcion && r.descripcion.trim() !== '') {
-                if (!actividadesMap[t.id].descripciones.includes(r.descripcion.trim())) {
-                    actividadesMap[t.id].descripciones.push(r.descripcion.trim());
+            if (descansos.length > 0) {
+                htmlCuerpo += `<h2 style="color: #1e293b; font-size: 14pt;">Semana de descanso desde ${fmtDate(descansos[0].fecha_inicio)} al ${fmtDate(descansos[0].fecha_fin)}</h2>`;
+            } else {
+                // Buscar manpower de esta semana
+                const registros = state.manpowerCache.filter(m => {
+                    if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
+                    const f = new Date(m.fecha + 'T00:00:00');
+                    return f >= inicioSemana && f <= finSemana;
+                });
+
+                const mapActividades = {};
+                registros.forEach(r => {
+                    if (!r.pendiente_id) return;
+                    const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+                    if (!t) return;
+
+                    if (!mapActividades[t.id]) {
+                        mapActividades[t.id] = { tarea: t, notas: [] };
+                    }
+                    if (r.descripcion && r.descripcion.trim()) {
+                        mapActividades[t.id].notas.push(r.descripcion.trim());
+                    }
+                });
+
+                const actividades = Object.values(mapActividades);
+
+                if (actividades.length > 0) {
+                    htmlCuerpo += `<h2 style="color: #1e293b; font-size: 14pt; margin-top: 20px;">Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}</h2>`;
+                    
+                    actividades.forEach((act, idx) => {
+                        const notaFinal = act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)';
+                        
+                        htmlCuerpo += `
+                            <h3 style="color: #334155; font-size: 12pt; margin-top: 15px;">Actividad ${idx + 1}: ${act.tarea.actividad}</h3>
+                            <p style="font-size: 11pt;"><strong>Descripción de la actividad:</strong><br>${notaFinal}</p>
+                            <p style="font-size: 11pt;"><strong>Metodología y herramientas utilizadas:</strong><br>• Revit 2024</p>
+                            <p style="font-size: 11pt;"><strong>Resultados y logros obtenidos:</strong><br>(Mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)</p>
+                        `;
+
+                        // Fila para la tabla de entregables
+                        filasTabla += `
+                            <tr>
+                                <td style="border: 1px solid #cbd5e1; padding: 8px;">${escapeHtml(act.tarea.actividad)}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 8px;">${escapeHtml(notaFinal)}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${fmtDate(strIni)} - ${fmtDate(strFin)}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${escapeHtml(act.tarea.estado)}</td>
+                            </tr>
+                        `;
+                    });
                 }
             }
-        });
 
-        semanas.push({
-            numero: contadorSemanas,
-            inicio: new Date(inicioSemana),
-            fin: new Date(finSemana),
-            actividades: Object.values(actividadesMap)
-        });
+            inicioSemana.setDate(inicioSemana.getDate() + 7);
+            finSemana.setDate(finSemana.getDate() + 7);
+            if (finSemana > hoy) finSemana = new Date(hoy);
+        }
 
-        inicioSemana.setDate(inicioSemana.getDate() + 7);
-        finSemana.setDate(finSemana.getDate() + 7);
-        if (finSemana > hoy) finSemana = new Date(hoy);
-        contadorSemanas++;
-        if (contadorSemanas > 20) break;
-    }
-
-    // --- GENERACIÓN DEL HTML PARA WORD ---
-    const cargo = state.currentCargo || 'Modelador BIM';
-    const ultimaSemana = semanas[semanas.length - 1];
-    const mes = ultimaSemana ? ultimaSemana.fin.toLocaleString('es-ES', { month: 'long' }).toUpperCase() : '';
-    const rangoSemanas = semanas.length > 0 ? `${semanas[0].inicio.toLocaleDateString()} – ${ultimaSemana.fin.toLocaleDateString()}` : '';
-
-    let htmlContent = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'><title>Informe</title></head>
-        <body style="font-family: Arial, sans-serif; padding: 40px;">
-            <!-- PORTADA -->
-            <div style="text-align: center; margin-bottom: 40px;">
-                <h1 style="font-size: 24px;">INFORME MENSUAL DE ACTIVIDADES</h1>
-                <br><br><br>
-                <p style="font-size: 18px;"><strong>Nombre:</strong> ${nombre}</p>
-                <p style="font-size: 18px;"><strong>Cargo:</strong> ${cargo}</p>
-                <br><br><br>
-                <p style="font-size: 16px;"><strong>Mes:</strong> ${mes}</p>
-                <p style="font-size: 16px;"><strong>Semanas:</strong> ${rangoSemanas}</p>
-                <br><br><br><br><br><br>
-                <p style="font-size: 14px;">Consorcio SUYAY II - Hospital Caraz II-1</p>
-            </div>
-            
-            <div style="page-break-after: always;"></div>
-            
-            <!-- SALTO DE PÁGINA PARA EMPEZAR EL CONTENIDO -->
-            <h2 style="font-size: 18px;">CONTENIDO</h2>
-            <hr>
-            <br>
-    `;
-
-    semanas.forEach(s => {
-        htmlContent += `
-            <h3 style="font-size: 16px; background-color: #f0f0f0; padding: 5px;">Actividades semana ${s.inicio.toLocaleDateString()} al ${s.fin.toLocaleDateString()}</h3>
-        `;
-        
-        s.actividades.forEach((a, idx) => {
-            const desc = a.descripciones.length > 0 ? a.descripciones.join(' | ') : '(Sin descripción registrada)';
-            htmlContent += `
-                <div style="margin-bottom: 20px;">
-                    <h4 style="font-size: 14px;"><strong>Actividad ${idx + 1}:</strong> ${a.nombre} (${a.codigo})</h4>
-                    <p style="font-size: 12px;"><strong>Descripción de la actividad:</strong> ${desc}</p>
-                    <p style="font-size: 12px;"><strong>Metodología y Herramientas Utilizadas:</strong> Revit 2024</p>
-                    <p style="font-size: 12px;"><strong>Resultados y Logros Obtenidos:</strong> (mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)</p>
-                </div>
+        // Armamos el bloque de la tabla de entregables
+        if (filasTabla) {
+            htmlCuerpo += `
+                <h2 style="color: #1e293b; font-size: 14pt; margin-top: 30px;">3. Entregables realizados</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9;">
+                            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">ACTIVIDAD</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">DESCRIPCIÓN</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">FECHA DE EJECUCIÓN</th>
+                            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filasTabla}</tbody>
+                </table>
             `;
+        }
+
+        // Llenar los datos de la portada
+        const mes = hoy.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
+        const rangoSemanas = `${fechaInicio.toLocaleDateString()} – ${hoy.toLocaleDateString()}`;
+
+        // Descargar y procesar la plantilla Word
+        const response = await fetch('assets/templates/FORMATO.docx');
+        const arrayBuffer = await response.arrayBuffer();
+
+        const zip = new PizZip(arrayBuffer);
+        const doc = new window.docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
         });
-    });
 
-    htmlContent += `</body></html>`;
+        doc.render({
+            NOMBRE: nombre,
+            CARGO: state.currentCargo || 'Modelador BIM',
+            MES: mes,
+            SEMANAS: rangoSemanas,
+            CUERPO_INFORME: htmlCuerpo // Inyectamos el HTML generado en la etiqueta {CUERPO_INFORME}
+        });
 
-    // --- DESCARGA DEL ARCHIVO ---
-    const converted = window.htmlDocx.asBlob(htmlContent);
-    const url = window.URL.createObjectURL(converted);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Informe_${nombre.replace(/ /g, '_')}_${mes}.docx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    
-    toast('Informe Word generado correctamente.');
+        const out = doc.getZip().generate({
+            type: 'blob',
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+
+        // Forzar descarga
+        const url = window.URL.createObjectURL(out);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Informe_${nombre.replace(/ /g, '_')}_${mes}.docx`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+
+        toast('Informe generado con éxito.');
+
+    } catch (error) {
+        console.error(error);
+        alert('Hubo un error al generar el Word. Revisa que el archivo FORMATO.docx esté en assets/templates/ y tenga las etiquetas correctas.');
+    }
 };
 
 // ============================================================
