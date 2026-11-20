@@ -180,19 +180,24 @@ window.generarInformeWord = async function() {
         primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
         primerDomingo.setHours(23, 59, 59, 999);
 
-                        // 1. Recolectar datos para la plantilla
-        const semanasData = [];
-        let inicioSemana = new Date(fechaInicio);
+                        // 1. Ajustar la fecha de inicio al lunes de esa semana
+        const fechaInicioInput = new Date(fechaInicioStr + 'T00:00:00');
+        const diaInput = fechaInicioInput.getDay();
+        const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; // Si es domingo, retrocede 6 días. Si es otro, retrocede al lunes.
+        
+        let inicioSemana = new Date(fechaInicioInput);
+        inicioSemana.setDate(fechaInicioInput.getDate() + diffLunes);
         inicioSemana.setHours(0, 0, 0, 0);
+
+        const semanasData = [];
         let contadorSemana = 1;
+        let strPrimerLunes = inicioSemana.toISOString().split('T')[0];
 
         while (inicioSemana <= hoy) {
-            // Calculamos el fin de semana como 6 días después del inicio
             let finSemana = new Date(inicioSemana);
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
 
-            // Si el fin de semana se pasa del día de hoy, lo recortamos a hoy
             if (finSemana > hoy) {
                 finSemana = new Date(hoy);
             }
@@ -240,7 +245,6 @@ window.generarInformeWord = async function() {
 
             semanasData.push(semanaObj);
             
-            // Avanzamos exactamente 7 días para la siguiente semana
             inicioSemana.setDate(inicioSemana.getDate() + 7);
             contadorSemana++;
         }
@@ -259,12 +263,11 @@ window.generarInformeWord = async function() {
         });
 
         // 3. Renderizar con los datos
-        doc.render({
+          doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
             MES: hoy.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fechaInicio.toLocaleDateString()} – ${hoy.toLocaleDateString()}`,
-            // Enviamos el arreglo de semanas a la etiqueta {#semanas}
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(hoy.toISOString().split('T')[0])}`,
             semanas: semanasData 
         });
 
