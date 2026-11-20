@@ -5,13 +5,11 @@ import {
 } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
-// Conversión: 100% equivale a 9.3333 horas hombre
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) {
     return (parseFloat(pct || 0) * HORAS_POR_100) / 100;
 }
 
-// Filtros del listado
 let manpowerState = {
     search: '',
     filterResp: '',
@@ -164,23 +162,11 @@ window.generarInformeWord = async function() {
         return;
     }
 
-    // Mostrar indicador de carga
     toast('Generando informe, por favor espera...');
     document.getElementById('modal-informe').classList.add('hidden');
 
     try {
-        const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
-        const hoy = new Date();
-        hoy.setHours(23, 59, 59, 999);
-
-        // Calcular domingo inmediato
-        const diaInicio = fechaInicio.getDay();
-        const diffDomingo = diaInicio === 0 ? 0 : 7 - diaInicio;
-        const primerDomingo = new Date(fechaInicio);
-        primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
-        primerDomingo.setHours(23, 59, 59, 999);
-
-                 // 1. Función auxiliar para manejar fechas sin desfase UTC
+        // 1. Función auxiliar para manejar fechas sin desfase UTC
         const formatDateStr = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -189,16 +175,16 @@ window.generarInformeWord = async function() {
         };
 
         // 2. Ajustar la fecha de inicio al lunes de esa semana
-        const fechaInicioInput = new Date(fechaInicioStr + 'T12:00:00'); // Usamos T12 para evitar problemas de zona horaria
+        const fechaInicioInput = new Date(fechaInicioStr + 'T12:00:00'); 
         const diaInput = fechaInicioInput.getDay();
-        const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; // Si es domingo, retrocede 6 días. Si no, retrocede al lunes.
+        const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; 
         
         let inicioSemana = new Date(fechaInicioInput);
         inicioSemana.setDate(fechaInicioInput.getDate() + diffLunes);
-        inicioSemana.setHours(12, 0, 0, 0); // Fijamos a medio día para evitar bordes de zona horaria
+        inicioSemana.setHours(12, 0, 0, 0); 
 
         const hoy = new Date();
-        hoy.setHours(23, 59, 59, 999); // Hoy al final del día
+        hoy.setHours(23, 59, 59, 999); 
 
         const semanasData = [];
         let contadorSemana = 1;
@@ -209,7 +195,6 @@ window.generarInformeWord = async function() {
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
 
-            // Si el fin de semana se pasa de hoy, lo recortamos a hoy
             if (finSemana > hoy) {
                 finSemana = new Date(hoy);
             }
@@ -255,38 +240,27 @@ window.generarInformeWord = async function() {
             }
 
             semanasData.push(semanaObj);
-            
-            // Avanzamos exactamente 7 días en el objeto Date
             inicioSemana.setDate(inicioSemana.getDate() + 7);
             contadorSemana++;
         }
 
-        // DEPURACIÓN: Esto te mostrará en consola la tabla de semanas generadas
-        console.log("=== SEMANAS GENERADAS ===");
-        console.table(semanasData.map(s => ({
-            Titulo: s.tituloSemana || s.textoDescanso,
-            Actividades: s.actividades.length
-        })));
-
-        // 2. Cargar plantilla y reemplazar
+        // 3. Cargar plantilla y reemplazar
         const response = await fetch('assets/templates/FORMATO.docx');
         if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
         
         const arrayBuffer = await response.arrayBuffer();
         const zip = new PizZip(arrayBuffer);
         
-        // Inicializamos SIN el módulo de HTML (porque no lo tenemos)
         const doc = new window.docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true
         });
 
-        // 3. Renderizar con los datos
         doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
             MES: hoy.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(hoy))}`, // <-- Usa la nueva función
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(hoy))}`,
             semanas: semanasData 
         });
 
@@ -313,7 +287,6 @@ window.generarInformeWord = async function() {
 // MANPOWER (listado con filtros + conversión a horas)
 // ============================================================
 export function renderManpower(container) {
-    // Base: registros visibles según rol
     let registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
     );
@@ -321,7 +294,6 @@ export function renderManpower(container) {
         registros = registros.filter(m => m.usuario_id === state.currentUser?.id);
     }
 
-    // Aplicar filtros
     registros = registros.filter(r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
@@ -330,12 +302,7 @@ export function renderManpower(container) {
         const actividad = t ? t.actividad : 'General';
 
         const q = (manpowerState.search || '').toLowerCase().trim();
-
-        // La búsqueda se limita al Nombre del Usuario y a la Actividad
-        const matchSearch = !q || 
-            nombre.toLowerCase().includes(q) ||
-            actividad.toLowerCase().includes(q);
-
+        const matchSearch = !q || nombre.toLowerCase().includes(q) || actividad.toLowerCase().includes(q);
         const matchResp = !manpowerState.filterResp || r.usuario_id === manpowerState.filterResp;
         const matchGrupo = !manpowerState.filterGrupo || grupo === manpowerState.filterGrupo;
         const matchIni = !manpowerState.iniDesde || (r.fecha && r.fecha >= manpowerState.iniDesde);
@@ -348,13 +315,8 @@ export function renderManpower(container) {
     const respOpts = state.perfilesCache.map(p => ({ id: p.id, name: nombreFormateado(p) }));
 
     const filtrosActivos = Object.entries(manpowerState).filter(([k, v]) => {
-        // "Registrados por mí" SÍ cuenta como filtro activo
         if (k === 'soloRegistradosPorMi') return v === true;
-        
-        // El buscador de texto NO cuenta
         if (k === 'search') return false;
-        
-        // El resto (fechas, grupo, responsable) cuentan si tienen valor
         return v !== '' && v !== false && v !== null;
     }).length;
     const totalHoras = registros.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
@@ -434,7 +396,6 @@ export function renderManpower(container) {
         </div>
     `;
 
-    // Drawer de filtros
     if (!document.getElementById('manpower-filter-drawer')) {
         const drawerHtml = `
             <div id="manpower-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleManpowerFilterDrawer()"></div>
@@ -505,9 +466,6 @@ export function renderManpower(container) {
     }
 }
 
-// ============================================================
-// MODAL REGISTRAR HORAS
-// ============================================================
 export function openManpowerModal(pendienteId, fechaPredefinida) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
@@ -633,9 +591,6 @@ export async function saveManpower(e) {
     toast(`Registro guardado: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
 }
 
-// ============================================================
-// ELIMINAR REGISTRO (solo admin)
-// ============================================================
 window.deleteManpower = async function(id) {
     if (!state.isAdmin && !state.isCoordinador) { toast('Solo administradores o coordinadores pueden eliminar registros.'); return; }
     
@@ -664,9 +619,6 @@ window.deleteManpower = async function(id) {
     window.renderView();
 };
 
-// ============================================================
-// FILTROS DEL DRAWER
-// ============================================================
 window.toggleManpowerFilterDrawer = function() {
     const drawer = document.getElementById('manpower-filter-drawer');
     const overlay = document.getElementById('manpower-filter-drawer-overlay');
