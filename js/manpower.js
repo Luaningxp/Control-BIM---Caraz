@@ -168,7 +168,6 @@ window.generarInformeWord = async function() {
         toast('Por favor, ingresa tu nombre y el rango de fechas.');
         return;
     }
-    
     if (fechaFinStr < fechaInicioStr) {
         toast('La fecha de fin no puede ser anterior a la fecha de inicio.');
         return;
@@ -178,7 +177,6 @@ window.generarInformeWord = async function() {
     document.getElementById('modal-informe').classList.add('hidden');
 
     try {
-        // 1. Función auxiliar para manejar fechas sin desfase UTC
         const formatDateStr = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -186,7 +184,6 @@ window.generarInformeWord = async function() {
             return `${y}-${m}-${d}`;
         };
 
-        // 2. Ajustar la fecha de inicio al lunes de esa semana
         const fechaInicioInput = new Date(fechaInicioStr + 'T12:00:00'); 
         const diaInput = fechaInicioInput.getDay();
         const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; 
@@ -195,7 +192,6 @@ window.generarInformeWord = async function() {
         inicioSemana.setDate(fechaInicioInput.getDate() + diffLunes);
         inicioSemana.setHours(12, 0, 0, 0); 
 
-        // 3. Usar la fecha de fin elegida por el usuario en lugar de 'hoy'
         const fechaFinInput = new Date(fechaFinStr + 'T23:59:59'); 
 
         const semanasData = [];
@@ -207,18 +203,13 @@ window.generarInformeWord = async function() {
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
 
-            // Si el fin de semana se pasa de la fecha fin elegida, lo recortamos
-            if (finSemana > fechaFinInput) {
-                finSemana = new Date(fechaFinInput);
-            }
+            if (finSemana > fechaFinInput) finSemana = new Date(fechaFinInput);
 
             const strIni = formatDateStr(inicioSemana);
             const strFin = formatDateStr(finSemana);
 
-            // Buscar descansos
             const descanso = state.descansosCache.find(d => 
-                d.usuario_id === state.currentUser.id && 
-                d.fecha_inicio <= strFin && d.fecha_fin >= strIni
+                d.usuario_id === state.currentUser.id && d.fecha_inicio <= strFin && d.fecha_fin >= strIni
             );
 
             const semanaObj = {
@@ -244,7 +235,7 @@ window.generarInformeWord = async function() {
                 });
 
                 semanaObj.actividades = Object.values(mapAct).map((act, idx) => ({
-                    numero: idx + 1,
+                    numero: `${contadorSemana}.${idx + 1}`, 
                     nombre: act.tarea.actividad,
                     descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
                     estado: act.tarea.estado,
@@ -257,7 +248,6 @@ window.generarInformeWord = async function() {
             contadorSemana++;
         }
 
-        // 4. Cargar plantilla y reemplazar
         const response = await fetch('assets/templates/FORMATO.docx');
         if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
         
@@ -269,12 +259,33 @@ window.generarInformeWord = async function() {
             linebreaks: true
         });
 
+        // Generamos el contenido forzando los estilos de Word directamente
+        const semanasProcesadas = semanasData.map(sem => {
+            const actividadesProcesadas = sem.actividades.map(act => ({
+                numero: act.numero,
+                nombre: act.nombre,
+                // Forzamos el estilo de Título 2 y 3 usando código OOXML de Word (w:pStyle)
+                tituloSemanaFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.tituloSemana}</w:t></w:r></w:p>`,
+                tituloActividadFmt: `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Actividad ${act.numero}: ${act.nombre}</w:t></w:r></w:p>`,
+                descripcion: act.descripcion,
+                estado: act.estado,
+                fechaEjecucion: act.fechaEjecucion
+            }));
+            
+            return {
+                ...sem,
+                tituloSemanaFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.tituloSemana}</w:t></w:r></w:p>`,
+                textoDescansoFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.textoDescanso}</w:t></w:r></w:p>`,
+                actividades: actividadesProcesadas
+            };
+        });
+
         doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
             MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`, // Se ajustó la portada
-            semanas: semanasData 
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`,
+            semanas: semanasProcesadas 
         });
 
         const out = doc.getZip().generate({
