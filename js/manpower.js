@@ -180,30 +180,42 @@ window.generarInformeWord = async function() {
         primerDomingo.setDate(fechaInicio.getDate() + diffDomingo);
         primerDomingo.setHours(23, 59, 59, 999);
 
-                        // 1. Ajustar la fecha de inicio al lunes de esa semana
-        const fechaInicioInput = new Date(fechaInicioStr + 'T00:00:00');
+                 // 1. Función auxiliar para manejar fechas sin desfase UTC
+        const formatDateStr = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
+        // 2. Ajustar la fecha de inicio al lunes de esa semana
+        const fechaInicioInput = new Date(fechaInicioStr + 'T12:00:00'); // Usamos T12 para evitar problemas de zona horaria
         const diaInput = fechaInicioInput.getDay();
-        const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; // Si es domingo, retrocede 6 días. Si es otro, retrocede al lunes.
+        const diffLunes = diaInput === 0 ? -6 : 1 - diaInput; // Si es domingo, retrocede 6 días. Si no, retrocede al lunes.
         
         let inicioSemana = new Date(fechaInicioInput);
         inicioSemana.setDate(fechaInicioInput.getDate() + diffLunes);
-        inicioSemana.setHours(0, 0, 0, 0);
+        inicioSemana.setHours(12, 0, 0, 0); // Fijamos a medio día para evitar bordes de zona horaria
+
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999); // Hoy al final del día
 
         const semanasData = [];
         let contadorSemana = 1;
-        let strPrimerLunes = inicioSemana.toISOString().split('T')[0];
+        const strPrimerLunes = formatDateStr(inicioSemana);
 
         while (inicioSemana <= hoy) {
             let finSemana = new Date(inicioSemana);
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
 
+            // Si el fin de semana se pasa de hoy, lo recortamos a hoy
             if (finSemana > hoy) {
                 finSemana = new Date(hoy);
             }
 
-            const strIni = inicioSemana.toISOString().split('T')[0];
-            const strFin = finSemana.toISOString().split('T')[0];
+            const strIni = formatDateStr(inicioSemana);
+            const strFin = formatDateStr(finSemana);
 
             // Buscar descansos
             const descanso = state.descansosCache.find(d => 
@@ -221,8 +233,7 @@ window.generarInformeWord = async function() {
             if (!descanso) {
                 const registros = state.manpowerCache.filter(m => {
                     if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
-                    const f = new Date(m.fecha + 'T00:00:00');
-                    return f >= inicioSemana && f <= finSemana;
+                    return m.fecha >= strIni && m.fecha <= strFin;
                 });
 
                 const mapAct = {};
@@ -245,9 +256,17 @@ window.generarInformeWord = async function() {
 
             semanasData.push(semanaObj);
             
+            // Avanzamos exactamente 7 días en el objeto Date
             inicioSemana.setDate(inicioSemana.getDate() + 7);
             contadorSemana++;
         }
+
+        // DEPURACIÓN: Esto te mostrará en consola la tabla de semanas generadas
+        console.log("=== SEMANAS GENERADAS ===");
+        console.table(semanasData.map(s => ({
+            Titulo: s.tituloSemana || s.textoDescanso,
+            Actividades: s.actividades.length
+        })));
 
         // 2. Cargar plantilla y reemplazar
         const response = await fetch('assets/templates/FORMATO.docx');
@@ -263,11 +282,11 @@ window.generarInformeWord = async function() {
         });
 
         // 3. Renderizar con los datos
-          doc.render({
+        doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
             MES: hoy.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(hoy.toISOString().split('T')[0])}`,
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(hoy))}`, // <-- Usa la nueva función
             semanas: semanasData 
         });
 
