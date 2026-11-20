@@ -230,7 +230,7 @@ window.generarInformeWord = async function() {
                 });
 
                 semanaObj.actividades = Object.values(mapAct).map((act, idx) => ({
-                    numero: `${contadorSemana}.${idx + 1}`, 
+                    numero: (idx + 1).toString(), // "1", "2", "3" por cada semana
                     nombre: act.tarea.actividad,
                     descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
                     estado: act.tarea.estado,
