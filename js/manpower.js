@@ -254,6 +254,21 @@ window.generarInformeWord = async function() {
             linebreaks: true
         });
 
+        // ▼ AÑADIR ESTAS 3 LÍNEAS AQUÍ ▼
+        const mesString = fechaFinInput.toLocaleString('es-ES', { month: 'long' });
+        const anioString = fechaFinInput.getFullYear();
+        const periodoTexto = `${mesString} - ${anioString}`;
+        // ▲ FIN ▲
+
+        doc.render({
+            NOMBRE: nombre,
+            CARGO: state.currentCargo || 'Modelador BIM',
+            MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`,
+            PERIODO: periodoTexto, // <-- AÑADIR ESTO TAMBIÉN
+            semanas: semanasData 
+        });
+
         doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
