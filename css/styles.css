@@ -375,32 +375,35 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
    TRANSFORMACIÓN DE ACENTOS Y BOTONES
    ========================================= */
 
-/* Botones principales (Azafrán Tostado más sobrio para modo claro) */
+/* MODO CLARO: Botones en Azul Cobalto */
 .bg-sky-600, .bg-sky-500, .bg-teal-600, .bg-slate-800, .bg-indigo-600 {
-    background-color: #D97706 !important; /* Ámbar / Ocre oscuro */
+    background-color: #1D4ED8 !important; /* Azul Cobalto Medio */
     color: #FFFFFF !important;
     transition: background-color 0.2s ease;
 }
 
-/* Hover de botones */
 .hover\:bg-sky-700:hover, .hover\:bg-teal-700:hover, .hover\:bg-slate-700:hover, .hover\:bg-indigo-700:hover {
-    background-color: #B45309 !important; /* Azafrán Profundo */
+    background-color: #1E3A8A !important; /* Cobalto más oscuro para hover */
 }
 
-/* Enlaces y textos de acción */
 .text-sky-600, .text-teal-600, .text-sky-500 {
-    color: #D97706 !important;
+    color: #1D4ED8 !important;
 }
 
-/* En modo oscuro, subimos un poco el brillo para que contraste bien con el marino */
+/* MODO OSCURO: Botones en Azafrán Luminoso */
 .dark .bg-sky-600, .dark .bg-sky-500, .dark .bg-teal-600, .dark .bg-slate-800, .dark .bg-indigo-600 {
-    background-color: #F59E0B !important; /* Azafrán Luminoso (brilla más en fondo oscuro) */
+    background-color: #F59E0B !important;
 }
+
+.dark .hover\:bg-sky-700:hover, .dark .hover\:bg-teal-700:hover, .dark .hover\:bg-slate-700:hover, .dark .hover\:bg-indigo-700:hover {
+    background-color: #B45309 !important;
+}
+
 .dark .text-sky-600, .dark .text-teal-600, .dark .text-sky-500 {
     color: #F59E0B !important;
 }
 
-/* PERO los textos de los KPIs y números se mantienen en tonos marino/gris para legibilidad */
+/* Los KPIs y números grandes se mantienen en el color de texto principal */
 .text-sky-700 {
     color: #14253D !important; 
 }
@@ -408,7 +411,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
     color: #F8FAFC !important;
 }
 
-/* Mantener verde y rojo para estados reales */
+/* Mantener verde y rojo para estados reales (Cerrado, Vencido) */
 .text-emerald-600, .text-emerald-500, .text-emerald-700 { color: #059669 !important; }
 .dark .text-emerald-400 { color: #34D399 !important; }
 .text-red-500, .text-red-600, .text-red-700 { color: #DC2626 !important; }
