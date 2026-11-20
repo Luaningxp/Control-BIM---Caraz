@@ -132,11 +132,17 @@ window.openInformeModal = function() {
                             <label class="block font-semibold text-slate-600 mb-1">Nombre completo (para el documento)</label>
                             <input type="text" id="inf-nombre" class="inp" value="${nombreFormateado(state.currentUser)}" placeholder="Ej. Ing. Carlos Tunuque">
                         </div>
-                        <div>
-                            <label class="block font-semibold text-slate-600 mb-1">Fecha de Inicio de Reporte</label>
-                            <input type="date" id="inf-fecha-inicio" class="inp">
-                            <p class="text-[10px] text-slate-500 mt-1">El sistema calculará las semanas hasta la fecha actual.</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Fecha de Inicio</label>
+                                <input type="date" id="inf-fecha-inicio" class="inp">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Fecha de Fin</label>
+                                <input type="date" id="inf-fecha-fin" class="inp">
+                            </div>
                         </div>
+                        <p class="text-[10px] text-slate-500 mt-1">El sistema agrupará las actividades por semanas (de lunes a domingo) entre estas fechas.</p>
                     </div>
                     <div class="flex justify-end gap-2 pt-3 border-t">
                         <button onclick="document.getElementById('modal-informe').classList.add('hidden')" class="px-3 py-1.5 border rounded text-slate-600">Cancelar</button>
@@ -156,9 +162,15 @@ window.openInformeModal = function() {
 window.generarInformeWord = async function() {
     const nombre = document.getElementById('inf-nombre').value.trim();
     const fechaInicioStr = document.getElementById('inf-fecha-inicio').value;
+    const fechaFinStr = document.getElementById('inf-fecha-fin').value;
     
-    if (!nombre || !fechaInicioStr) {
-        toast('Por favor, ingresa tu nombre y la fecha de inicio.');
+    if (!nombre || !fechaInicioStr || !fechaFinStr) {
+        toast('Por favor, ingresa tu nombre y el rango de fechas.');
+        return;
+    }
+    
+    if (fechaFinStr < fechaInicioStr) {
+        toast('La fecha de fin no puede ser anterior a la fecha de inicio.');
         return;
     }
 
@@ -183,20 +195,21 @@ window.generarInformeWord = async function() {
         inicioSemana.setDate(fechaInicioInput.getDate() + diffLunes);
         inicioSemana.setHours(12, 0, 0, 0); 
 
-        const hoy = new Date();
-        hoy.setHours(23, 59, 59, 999); 
+        // 3. Usar la fecha de fin elegida por el usuario en lugar de 'hoy'
+        const fechaFinInput = new Date(fechaFinStr + 'T23:59:59'); 
 
         const semanasData = [];
         let contadorSemana = 1;
         const strPrimerLunes = formatDateStr(inicioSemana);
 
-        while (inicioSemana <= hoy) {
+        while (inicioSemana <= fechaFinInput) {
             let finSemana = new Date(inicioSemana);
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
 
-            if (finSemana > hoy) {
-                finSemana = new Date(hoy);
+            // Si el fin de semana se pasa de la fecha fin elegida, lo recortamos
+            if (finSemana > fechaFinInput) {
+                finSemana = new Date(fechaFinInput);
             }
 
             const strIni = formatDateStr(inicioSemana);
@@ -244,7 +257,7 @@ window.generarInformeWord = async function() {
             contadorSemana++;
         }
 
-        // 3. Cargar plantilla y reemplazar
+        // 4. Cargar plantilla y reemplazar
         const response = await fetch('assets/templates/FORMATO.docx');
         if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
         
@@ -259,8 +272,8 @@ window.generarInformeWord = async function() {
         doc.render({
             NOMBRE: nombre,
             CARGO: state.currentCargo || 'Modelador BIM',
-            MES: hoy.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(hoy))}`,
+            MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`, // Se ajustó la portada
             semanas: semanasData 
         });
 
