@@ -9,6 +9,14 @@ let rosterState = {
     month: new Date().getMonth()
 };
 
+function puedeEditarRoster() {
+    const cargo = (state.currentCargo || '').toLowerCase();
+    return state.isAdmin
+        || state.isCoordinador
+        || cargo.includes('bim manager')
+        || cargo.includes('coordinador bim');
+}
+
 function isoDate(y, m, d) {
     return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
@@ -58,7 +66,7 @@ export function renderRoster(container) {
     const { year, month } = rosterState;
     const diasDelMes = new Date(year, month + 1, 0).getDate();
     const usuarios = [...state.perfilesCache].sort((a, b) => a.email.localeCompare(b.email));
-    const esAdmin = state.isAdmin;
+    const esAdmin = puedeEditarRoster();
 
     const fechas = [];
     for (let d = 1; d <= diasDelMes; d++) fechas.push(isoDate(year, month, d));
@@ -223,7 +231,7 @@ window.rosterToday = function() {
 };
 
 window.rosterCellClick = function(usuarioId, fecha, tipo) {
-    if (!state.isAdmin) return;
+    if (!puedeEditarRoster()) return;
     
     if (tipo === 'DE') {
         const d = (state.descansosCache || []).find(x => x.usuario_id === usuarioId && fecha >= x.fecha_inicio && fecha <= x.fecha_fin);
@@ -317,7 +325,7 @@ function llenarUsuarios(selectId, valorSeleccionado) {
 }
 
 window.openDescansoModal = function(id, fechaPredefinida) {
-    if (!state.isAdmin) return;
+    if (!puedeEditarRoster()) return;
     asegurarModales();
     const d = id ? (state.descansosCache || []).find(x => x.id === id) : null;
     document.getElementById('descanso-title').innerText = d ? 'Editar descanso' : 'Nuevo descanso';
@@ -387,7 +395,7 @@ window.deleteDescansoActual = async function() {
 };
 
 window.openFeriadoModal = function(id, fechaPredefinida) {
-    if (!state.isAdmin) return;
+    if (!puedeEditarRoster()) return;
     asegurarModales();
     const f = id ? (state.feriadosCache || []).find(x => x.id === id) : null;
     document.getElementById('feriado-title').innerText = f ? 'Editar feriado' : 'Nuevo feriado';
@@ -427,7 +435,7 @@ window.deleteFeriadoActual = async function() {
 };
 
 window.openTrabajoExtraModal = function(id, usuarioId, fecha) {
-    if (!state.isAdmin) return;
+    if (!puedeEditarRoster()) return;
     asegurarModales();
     const te = id ? (state.trabajosExtraCache || []).find(x => x.id === id) : null;
     document.getElementById('te-title').innerText = te ? 'Editar trabajo extra' : 'Nuevo trabajo extra';
@@ -478,7 +486,7 @@ export function tipoDia(usuarioId, fechaStr) {
 }
 
 window.openDescansoMedicoModal = function(id, fechaPredefinida) {
-    if (!state.isAdmin) return;
+    if (!puedeEditarRoster()) return;
     asegurarModales();
     const d = id ? (state.descansosMedicosCache || []).find(x => x.id === id) : null;
     
