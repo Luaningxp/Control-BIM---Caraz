@@ -256,7 +256,15 @@ window.generarInformeWord = async function() {
         
         const doc = new window.docxtemplater(zip, {
             paragraphLoop: true,
-            linebreaks: true
+            linebreaks: true,
+            // Esto le dice a docxtemplater que permita inyectar código de Word crudo
+            parser: function(tag) {
+                return {
+                    get: function(scope) {
+                        return scope[tag];
+                    }
+                };
+            }
         });
 
         // Generamos el contenido forzando los estilos de Word directamente
