@@ -198,11 +198,15 @@ window.generarInformeWord = async function() {
         let contadorSemana = 1;
         const strPrimerLunes = formatDateStr(inicioSemana);
 
+        // ARMAMOS EL HTML CON LOS ESTILOS DE TÍTULO NATIVOS DE WORD
+        let htmlCuerpo = '<h1>1. Funciones desempeñadas</h1>';
+        htmlCuerpo += '<h2>1.1 Descripción general</h2>';
+        htmlCuerpo += '<p>Mis actividades se centraron en la gestión BIM general del proyecto, llevando reuniones, controles, estandarización, revisiones, auditorías y acompañamiento de diseño e ingeniería a las diferentes áreas del proyecto.</p><br>';
+
         while (inicioSemana <= fechaFinInput) {
             let finSemana = new Date(inicioSemana);
             finSemana.setDate(inicioSemana.getDate() + 6);
             finSemana.setHours(23, 59, 59, 999);
-
             if (finSemana > fechaFinInput) finSemana = new Date(fechaFinInput);
 
             const strIni = formatDateStr(inicioSemana);
@@ -212,15 +216,13 @@ window.generarInformeWord = async function() {
                 d.usuario_id === state.currentUser.id && d.fecha_inicio <= strFin && d.fecha_fin >= strIni
             );
 
-            const semanaObj = {
-                numeroSemana: contadorSemana,
-                esDescanso: !!descanso,
-                textoDescanso: descanso ? `Semana de descanso desde ${fmtDate(descanso.fecha_inicio)} al ${fmtDate(descanso.fecha_fin)}` : '',
-                tituloSemana: descanso ? '' : `Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}`,
-                actividades: []
-            };
-
-            if (!descanso) {
+            if (descanso) {
+                // H2 para descansos
+                htmlCuerpo += `<h2>Semana de descanso desde ${fmtDate(descanso.fecha_inicio)} al ${fmtDate(descanso.fecha_fin)}</h2>`;
+            } else {
+                // H2 para el título de la semana
+                htmlCuerpo += `<h2>Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}</h2>`;
+                
                 const registros = state.manpowerCache.filter(m => {
                     if (m.usuario_id !== state.currentUser.id || !m.fecha) return false;
                     return m.fecha >= strIni && m.fecha <= strFin;
@@ -235,109 +237,60 @@ window.generarInformeWord = async function() {
                     if (r.descripcion && r.descripcion.trim()) mapAct[t.id].notas.push(r.descripcion.trim());
                 });
 
-                semanaObj.actividades = Object.values(mapAct).map((act, idx) => ({
-                    numero: `${contadorSemana}.${idx + 1}`,
-                    nombre: act.tarea.actividad,
-                    descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
-                    estado: act.tarea.estado,
-                    fechaEjecucion: `${fmtDate(strIni)} - ${fmtDate(strFin)}`
-                }));
+                Object.values(mapAct).forEach((act, idx) => {
+                    const desc = act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)';
+                    
+                    // H3 para la actividad (Título 3)
+                    htmlCuerpo += `<h3>Actividad ${contadorSemana}.${idx + 1}: ${act.tarea.actividad}</h3>`;
+                    htmlCuerpo += `<p><strong>Descripción de la actividad:</strong><br>${desc}</p>`;
+                    htmlCuerpo += `<p><strong>Metodología y herramientas utilizadas:</strong><br>• Revit 2024</p>`;
+                    htmlCuerpo += `<p><strong>Resultados y logros obtenidos:</strong><br>(Mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)</p>`;
+                    htmlCuerpo += `<br>`;
+                });
             }
 
-            semanasData.push(semanaObj);
             inicioSemana.setDate(inicioSemana.getDate() + 7);
             contadorSemana++;
         }
 
-        // =========================================================
-        // GENERACIÓN NATIVA CON DOCX.JS (Títulos reales y tabla)
-        // =========================================================
-        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell } = window.docx;
-
-        const children = [];
-
-        // 1. PORTADA
-        children.push(
-            new Paragraph({ text: "INFORME DE FUNCIONES Y ENTREGABLES OFICINA TECNICA ÁREA DE BIM", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
-            new Paragraph({ children: [new TextRun({ text: nombre, size: 28 })], alignment: AlignmentType.CENTER }),
-            new Paragraph({ children: [new TextRun({ text: `(${state.currentCargo || 'Modelador BIM'})`, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
-            new Paragraph({ children: [new TextRun({ text: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(), size: 24 })], alignment: AlignmentType.CENTER }),
-            new Paragraph({ children: [new TextRun({ text: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 800 } }),
-            new Paragraph({ children: [new TextRun({ text: "Consorcio SUYAY II - Hospital Caraz II-1", size: 20 })], alignment: AlignmentType.CENTER }),
-            new Paragraph({ text: "", pageBreakBefore: true }) // Salto de página
-        );
-
-        // 2. CONTENIDO CON TÍTULOS NATIVOS (Esto actualiza el Índice automáticamente)
-        children.push(new Paragraph({ text: "1. Funciones desempeñadas", heading: HeadingLevel.HEADING_1 }));
-        children.push(new Paragraph({ text: "1.1 Descripción general", heading: HeadingLevel.HEADING_2 }));
-        children.push(new Paragraph("Mis actividades se centraron en la gestión BIM general del proyecto, llevando reuniones, controles, estandarización, revisiones, auditorías y acompañamiento de diseño e ingeniería a las diferentes áreas del proyecto."));
-        children.push(new Paragraph({ text: "", spacing: { after: 400 } }));
-
-        semanasData.forEach((sem) => {
-            if (sem.esDescanso) {
-                children.push(new Paragraph({ text: sem.textoDescanso, heading: HeadingLevel.HEADING_2 }));
-            } else {
-                children.push(new Paragraph({ text: sem.tituloSemana, heading: HeadingLevel.HEADING_2 }));
-                
-                sem.actividades.forEach(act => {
-                    // TÍTULO 3 NATIVO
-                    children.push(new Paragraph({ text: `Actividad ${act.numero}: ${act.nombre}`, heading: HeadingLevel.HEADING_3 }));
-                    children.push(new Paragraph({ children: [new TextRun({ text: "Descripción de la actividad:", bold: true })] }));
-                    children.push(new Paragraph(act.descripcion));
-                    children.push(new Paragraph({ children: [new TextRun({ text: "Metodología y herramientas utilizadas:", bold: true })] }));
-                    children.push(new Paragraph("• Revit 2024"));
-                    children.push(new Paragraph({ children: [new TextRun({ text: "Resultados y logros obtenidos:", bold: true })] }));
-                    children.push(new Paragraph("(Mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)"));
-                    children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
-                });
-            }
+        // CARGAR PLANTILLA Y REEMPLAZAR
+        const response = await fetch('assets/templates/FORMATO.docx');
+        if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const zip = new PizZip(arrayBuffer);
+        
+        // Usamos el módulo HTML para que interprete los <h1>, <h2>, <h3>
+        const doc = new window.docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+            modules: [new window.docxtemplaterHtmlModule()]
         });
 
-        // 3. SECCIÓN DE ENTREGABLES (Tabla)
-        children.push(new Paragraph({ text: "2. Entregables realizados", heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
-        
-        const tableRows = [
-            new TableRow({
-                children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ACTIVIDAD", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPCIÓN", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "FECHA DE EJECUCIÓN", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ESTADO", bold: true })] })] }),
-                ],
-            })
-        ];
-
-        semanasData.forEach(sem => {
-            sem.actividades.forEach(act => {
-                tableRows.push(new TableRow({
-                    children: [
-                        new TableCell({ children: [new Paragraph(act.nombre)] }),
-                        new TableCell({ children: [new Paragraph(act.descripcion)] }),
-                        new TableCell({ children: [new Paragraph(act.fechaEjecucion)] }),
-                        new TableCell({ children: [new Paragraph(act.estado)] }),
-                    ],
-                }));
-            });
+        doc.render({
+            NOMBRE: nombre,
+            CARGO: state.currentCargo || 'Modelador BIM',
+            MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
+            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`,
+            CUERPO_INFORME: htmlCuerpo 
         });
 
-        children.push(new Table({ rows: tableRows }));
+        const out = doc.getZip().generate({
+            type: 'blob',
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
 
-        // CREAR DOCUMENTO Y DESCARGAR
-        const doc = new Document({ sections: [{ children: children }] });
-        
-        const blob = await Packer.toBlob(doc);
-        const url = window.URL.createObjectURL(blob);
+        const url = window.URL.createObjectURL(out);
         const link = document.createElement('a');
         link.href = url;
         link.download = `Informe_${nombre.replace(/ /g, '_')}.docx`;
         link.click();
         window.URL.revokeObjectURL(url);
-        
-        toast('Informe generado con éxito.');
+        toast('Informe generado.');
 
     } catch (error) {
         console.error(error);
-        alert('Hubo un error al generar el Word. Revisa la consola.');
+        alert('Hubo un error al generar el Word. Revisa que el módulo HTML esté cargado en el index.html.');
     }
 };
 
