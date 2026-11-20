@@ -213,6 +213,7 @@ window.generarInformeWord = async function() {
             );
 
             const semanaObj = {
+                numeroSemana: contadorSemana,
                 esDescanso: !!descanso,
                 textoDescanso: descanso ? `Semana de descanso desde ${fmtDate(descanso.fecha_inicio)} al ${fmtDate(descanso.fecha_fin)}` : '',
                 tituloSemana: descanso ? '' : `Actividades semana ${fmtDate(strIni)} al ${fmtDate(strFin)}`,
@@ -235,7 +236,7 @@ window.generarInformeWord = async function() {
                 });
 
                 semanaObj.actividades = Object.values(mapAct).map((act, idx) => ({
-                    numero: `${contadorSemana}.${idx + 1}`, 
+                    numero: `${contadorSemana}.${idx + 1}`,
                     nombre: act.tarea.actividad,
                     descripcion: act.notas.length > 0 ? act.notas[act.notas.length - 1] : '(Sin descripción registrada)',
                     estado: act.tarea.estado,
@@ -248,70 +249,95 @@ window.generarInformeWord = async function() {
             contadorSemana++;
         }
 
-        const response = await fetch('assets/templates/FORMATO.docx');
-        if (!response.ok) throw new Error("No se encontró el archivo FORMATO.docx");
-        
-        const arrayBuffer = await response.arrayBuffer();
-        const zip = new PizZip(arrayBuffer);
-        
-        const doc = new window.docxtemplater(zip, {
-            paragraphLoop: true,
-            linebreaks: true,
-            // Esto le dice a docxtemplater que permita inyectar código de Word crudo
-            parser: function(tag) {
-                return {
-                    get: function(scope) {
-                        return scope[tag];
-                    }
-                };
+        // =========================================================
+        // GENERACIÓN NATIVA CON DOCX.JS (Títulos reales y tabla)
+        // =========================================================
+        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell } = window.docx;
+
+        const children = [];
+
+        // 1. PORTADA
+        children.push(
+            new Paragraph({ text: "INFORME DE FUNCIONES Y ENTREGABLES OFICINA TECNICA ÁREA DE BIM", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+            new Paragraph({ children: [new TextRun({ text: nombre, size: 28 })], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [new TextRun({ text: `(${state.currentCargo || 'Modelador BIM'})`, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+            new Paragraph({ children: [new TextRun({ text: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(), size: 24 })], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [new TextRun({ text: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`, size: 24 })], alignment: AlignmentType.CENTER, spacing: { after: 800 } }),
+            new Paragraph({ children: [new TextRun({ text: "Consorcio SUYAY II - Hospital Caraz II-1", size: 20 })], alignment: AlignmentType.CENTER }),
+            new Paragraph({ text: "", pageBreakBefore: true }) // Salto de página
+        );
+
+        // 2. CONTENIDO CON TÍTULOS NATIVOS (Esto actualiza el Índice automáticamente)
+        children.push(new Paragraph({ text: "1. Funciones desempeñadas", heading: HeadingLevel.HEADING_1 }));
+        children.push(new Paragraph({ text: "1.1 Descripción general", heading: HeadingLevel.HEADING_2 }));
+        children.push(new Paragraph("Mis actividades se centraron en la gestión BIM general del proyecto, llevando reuniones, controles, estandarización, revisiones, auditorías y acompañamiento de diseño e ingeniería a las diferentes áreas del proyecto."));
+        children.push(new Paragraph({ text: "", spacing: { after: 400 } }));
+
+        semanasData.forEach((sem) => {
+            if (sem.esDescanso) {
+                children.push(new Paragraph({ text: sem.textoDescanso, heading: HeadingLevel.HEADING_2 }));
+            } else {
+                children.push(new Paragraph({ text: sem.tituloSemana, heading: HeadingLevel.HEADING_2 }));
+                
+                sem.actividades.forEach(act => {
+                    // TÍTULO 3 NATIVO
+                    children.push(new Paragraph({ text: `Actividad ${act.numero}: ${act.nombre}`, heading: HeadingLevel.HEADING_3 }));
+                    children.push(new Paragraph({ children: [new TextRun({ text: "Descripción de la actividad:", bold: true })] }));
+                    children.push(new Paragraph(act.descripcion));
+                    children.push(new Paragraph({ children: [new TextRun({ text: "Metodología y herramientas utilizadas:", bold: true })] }));
+                    children.push(new Paragraph("• Revit 2024"));
+                    children.push(new Paragraph({ children: [new TextRun({ text: "Resultados y logros obtenidos:", bold: true })] }));
+                    children.push(new Paragraph("(Mencionar los logros de esta actividad, no olvidar adjuntar imágenes que comprueben la entrega de la actividad)"));
+                    children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
+                });
             }
         });
 
-        // Generamos el contenido forzando los estilos de Word directamente
-        const semanasProcesadas = semanasData.map(sem => {
-            const actividadesProcesadas = sem.actividades.map(act => ({
-                numero: act.numero,
-                nombre: act.nombre,
-                // Forzamos el estilo de Título 2 y 3 usando código OOXML de Word (w:pStyle)
-                tituloSemanaFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.tituloSemana}</w:t></w:r></w:p>`,
-                tituloActividadFmt: `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t>Actividad ${act.numero}: ${act.nombre}</w:t></w:r></w:p>`,
-                descripcion: act.descripcion,
-                estado: act.estado,
-                fechaEjecucion: act.fechaEjecucion
-            }));
-            
-            return {
-                ...sem,
-                tituloSemanaFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.tituloSemana}</w:t></w:r></w:p>`,
-                textoDescansoFmt: `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>${sem.textoDescanso}</w:t></w:r></w:p>`,
-                actividades: actividadesProcesadas
-            };
+        // 3. SECCIÓN DE ENTREGABLES (Tabla)
+        children.push(new Paragraph({ text: "2. Entregables realizados", heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
+        
+        const tableRows = [
+            new TableRow({
+                children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ACTIVIDAD", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPCIÓN", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "FECHA DE EJECUCIÓN", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ESTADO", bold: true })] })] }),
+                ],
+            })
+        ];
+
+        semanasData.forEach(sem => {
+            sem.actividades.forEach(act => {
+                tableRows.push(new TableRow({
+                    children: [
+                        new TableCell({ children: [new Paragraph(act.nombre)] }),
+                        new TableCell({ children: [new Paragraph(act.descripcion)] }),
+                        new TableCell({ children: [new Paragraph(act.fechaEjecucion)] }),
+                        new TableCell({ children: [new Paragraph(act.estado)] }),
+                    ],
+                }));
+            });
         });
 
-        doc.render({
-            NOMBRE: nombre,
-            CARGO: state.currentCargo || 'Modelador BIM',
-            MES: fechaFinInput.toLocaleString('es-ES', { month: 'long' }).toUpperCase(),
-            SEMANAS: `${fmtDate(strPrimerLunes)} – ${fmtDate(formatDateStr(fechaFinInput))}`,
-            semanas: semanasProcesadas 
-        });
+        children.push(new Table({ rows: tableRows }));
 
-        const out = doc.getZip().generate({
-            type: 'blob',
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-
-        const url = window.URL.createObjectURL(out);
+        // CREAR DOCUMENTO Y DESCARGAR
+        const doc = new Document({ sections: [{ children: children }] });
+        
+        const blob = await Packer.toBlob(doc);
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `Informe_${nombre.replace(/ /g, '_')}.docx`;
         link.click();
         window.URL.revokeObjectURL(url);
-        toast('Informe generado.');
+        
+        toast('Informe generado con éxito.');
 
     } catch (error) {
         console.error(error);
-        alert('Hubo un error al generar el Word. Revisa que el archivo FORMATO.docx esté en assets/templates/ y tenga las etiquetas correctas.');
+        alert('Hubo un error al generar el Word. Revisa la consola.');
     }
 };
 
