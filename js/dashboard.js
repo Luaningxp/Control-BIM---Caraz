@@ -161,7 +161,7 @@ export function renderDashboard(container) {
                         <th class="p-3">Planos Shared</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                                <tbody class="divide-y divide-slate-100">
                     ${(() => {
                         const hoy = new Date();
                         hoy.setHours(0, 0, 0, 0);
@@ -172,7 +172,7 @@ export function renderDashboard(container) {
 
                         const listaSemanas = [];
 
-                        // Vamos a calcular las últimas 8 semanas (incluyendo la actual) en vivo
+                        // Vamos a calcular las últimas 8 semanas
                         for (let i = 0; i < 8; i++) {
                             const lunes = new Date(lunesActual);
                             lunes.setDate(lunesActual.getDate() - (i * 7));
@@ -180,7 +180,7 @@ export function renderDashboard(container) {
                             
                             const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
 
-                            // 1. Calcular las tareas de esa semana (Misma fórmula que el gráfico)
+                            // 1. PPC en vivo (siempre exacto)
                             const tareasSemana = state.tasksCache.filter(t => {
                                 if (!t.fecha_fin) return false;
                                 if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
@@ -193,25 +193,56 @@ export function renderDashboard(container) {
                             const cumplidas = tareasSemana.filter(t => t.fecha_cierre && t.fecha_cierre <= t.fecha_fin);
                             const ppcSemana = tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null;
 
-                            // 2. Calcular los totales para esa semana (en vivo)
+                            // 2. Datos históricos
                             const esSemanaActual = (i === 0);
-                            
-                            const total = esSemanaActual ? k.total : state.tasksCache.length;
-                            const abiertas = esSemanaActual ? k.abiertas : state.tasksCache.filter(t => !isCerrado(t)).length;
-                            const vencidas = esSemanaActual ? k.vencidas : state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Vencida').length;
-                            const porVencer = esSemanaActual ? k.porVencer : state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Por vencer').length;
-
-                            // 3. Calcular horas
-                            const horasSem = state.manpowerCache.filter(m => {
-                                if(!m.fecha) return false;
-                                const f = new Date(m.fecha + 'T00:00:00');
-                                return f >= lunes && f <= finSem;
-                            }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
-
-                            // 4. Planos (los calculamos en vivo si es la actual, si no, los sacamos de BD si existen)
                             const snapDB = state.snapshotsCache?.find(s => s.semana === semanaStr);
-                            const planosWip = esSemanaActual ? 0 : (snapDB?.planos_wip || 0);
-                            const planosShared = esSemanaActual ? 0 : (snapDB?.planos_shared || 0);
+                            
+                            let total, abiertas, vencidas, porVencer, horasSem, planosWip, planosShared;
+
+                            if (esSemanaActual) {
+                                // Semana actual: en vivo
+                                total = k.total;
+                                abiertas = k.abiertas;
+                                vencidas = k.vencidas;
+                                porVencer = k.porVencer;
+                                horasSem = state.manpowerCache.filter(m => {
+                                    if(!m.fecha) return false;
+                                    const f = new Date(m.fecha + 'T00:00:00');
+                                    return f >= lunes && f <= finSem;
+                                }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
+                                planosWip = 0;
+                                planosShared = 0;
+                            } else if (snapDB) {
+                                // Si existe el snapshot en BD, usarlo (esto aplica para el futuro)
+                                total = snapDB.total_tareas;
+                                abiertas = snapDB.abiertas;
+                                vencidas = snapDB.vencidas;
+                                porVencer = snapDB.por_vencer;
+                                horasSem = snapDB.horas_semana;
+                                planosWip = snapDB.planos_wip;
+                                planosShared = snapDB.planos_shared;
+                            } else {
+                                // RECONSTRUCCIÓN: Si no hay snapshot, usamos created_at
+                                const tareasCreadas = state.tasksCache.filter(t => t.created_at && new Date(t.created_at) <= finSem);
+                                total = tareasCreadas.length;
+                                
+                                const cerradasHastaFinSem = tareasCreadas.filter(t => t.fecha_cierre && new Date(t.fecha_cierre) <= finSem).length;
+                                abiertas = total - cerradasHastaFinSem;
+                                
+                                vencidas = tareasCreadas.filter(t => {
+                                    if (t.fecha_cierre && new Date(t.fecha_cierre) <= finSem) return false;
+                                    return t.fecha_fin && new Date(t.fecha_fin + 'T00:00:00') < finSem;
+                                }).length;
+                                
+                                porVencer = 0;
+                                horasSem = state.manpowerCache.filter(m => {
+                                    if(!m.fecha) return false;
+                                    const f = new Date(m.fecha + 'T00:00:00');
+                                    return f >= lunes && f <= finSem;
+                                }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
+                                planosWip = 0;
+                                planosShared = 0;
+                            }
 
                             listaSemanas.push({
                                 semana: semanaStr,
@@ -219,7 +250,7 @@ export function renderDashboard(container) {
                                 abiertas: abiertas,
                                 vencidas: vencidas,
                                 por_vencer: porVencer,
-                                ppc: ppcSemana, // Usamos siempre el PPC recalculado en vivo
+                                ppc: ppcSemana,
                                 horas_semana: horasSem,
                                 planos_wip: planosWip,
                                 planos_shared: planosShared
@@ -230,23 +261,25 @@ export function renderDashboard(container) {
                         return listaSemanas.map((s, i, arr) => {
                             const prev = arr[i + 1];
                             const delta = (val, prevVal) => {
-                                if (prevVal === undefined || prevVal === null) return '';
+                                if (val === null || prevVal === undefined || prevVal === null) return '';
                                 const d = val - prevVal;
                                 if (d === 0) return '<span class="text-slate-400">=</span>';
                                 return d > 0 ? `<span class="text-red-600">▲${d}</span>` : `<span class="text-emerald-600">▼${Math.abs(d)}</span>`;
                             };
+                            const valOrDash = (val) => val === null || val === undefined ? '<span class="text-slate-300">—</span>' : val;
+
                             return `<tr class="hover:bg-slate-50">
                                 <td class="p-3 font-mono font-bold ${i === 0 ? 'text-sky-700' : 'text-slate-600'}">
                                     ${fmtDate(s.semana)} ${i === 0 ? '(Actual)' : ''}
                                 </td>
-                                <td class="p-3">${s.total_tareas}</td>
-                                <td class="p-3">${s.abiertas} ${delta(s.abiertas, prev?.abiertas)}</td>
-                                <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${s.vencidas} ${delta(s.vencidas, prev?.vencidas)}</td>
-                                <td class="p-3">${s.por_vencer} ${delta(s.por_vencer, prev?.por_vencer)}</td>
+                                <td class="p-3">${valOrDash(s.total_tareas)}</td>
+                                <td class="p-3">${valOrDash(s.abiertas)} ${delta(s.abiertas, prev?.abiertas)}</td>
+                                <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${valOrDash(s.vencidas)} ${delta(s.vencidas, prev?.vencidas)}</td>
+                                <td class="p-3">${valOrDash(s.por_vencer)} ${delta(s.por_vencer, prev?.por_vencer)}</td>
                                 <td class="p-3 font-bold">${s.ppc !== null ? s.ppc + '%' : '—'} ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
-                                <td class="p-3">${s.horas_semana?.toFixed(1) || '0.0'} h</td>
-                                <td class="p-3">${s.planos_wip}</td>
-                                <td class="p-3">${s.planos_shared}</td>
+                                <td class="p-3">${s.horas_semana !== null ? s.horas_semana.toFixed(1) + ' h' : '<span class="text-slate-300">—</span>'}</td>
+                                <td class="p-3">${valOrDash(s.planos_wip)}</td>
+                                <td class="p-3">${valOrDash(s.planos_shared)}</td>
                             </tr>`;
                         }).join('');
                     })() || '<tr><td colspan="9" class="text-center py-4 text-slate-400">Aún no hay datos.</td></tr>'}
