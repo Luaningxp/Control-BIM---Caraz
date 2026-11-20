@@ -282,18 +282,21 @@ window.generarInformeWord = async function() {
         const arrayBuffer = await response.arrayBuffer();
 
         const zip = new PizZip(arrayBuffer);
+        
+        // Inicializamos docxtemplater con el módulo de HTML
         const doc = new window.docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
-            modules: [new window.docxtemplaterHtmlModule()]
+            modules: [new window.docxtemplaterHtmlModule()] // <-- Aquí se aplica el módulo
         });
 
+        // Esto ayuda a que no explote si hay etiquetas vacías
         doc.render({
-            NOMBRE: nombre,
+            NOMBRE: nombre || '',
             CARGO: state.currentCargo || 'Modelador BIM',
-            MES: mes,
-            SEMANAS: rangoSemanas,
-            CUERPO_INFORME: htmlCuerpo // Inyectamos el HTML generado en la etiqueta {CUERPO_INFORME}
+            MES: mes || '',
+            SEMANAS: rangoSemanas || '',
+            CUERPO_INFORME: htmlCuerpo || '' 
         });
 
         const out = doc.getZip().generate({
