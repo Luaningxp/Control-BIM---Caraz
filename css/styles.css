@@ -416,3 +416,110 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 .dark .text-emerald-400 { color: #34D399 !important; }
 .text-red-500, .text-red-600, .text-red-700 { color: #DC2626 !important; }
 .dark .text-red-400 { color: #F87171 !important; }
+/* =========================================================
+   PALETA 60-30-10 · MODO CLARO
+   60% Marfil #FAF9F5 · 30% Marino #14253D · 10% Azafrán #F59E0B
+   ========================================================= */
+:root {
+    --navy: #14253D;
+    --navy-deep: #0F1D30;
+    --navy-soft: #1E3556;
+    --saffron: #F59E0B;
+    --saffron-dark: #D97706;
+}
+
+:root:not(.dark) {
+    --bg-body: #FAF9F5;
+    --bg-card: #FFFEFA;
+    --bg-table-head: #F1EEE6;
+    --bg-table-row: #FFFEFA;
+    --bg-input: #FFFEFA;
+    --text-body: #14253D;
+    --text-muted: #5B6677;
+    --border-card: #E4E0D5;
+    --border-input: #D3CEC0;
+}
+
+/* --- Superficies neutras (menos blanco) --- */
+html:not(.dark) .bg-white      { background-color: var(--bg-card); }
+html:not(.dark) .bg-slate-50   { background-color: #F6F3EC; }
+html:not(.dark) .bg-slate-100  { background-color: #F1EEE6; }
+html:not(.dark) .bg-slate-200  { background-color: #E8E4D9; }
+html:not(.dark) .border-slate-100,
+html:not(.dark) .border-slate-200 { border-color: var(--border-card); }
+html:not(.dark) .border-slate-300 { border-color: var(--border-input); }
+
+/* --- Textos --- */
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-slate-800 { color: var(--text-body); }
+html:not(.dark) .text-slate-700 { color: #2A3B55; }
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-slate-500 { color: var(--text-muted); }
+
+html:not(.dark) tr:hover { background-color: rgba(245, 158, 11, 0.06); }
+
+/* --- Header (Marino) --- */
+html:not(.dark) #app-screen header {
+    background-color: var(--navy);
+    border-bottom: 2px solid var(--saffron);
+}
+html:not(.dark) #app-screen header h1 { color: #FFFFFF; }
+html:not(.dark) #app-screen header p  { color: #AEBBD0; }
+html:not(.dark) #app-screen header #user-display { color: #FBBF24; }
+html:not(.dark) #app-screen header #role-display {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+}
+html:not(.dark) #app-screen header .bg-white { background-color: #FFFFFF; } /* logos */
+html:not(.dark) #app-screen header #btn-dark-mode,
+html:not(.dark) #app-screen header #btn-logout {
+    color: #D5DDEA;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+html:not(.dark) #app-screen header #btn-dark-mode:hover,
+html:not(.dark) #app-screen header #btn-logout:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+}
+
+/* --- Nav de pestañas (Marino profundo) --- */
+html:not(.dark) #app-screen nav {
+    background-color: var(--navy-deep);
+    border-bottom: 1px solid var(--navy-soft);
+}
+html:not(.dark) #app-screen nav .tab-btn { color: #AEBBD0; }
+html:not(.dark) #app-screen nav .tab-btn:hover {
+    color: #FFFFFF;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+html:not(.dark) #app-screen nav .tab-btn.tab-active {
+    color: var(--saffron) !important;
+    border-color: var(--saffron) !important;
+}
+
+/* --- Footer --- */
+html:not(.dark) #app-screen footer {
+    background-color: var(--navy);
+    border-top: 1px solid var(--navy-soft);
+}
+html:not(.dark) #app-screen footer p    { color: #8FA0BA; }
+html:not(.dark) #app-screen footer span { color: #E5EAF2; }
+html:not(.dark) #app-screen footer a    { color: #FBBF24; }
+
+/* --- Acento Azafrán: botones primarios, focos, íconos de acción --- */
+html:not(.dark) .bg-sky-600 {
+    background-color: var(--saffron);
+    color: var(--navy);
+}
+html:not(.dark) .bg-sky-600:hover,
+html:not(.dark) .hover\:bg-sky-700:hover {
+    background-color: var(--saffron-dark);
+}
+html:not(.dark) .text-sky-600 { color: #B45309; }
+html:not(.dark) .hover\:text-sky-800:hover { color: #92400E; }
+html:not(.dark) .border-sky-600,
+html:not(.dark) .focus\:border-sky-600:focus { border-color: var(--saffron); }
+html:not(.dark) .focus\:ring-sky-100:focus { --tw-ring-color: #FEF3C7; }
+
+/* --- Login --- */
+html:not(.dark) .login-box { background: rgba(250, 249, 245, 0.94); }
