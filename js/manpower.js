@@ -285,6 +285,7 @@ window.generarInformeWord = async function() {
         const doc = new window.docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
+            modules: [new window.docxtemplaterHtmlModule()]
         });
 
         doc.render({
