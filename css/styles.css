@@ -375,19 +375,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
    TRANSFORMACIÓN DE ACENTOS Y BOTONES
    ========================================= */
 
-/* Botones principales y secundarios pasan a Azafrán */
+/* Botones principales (Azafrán Tostado más sobrio para modo claro) */
 .bg-sky-600, .bg-sky-500, .bg-teal-600, .bg-slate-800, .bg-indigo-600 {
-    background-color: #F59E0B !important;
+    background-color: #D97706 !important; /* Ámbar / Ocre oscuro */
     color: #FFFFFF !important;
     transition: background-color 0.2s ease;
 }
 
+/* Hover de botones */
 .hover\:bg-sky-700:hover, .hover\:bg-teal-700:hover, .hover\:bg-slate-700:hover, .hover\:bg-indigo-700:hover {
     background-color: #B45309 !important; /* Azafrán Profundo */
 }
 
-/* Enlaces y textos de acción toman el azafrán */
+/* Enlaces y textos de acción */
 .text-sky-600, .text-teal-600, .text-sky-500 {
+    color: #D97706 !important;
+}
+
+/* En modo oscuro, subimos un poco el brillo para que contraste bien con el marino */
+.dark .bg-sky-600, .dark .bg-sky-500, .dark .bg-teal-600, .dark .bg-slate-800, .dark .bg-indigo-600 {
+    background-color: #F59E0B !important; /* Azafrán Luminoso (brilla más en fondo oscuro) */
+}
+.dark .text-sky-600, .dark .text-teal-600, .dark .text-sky-500 {
     color: #F59E0B !important;
 }
 
