@@ -9,193 +9,73 @@ export function renderDashboard(container) {
 
     const k = calcularKPIs();
     
-    const hoy = new Date();
-    hoy.setHours(0,0,0,0);
-    const diaSemana = hoy.getDay();
-    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0,0,0,0);
-    const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6);
-    finSemana.setHours(23,59,59,999);
-
-    const cerradasEstaSemana = state.tasksCache.filter(t => {
-        if (!t.fecha_cierre) return false;
-        const c = new Date(t.fecha_cierre + 'T00:00:00');
-        return c >= inicioSemana && c <= finSemana;
-    });
-    
-    const reprogramadasEstaSemana = state.tasksCache.filter(t => {
-        if (t.estado !== 'Reprogramado') return false;
-        if (!t.fecha_fin) return false;
-        const f = new Date(t.fecha_fin + 'T00:00:00');
-        return f >= inicioSemana && f <= finSemana;
-    }).length;
-
-    const vencidasSinCerrar = state.tasksCache.filter(t => 
-        !isCerrado(t) && semaforo(t) === 'Vencida'
-    ).length;
-
-    const latenciaPromedio = (() => {
-        const cerradas = state.tasksCache.filter(t => t.fecha_cierre && t.fecha_fin);
-        const conAtraso = cerradas.filter(t => new Date(t.fecha_cierre + 'T00:00:00') > new Date(t.fecha_fin + 'T00:00:00'));
-        if (conAtraso.length === 0) return 0;
-        const suma = conAtraso.reduce((s, t) => {
-            const dias = Math.round((new Date(t.fecha_cierre + 'T00:00:00') - new Date(t.fecha_fin + 'T00:00:00')) / DAY);
-            return s + dias;
-        }, 0);
-        return suma / conAtraso.length;
-    })();
-
-    const KPI = [
-        { label: 'PPC Semanal', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} cerradas a tiempo`, color: 'teal', icon: 'fa-chart-line' },
-        { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
-        { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
-        { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
-        { label: 'Latencia', value: latenciaPromedio.toFixed(1) + ' d', sub: 'promedio de atraso', color: 'orange', icon: 'fa-hourglass-half' },
-        { label: 'Total', value: k.total, sub: 'actividades', color: 'sky', icon: 'fa-cubes' }
-    ];
-
-    const COMPLEMENTARIAS = [
-        { label: 'Cerradas esta semana', value: cerradasEstaSemana.length, sub: 'todas, a tiempo o tarde', color: 'emerald', icon: 'fa-circle-check' },
-        { label: 'Reprogramadas', value: reprogramadasEstaSemana, sub: 'esta semana', color: 'violet', icon: 'fa-calendar-plus' },
-        { label: 'Vencidas sin cerrar', value: vencidasSinCerrar, sub: 'requieren acción', color: 'red', icon: 'fa-bell' },
-        { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
-    ];
-
-    container.innerHTML = `
-        <div class="flex justify-between items-center mb-4">
-            <div>
-                <h3 class="font-bold text-sm text-slate-800">Dashboard de Control BIM</h3>
-                <p class="text-[11px] text-slate-500">Análisis de cumplimiento, latencia y salud del planeamiento.</p>
-            </div>
-            <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-            ${KPI.map(x => `
-                <div class="card kpi-card p-3 border-l-4 border-${x.color}-500">
-                    <div class="flex items-center justify-between">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
-                        <i class="fa-solid ${x.icon} text-${x.color}-500 text-xs"></i>
-                    </div>
-                    <p class="text-2xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
-                    <p class="text-[10px] text-slate-400">${x.sub}</p>
-                </div>
-            `).join('')}
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            ${COMPLEMENTARIAS.map(x => `
-                <div class="card p-3 border-l-4 border-${x.color}-500">
-                    <div class="flex items-center justify-between">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
-                        <i class="fa-solid ${x.icon} text-${x.color}-500 text-xs"></i>
-                    </div>
-                    <p class="text-xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
-                    <p class="text-[10px] text-slate-400">${x.sub}</p>
-                </div>
-            `).join('')}
-        </div>
-
-        <div class="grid lg:grid-cols-3 gap-3 mb-4">
-            <div class="card p-4 lg:col-span-2">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Evolución del PPC (últimas 8 semanas)</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-ppc"></canvas></div>
-            </div>
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Distribución por Estado</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-estados"></canvas></div>
-            </div>
-        </div>
-
-        <div class="grid lg:grid-cols-2 gap-3 mb-4">
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Carga de Trabajo (Tareas Abiertas)</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-carga"></canvas></div>
-            </div>
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Vencidas por Criticidad</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-vencidas"></canvas></div>
-            </div>
-        </div>
-
-        <div class="card overflow-x-auto mb-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Desempeño por Responsable</h4>
-                <p class="text-[11px] text-slate-500">PPC calculado por semana de fecha_fin programada.</p>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Responsable · Cargo</th>
-                        <th class="p-3">Abiertas</th>
-                        <th class="p-3">Vencidas</th>
-                        <th class="p-3">% Venc.</th>
-                        <th class="p-3">Cerradas</th>
-                        <th class="p-3">PPC Semanal</th>
-                        <th class="p-3">Carga Pond.</th>
-                    </tr>
-                </thead>
-                <tbody id="perf-table" class="divide-y divide-slate-100"></tbody>
-            </table>
-        </div>
-
-        <div class="card overflow-x-auto mt-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
-                <p class="text-[11px] text-slate-500">La semana en curso se calcula en vivo. Las anteriores se leen del historial congelado.</p>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Semana</th>
-                        <th class="p-3">Total</th>
-                        <th class="p-3">Abiertas</th>
-                        <th class="p-3">Vencidas</th>
-                        <th class="p-3">Por vencer</th>
-                        <th class="p-3">PPC</th>
-                        <th class="p-3">Horas</th>
-                        <th class="p-3">Planos WIP</th>
-                        <th class="p-3">Planos Shared</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    ${(() => {
+                        ${(() => {
                         const hoy = new Date();
                         hoy.setHours(0, 0, 0, 0);
                         const dia = hoy.getDay();
                         const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
-                        const lunes = new Date(hoy); lunes.setDate(diff);
-                        const semanaActualStr = lunes.toISOString().split('T')[0];
-                        
-                                                const snapshotsHistoricos = (state.snapshotsCache || []).filter(s => s.semana !== semanaActualStr);
-                        
-                        const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
-                        const horasSem = state.manpowerCache.filter(m => {
-                            if(!m.fecha) return false;
-                            const f = new Date(m.fecha + 'T00:00:00');
-                            return f >= lunes && f <= finSem;
-                        }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
+                        const lunesActual = new Date(hoy); lunesActual.setDate(diff);
+                        lunesActual.setHours(0, 0, 0, 0);
 
-                        // Forzamos a que la semana actual use exactamente el mismo objeto k del KPI
-                        const snapshotActual = {
-                            semana: semanaActualStr,
-                            total_tareas: k.total,
-                            abiertas: k.abiertas,
-                            vencidas: k.vencidas,
-                            por_vencer: k.porVencer,
-                            ppc: k.ppc, // <-- Este es el mismo valor de la tarjeta superior
-                            horas_semana: horasSem,
-                            planos_wip: 0,
-                            planos_shared: 0
-                        };
+                        const listaSemanas = [];
 
-                        // Juntamos la actual con las pasadas
-                        const listaFinal = [snapshotActual, ...snapshotsHistoricos].slice(0, 8);
+                        // Vamos a calcular las últimas 8 semanas (incluyendo la actual) en vivo
+                        for (let i = 0; i < 8; i++) {
+                            const lunes = new Date(lunesActual);
+                            lunes.setDate(lunesActual.getDate() - (i * 7));
+                            const semanaStr = lunes.toISOString().split('T')[0];
+                            
+                            const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
 
-                        return listaFinal.map((s, i, arr) => {
+                            // 1. Calcular las tareas de esa semana (Misma fórmula que el gráfico)
+                            const tareasSemana = state.tasksCache.filter(t => {
+                                if (!t.fecha_fin) return false;
+                                if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
+                                const f = new Date(t.fecha_fin + 'T00:00:00');
+                                if (f < lunes || f > finSem) return false;
+                                if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
+                                return true;
+                            });
+
+                            const cumplidas = tareasSemana.filter(t => t.fecha_cierre && t.fecha_cierre <= t.fecha_fin);
+                            const ppcSemana = tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null;
+
+                            // 2. Calcular los totales para esa semana (en vivo)
+                            // Para la semana actual usamos el objeto 'k' que ya tienes calculado arriba
+                            const esSemanaActual = (i === 0);
+                            
+                            const total = esSemanaActual ? k.total : state.tasksCache.length;
+                            const abiertas = esSemanaActual ? k.abiertas : state.tasksCache.filter(t => !isCerrado(t)).length;
+                            const vencidas = esSemanaActual ? k.vencidas : state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Vencida').length;
+                            const porVencer = esSemanaActual ? k.porVencer : state.tasksCache.filter(t => !isCerrado(t) && semaforo(t) === 'Por vencer').length;
+
+                            // 3. Calcular horas
+                            const horasSem = state.manpowerCache.filter(m => {
+                                if(!m.fecha) return false;
+                                const f = new Date(m.fecha + 'T00:00:00');
+                                return f >= lunes && f <= finSem;
+                            }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
+
+                            // 4. Planos (los calculamos en vivo si es la actual, si no, los sacamos de BD si existen)
+                            const snapDB = state.snapshotsCache?.find(s => s.semana === semanaStr);
+                            const planosWip = esSemanaActual ? 0 : (snapDB?.planos_wip || 0);
+                            const planosShared = esSemanaActual ? 0 : (snapDB?.planos_shared || 0);
+
+                            listaSemanas.push({
+                                semana: semanaStr,
+                                total_tareas: total,
+                                abiertas: abiertas,
+                                vencidas: vencidas,
+                                por_vencer: porVencer,
+                                ppc: ppcSemana, // Usamos siempre el PPC recalculado en vivo
+                                horas_semana: horasSem,
+                                planos_wip: planosWip,
+                                planos_shared: planosShared
+                            });
+                        }
+
+                        // Renderizar las filas
+                        return listaSemanas.map((s, i, arr) => {
                             const prev = arr[i + 1];
                             const delta = (val, prevVal) => {
                                 if (prevVal === undefined || prevVal === null) return '';
@@ -204,7 +84,9 @@ export function renderDashboard(container) {
                                 return d > 0 ? `<span class="text-red-600">▲${d}</span>` : `<span class="text-emerald-600">▼${Math.abs(d)}</span>`;
                             };
                             return `<tr class="hover:bg-slate-50">
-                                <td class="p-3 font-mono font-bold text-sky-700">${fmtDate(s.semana)}</td>
+                                <td class="p-3 font-mono font-bold ${i === 0 ? 'text-sky-700' : 'text-slate-600'}">
+                                    ${fmtDate(s.semana)} ${i === 0 ? '(Actual)' : ''}
+                                </td>
                                 <td class="p-3">${s.total_tareas}</td>
                                 <td class="p-3">${s.abiertas} ${delta(s.abiertas, prev?.abiertas)}</td>
                                 <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${s.vencidas} ${delta(s.vencidas, prev?.vencidas)}</td>
