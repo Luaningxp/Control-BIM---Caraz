@@ -233,7 +233,7 @@ export function renderRecursos(container) {
     });
 
     const semanasRecientes = semanas.slice(-6);
-    const hoyStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+    const hoyLocalStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
@@ -247,7 +247,7 @@ export function renderRecursos(container) {
                 const fechaStr = d.toISOString().split('T')[0];
                 if (!esDiaLaborable(p.id, fechaStr)) continue;
                 laborables++;
-                if (fechaStr <= hoyStr) evaluables.push(fechaStr);
+                if (fechaStr <= hoyLocalStr) evaluables.push(fechaStr);
             }
 
             if (laborables === 0) {
