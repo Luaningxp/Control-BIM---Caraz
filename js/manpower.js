@@ -159,6 +159,33 @@ window.openInformeModal = function() {
     document.getElementById('modal-informe').classList.add('flex');
 };
 
+function nombreArchivoInforme(nombreCompleto, fechaFinStr) {
+    const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SET','OCT','NOV','DIC'];
+    const [anio, mes] = fechaFinStr.split('-');
+    const periodo = `${MESES[parseInt(mes, 10) - 1]}${anio.slice(-2)}`;
+
+    const limpio = nombreCompleto
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')                 // sin tildes
+        .replace(/\b(ing|arq|dr|dra|mg|msc|lic|sr|sra|bach)\b\.?/gi, ' ')  // sin títulos
+        .replace(/[^A-Za-z\s]/g, ' ')
+        .toUpperCase().trim();
+
+    const PARTICULAS = new Set(['DE','DEL','LA','LAS','LOS','SAN','SANTA','VAN','VON','DA']);
+    const tokens = [];
+    let prefijo = '';
+    limpio.split(/\s+/).filter(Boolean).forEach(p => {
+        if (PARTICULAS.has(p)) { prefijo += p + '_'; return; }
+        tokens.push(prefijo + p);
+        prefijo = '';
+    });
+
+    const nApellidos = tokens.length >= 3 ? 2 : 1;
+    const apellidos = tokens.slice(-nApellidos);
+    const nombres   = tokens.slice(0, tokens.length - nApellidos);
+
+    return `INFORME_${periodo}_${[...apellidos, ...nombres].join('_')}`;
+}
+
 window.generarInformeWord = async function() {
     const nombre = document.getElementById('inf-nombre').value.trim();
     const fechaInicioStr = document.getElementById('inf-fecha-inicio').value;
@@ -277,7 +304,7 @@ window.generarInformeWord = async function() {
         const url = window.URL.createObjectURL(out);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `Informe_${nombre.replace(/ /g, '_')}.docx`;
+        link.download = `${nombreArchivoInforme(nombre, fechaFinStr)}.docx`;
         link.click();
         window.URL.revokeObjectURL(url);
         toast('Informe generado.');
