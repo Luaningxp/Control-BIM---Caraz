@@ -643,9 +643,18 @@ window.deleteManpower = async function(id) {
     
     if (!confirmado) return;
     
-    const { error } = await supabaseClient.from('manpower_registros').delete().eq('id', id);
+        const { data, error } = await supabaseClient
+        .from('manpower_registros')
+        .delete()
+        .eq('id', id)
+        .select('id');
+
     if (error) { toast('Error: ' + error.message); return; }
-    
+    if (!data || data.length === 0) {
+        toast('No se eliminó: la base de datos no te permite borrar este registro (falta política DELETE).');
+        return;
+    }
+
     toast('Registro eliminado');
     await fetchAll();
     window.renderView();
