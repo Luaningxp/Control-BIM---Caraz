@@ -233,19 +233,31 @@ export function renderRecursos(container) {
     });
 
     const semanasRecientes = semanas.slice(-6);
+    const hoyStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
         semanasRecientes.forEach(s => {
             const inicio = new Date(s + 'T00:00:00');
             const fin = new Date(inicio); fin.setDate(inicio.getDate() + 6);
-            const dias = [];
+
+            let laborables = 0;      // días laborables de la semana según roster
+            const evaluables = [];   // laborables que ya ocurrieron (<= hoy)
             for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
                 const fechaStr = d.toISOString().split('T')[0];
-                if (esDiaLaborable(p.id, fechaStr)) dias.push(fechaStr);
+                if (!esDiaLaborable(p.id, fechaStr)) continue;
+                laborables++;
+                if (fechaStr <= hoyStr) evaluables.push(fechaStr);
             }
-            const cumplidos = dias.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
-            cumplimientoSemanal[p.id].semanas[s] = dias.length > 0 ? Math.round((cumplidos / dias.length) * 100) : 0;
+
+            if (laborables === 0) {
+                cumplimientoSemanal[p.id].semanas[s] = 'DESCANSO';
+            } else if (evaluables.length === 0) {
+                cumplimientoSemanal[p.id].semanas[s] = 'PENDIENTE';
+            } else {
+                const cumplidos = evaluables.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
+                cumplimientoSemanal[p.id].semanas[s] = Math.round((cumplidos / evaluables.length) * 100);
+            }
         });
     });
 
@@ -533,6 +545,12 @@ export function renderRecursos(container) {
                             </td>
                             ${semanasRecientes.map(s => {
                                 const v = m.semanas[s];
+                                if (v === 'DESCANSO') {
+                                    return `<td class="p-3 text-center text-slate-400 font-semibold" title="Sin días laborables en el roster esa semana">Descanso</td>`;
+                                }
+                                if (v === 'PENDIENTE') {
+                                    return `<td class="p-3 text-center text-slate-300 font-semibold" title="Aún no transcurren días laborables de esta semana">—</td>`;
+                                }
                                 const color = v >= 80 ? 'text-emerald-700' : v >= 50 ? 'text-amber-700' : 'text-red-700';
                                 return `<td class="p-3 text-center font-bold ${color}">${v}%</td>`;
                             }).join('')}
