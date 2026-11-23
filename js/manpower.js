@@ -529,7 +529,7 @@ export function openManpowerModal(pendienteId, fechaPredefinida) {
                         </div>
                         <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                             <button type="button" onclick="window.closeManpowerModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
-                            <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
+                            <button type="submit" id="btn-save-manpower" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed">Guardar</button>
                         </div>
                     </form>
                 </div>
@@ -588,8 +588,13 @@ export function closeManpowerModal() {
     document.getElementById('modal-manpower').classList.remove('flex');
 }
 
+let guardandoManpower = false;
+
 export async function saveManpower(e) {
     e.preventDefault();
+    if (guardandoManpower) return; // Evita doble ejecución
+
+    const btn = document.getElementById('btn-save-manpower');
     const fecha = document.getElementById('mp-fecha').value;
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
 
@@ -599,16 +604,16 @@ export async function saveManpower(e) {
         toast(`No puedes registrar en un día no laborable (${etiquetas[tipo] || tipo}).`);
         return;
     }
-    
+
     const totalDia = state.manpowerCache
         .filter(m => m.usuario_id === state.currentUser.id && m.fecha === fecha)
         .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    
+
     if (totalDia + porcentaje > 100) {
         toast(`No puedes exceder 100%. Ya tienes ${totalDia.toFixed(0)}% (${pctAHoras(totalDia).toFixed(2)} h) registrado.`);
         return;
     }
-    
+
     const payload = {
         pendiente_id: document.getElementById('mp-actividad').value || null,
         usuario_id: state.currentUser.id,
@@ -616,11 +621,32 @@ export async function saveManpower(e) {
         porcentaje_dia: porcentaje,
         descripcion: document.getElementById('mp-desc').value
     };
-    const { error } = await supabaseClient.from('manpower_registros').insert([payload]);
-    if (error) { toast('Error: ' + error.message); return; }
-    closeManpowerModal();
-    await fetchAll(); window.renderView();
-    toast(`Registro guardado: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
+
+    // Bloquear botón mientras se guarda
+    guardandoManpower = true;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Guardando...';
+    }
+
+    try {
+        const { error } = await supabaseClient.from('manpower_registros').insert([payload]);
+        if (error) { toast('Error: ' + error.message); return; }
+
+        closeManpowerModal();
+        await fetchAll();
+        window.renderView();
+        toast(`Registro guardado: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
+    } catch (err) {
+        toast('Error inesperado: ' + err.message);
+    } finally {
+        // Siempre se libera, haya éxito o error
+        guardandoManpower = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Guardar';
+        }
+    }
 }
 
 window.deleteManpower = async function(id) {
