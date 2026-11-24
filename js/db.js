@@ -215,7 +215,7 @@ export async function fetchVista(tab) {
             await fetchPlanosLigeros(); // Para mostrar los chips de planos en modales
             break;
         case 'dashboard':
-            await Promise.all([fetchSnapshots(), fetchPlanosLigeros(), fetchCausas(), fetchManpower()]);
+            await Promise.all([fetchSnapshots(), fetchPlanosLigeros(), fetchCausas(), fetchManpower(), fetchReprogramaciones()]);
             break;
         case 'tabla':
             await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);

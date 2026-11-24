@@ -1,6 +1,71 @@
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
+import { TIPOS_REPROGRAMACION } from './reprogramaciones.js';
 import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado } from './utils.js';
+
+
+function metricasReprogramaciones() {
+    const rps = (state.reprogramacionesCache || []).filter(r => !r.es_migrada);
+    const causas = state.causasTodasCache || state.causasCache || [];
+    const porCausa = {}, porTipo = {};
+    rps.forEach(r => {
+        const n = r.causa_id ? (causas.find(c => Number(c.id) === Number(r.causa_id))?.nombre || 'Causa eliminada') : 'Sin causa';
+        porCausa[n] = (porCausa[n] || 0) + 1;
+        porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1;
+    });
+    const ord = o => Object.entries(o).sort((a, b) => b[1] - a[1]);
+    const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / DAY);
+    const cerradas = state.tasksCache.filter(t => t.estado === 'Cerrado' && t.fecha_cierre && t.fecha_fin_original);
+    const desvios = cerradas.map(t => dias(t.fecha_fin_original, t.fecha_cierre));
+    const conRep = new Set(rps.map(r => r.pendiente_id));
+    const avg = a => a.length ? Math.round(a.reduce((s, v) => s + v, 0) / a.length * 10) / 10 : 0;
+    return {
+        total: rps.length,
+        actividades: conRep.size,
+        causas: ord(porCausa).slice(0, 6),
+        tipos: ord(porTipo),
+        cerradasN: cerradas.length,
+        aTiempoOriginal: desvios.filter(d => d <= 0).length,
+        desvioProm: avg(desvios),
+        desvioPromReprog: avg(cerradas.filter(t => conRep.has(t.id)).map(t => dias(t.fecha_fin_original, t.fecha_cierre)))
+    };
+}
+
+function seccionReprogramaciones() {
+    const m = metricasReprogramaciones();
+    const barras = (lista, color, etiqueta) => lista.length
+        ? lista.map(([n, v]) => `
+            <div class="mb-1.5">
+                <div class="flex justify-between text-[11px] text-slate-600"><span class="truncate pr-2">${escapeHtml(etiqueta ? etiqueta(n) : n)}</span><span class="font-bold">${v}</span></div>
+                <div class="h-1.5 rounded bg-slate-100"><div class="h-1.5 rounded" style="width:${Math.round(v / lista[0][1] * 100)}%;background:${color}"></div></div>
+            </div>`).join('')
+        : '<p class="text-[11px] text-slate-400 italic">Sin reprogramaciones registradas.</p>';
+    const pct = m.cerradasN ? Math.round(m.aTiempoOriginal / m.cerradasN * 100) : 0;
+    const signo = v => (v > 0 ? '+' : '') + v;
+    return `
+        <div class="card p-4 mb-4">
+            <h4 class="font-semibold text-sm text-slate-800">Reprogramaciones</h4>
+            <p class="text-[11px] text-slate-500 mb-3">${m.total} evento${m.total === 1 ? '' : 's'} en ${m.actividades} actividad${m.actividades === 1 ? '' : 'es'} (sin contar migradas).</p>
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Causas más frecuentes</p>
+                    ${barras(m.causas, '#7c3aed')}
+                </div>
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Por tipo</p>
+                    ${barras(m.tipos, '#F59E0B', t => TIPOS_REPROGRAMACION[t] || t)}
+                </div>
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Cierre real vs. plan original</p>
+                    <p class="text-2xl font-bold text-slate-800">${pct}%</p>
+                    <p class="text-[10px] text-slate-400 mb-2">cerradas en o antes del fin original (${m.aTiempoOriginal} de ${m.cerradasN})</p>
+                    <p class="text-[11px] text-slate-600">Desvío promedio: <b>${signo(m.desvioProm)} d</b></p>
+                    <p class="text-[11px] text-slate-600">Solo reprogramadas: <b>${signo(m.desvioPromReprog)} d</b></p>
+                </div>
+            </div>
+        </div>
+`;
+}
 
 export function renderDashboard(container) {
     if (window.guardarSnapshotSemanal) {
@@ -119,6 +184,8 @@ export function renderDashboard(container) {
                 <div class="chart-box" style="height: 250px;"><canvas id="chart-vencidas"></canvas></div>
             </div>
         </div>
+
+        ${seccionReprogramaciones()}
 
         <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
