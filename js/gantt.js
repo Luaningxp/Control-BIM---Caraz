@@ -294,7 +294,7 @@ function inicializarGantt(tareas) {
         const nRep = getReprogramaciones(t.id).length;
         return {
             id: String(t.id),
-            name: `${t.codigo_contenedor || ''} ${t.actividad}`.substring(0, 70),
+            name: `${nRep ? `↻×${nRep} ` : ''}${t.codigo_contenedor || ''} ${t.actividad}`.substring(0, 70),
             start: t.fecha_inicio_programado,
             end: t.fecha_fin,
             progress: t.estado === 'Cerrado' ? 100 : t.estado === 'En proceso' ? 50 : 0,
