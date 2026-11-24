@@ -533,7 +533,7 @@ export function renderTabla(container) {
     const recursosOpts = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
     const visiblePropDefs = state.propDefsCache.filter(pd => tableState.visibleProps[pd.id] !== false);
 
-    const estadoColors = { 'No iniciado': 'bg-slate-400', 'En proceso': 'bg-sky-500', 'En espera': 'bg-amber-500', 'Reprogramado': 'bg-purple-500', 'Cerrado': 'bg-teal-500', 'Terminado': 'bg-emerald-500' };
+    const estadoColors = { 'No iniciado': 'bg-slate-400', 'En proceso': 'bg-sky-500', 'En espera': 'bg-amber-500', 'Cerrado': 'bg-teal-500', 'Terminado': 'bg-emerald-500' };
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-800 dark:text-slate-300";
@@ -703,7 +703,7 @@ window.toggleFilterDrawer = function() {
             .map(p => ({ id: p.id, name: nombreFormateado(p) }))
             .sort((a, b) => a.name.localeCompare(b.name));
         const recursosOpts = state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador');
-        const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+        const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Cerrado'];
         const drawerHtml = `
             <div id="table-filter-drawer-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40" onclick="window.toggleFilterDrawer()"></div>
             <div id="table-filter-drawer" class="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 overflow-y-auto">
@@ -902,7 +902,7 @@ export function editTask(id) {
     const estadoSel = document.getElementById('task-estado');
     if (estadoSel) {
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-        estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Reprogramado</option>' + (soloModelador ? '' : '<option>Cerrado</option>');
+        estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option>' + (soloModelador ? '' : '<option>Cerrado</option>');
         estadoSel.value = t.estado || 'No iniciado';
     }
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
