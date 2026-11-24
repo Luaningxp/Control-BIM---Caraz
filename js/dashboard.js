@@ -26,10 +26,9 @@ export function renderDashboard(container) {
         return c >= inicioSemana && c <= finSemana;
     });
     
-    const reprogramadasEstaSemana = state.tasksCache.filter(t => {
-        if (t.estado !== 'Reprogramado') return false;
-        if (!t.fecha_fin) return false;
-        const f = new Date(t.fecha_fin + 'T00:00:00');
+    const reprogramadasEstaSemana = (state.reprogramacionesCache || []).filter(r => {
+        if (r.es_migrada) return false;
+        const f = new Date(r.created_at);
         return f >= inicioSemana && f <= finSemana;
     }).length;
 
@@ -446,9 +445,9 @@ function renderCharts(inicioSemana, finSemana) {
         }
     });
 
-    const estados = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+    const estados = ['No iniciado', 'En proceso', 'En espera', 'Cerrado'];
     const counts = estados.map(e => state.tasksCache.filter(t => t.estado === e).length);
-    const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#7c3aed', '#0d9488'];
+    const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#0d9488'];
     const totalEstados = counts.reduce((s, v) => s + v, 0);
 
     state.charts.estados = new Chart(document.getElementById('chart-estados'), {
