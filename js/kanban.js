@@ -26,7 +26,7 @@ let kanbanState = {
 export function renderKanban(container) {
         // "Reprogramado" ya no es un estado de trabajo: la columna solo aparece mientras queden actividades antiguas en ese estado
     const hayReprogramadoLegacy = state.tasksCache.some(t => t.estado === 'Reprogramado');
-    const ESTADOS = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+    const ESTADOS = ['No iniciado', 'En proceso', 'En espera', ...(hayReprogramadoLegacy ? ['Reprogramado'] : []), 'Cerrado'];
     
     const META = {
         'No iniciado': { t: 'No iniciado', sub: 'Pendiente de inicio', color: 'slate', icon: 'fa-circle' },
@@ -129,7 +129,7 @@ export function renderKanban(container) {
             </div>
         </div>
 
-        <div class="grid grid-cols-1         <div class="grid grid-cols-1 ${ESTADOS.length === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3 overflow-x-auto pb-2"> gap-3 overflow-x-auto pb-2">
+        <div class="grid grid-cols-1 ${ESTADOS.length === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3 overflow-x-auto pb-2">
             ${ESTADOS.map(estado => {
                 const items = filteredTasks.filter(t => t.estado === estado);
                 return `
