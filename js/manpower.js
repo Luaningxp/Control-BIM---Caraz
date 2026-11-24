@@ -40,18 +40,21 @@ export function renderMiTrabajo(container) {
     
     const hoy = new Date();
     hoy.setHours(0,0,0,0);
-    const ayer = new Date(hoy);
-    ayer.setDate(ayer.getDate() - 1);
-    while (ayer.getDay() === 0) { ayer.setDate(ayer.getDate() - 1); }
-    
-    const ayerStr = ayer.toISOString().split('T')[0];
-    const registrosAyer = state.manpowerCache.filter(m => 
-        m.usuario_id === state.currentUser.id && 
-        m.fecha === ayerStr
-    );
+
+    // Último día laborable (según roster) anterior a hoy, buscando hasta 7 días atrás
+    let ayerStr = null;
+    const cursor = new Date(hoy);
+    for (let i = 0; i < 7; i++) {
+        cursor.setDate(cursor.getDate() - 1);
+        const f = cursor.toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+        if (esDiaLaborable(state.currentUser.id, f)) { ayerStr = f; break; }
+    }
+
+    const registrosAyer = ayerStr
+        ? state.manpowerCache.filter(m => m.usuario_id === state.currentUser.id && m.fecha === ayerStr)
+        : [];
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    const esModeladorPuro = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-    const noLlenoAyer = esModeladorPuro && porcentajeAyer < 100;
+    const noLlenoAyer = !!ayerStr && porcentajeAyer < 100;
 
     container.innerHTML = `
         ${noLlenoAyer ? `
