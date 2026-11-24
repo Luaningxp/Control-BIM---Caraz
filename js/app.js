@@ -78,14 +78,11 @@ async function initApp(user) {
     if (!state.isModelador || state.isAdmin || state.isCoordinador || state.isSupervisor) {
         document.getElementById('btn-new-task').classList.remove('hidden');
     }
-    if (state.isAdmin) {
-        document.getElementById('tab-config-btn').classList.remove('hidden');
-    }
-    
+        // Configuración: visible para admin y coordinador
+    const puedeConfig = state.isAdmin || state.isCoordinador;
+    document.getElementById('tab-config-btn').classList.toggle('hidden', !puedeConfig);
+
     document.querySelector('[data-tab="mitrabajo"]').classList.remove('hidden');
-    if (!state.isAdmin) {
-        document.getElementById('tab-config-btn').classList.add('hidden');
-    }
 
         await fetchCore();
     await fetchVista('mitrabajo');
