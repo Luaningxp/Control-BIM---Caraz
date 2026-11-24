@@ -24,15 +24,12 @@ let kanbanState = {
 };
 
 export function renderKanban(container) {
-        // "Reprogramado" ya no es un estado de trabajo: la columna solo aparece mientras queden actividades antiguas en ese estado
-    const hayReprogramadoLegacy = state.tasksCache.some(t => t.estado === 'Reprogramado');
-    const ESTADOS = ['No iniciado', 'En proceso', 'En espera', ...(hayReprogramadoLegacy ? ['Reprogramado'] : []), 'Cerrado'];
+    const ESTADOS = ['No iniciado', 'En proceso', 'En espera', 'Cerrado'];
     
     const META = {
         'No iniciado': { t: 'No iniciado', sub: 'Pendiente de inicio', color: 'slate', icon: 'fa-circle' },
         'En proceso': { t: 'En proceso', sub: 'Trabajando en ello', color: 'sky', icon: 'fa-spinner' },
         'En espera': { t: 'En espera', sub: 'Bloqueado / Pausado', color: 'amber', icon: 'fa-pause' },
-        'Reprogramado': { t: 'Reprogramado', sub: 'Nueva fecha', color: 'purple', icon: 'fa-calendar-plus' },
         'Cerrado': { t: 'Cerrado', sub: 'Completado', color: 'teal', icon: 'fa-check-circle' }
     };
 
@@ -129,7 +126,7 @@ export function renderKanban(container) {
             </div>
         </div>
 
-        <div class="grid grid-cols-1 ${ESTADOS.length === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3 overflow-x-auto pb-2">
+        <div class="grid grid-cols-1 ${ESTADOS.length === 5 ? 'md:grid-cols-4' : 'md:grid-cols-4'} gap-3 overflow-x-auto pb-2">
             ${ESTADOS.map(estado => {
                 const items = filteredTasks.filter(t => t.estado === estado);
                 return `
@@ -265,7 +262,7 @@ export function renderKanban(container) {
                    <div>
     <label class="block font-semibold text-slate-600 mb-2">Ocultar estados</label>
     <div class="space-y-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
-        ${['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'].map(e => `
+        ${['No iniciado', 'En proceso', 'En espera', 'Cerrado'].map(e => `
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" class="rounded text-red-600" 
                        ${kanbanState.estadosOcultos.includes(e) ? 'checked' : ''}
