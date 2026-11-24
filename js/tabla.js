@@ -1212,6 +1212,12 @@ export async function saveTask(e) {
         }
     }
 
+    console.log('REPROG DEBUG', {
+    id, soloModelador,
+    previa: state.tasksCache.find(t => String(t.id) === String(id)),
+    payload, reprog
+});
+
     const { data: validacion, error: errVal } = await supabaseClient.rpc('validar_guardado_tarea', {
         p_id: id ? parseInt(id) : null,
         p_payload: payload,
