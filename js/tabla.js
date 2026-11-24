@@ -6,19 +6,7 @@ import {
 } from './utils.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
-// Solo se autocompleta cuando la actividad realmente está arrancando
-function debeAutocompletarInicioReal(estadoNuevo) {
-    return ['En proceso', 'En espera', 'Cerrado'].includes(estadoNuevo)
-        && ['No iniciado', 'Reprogramado'].includes(estadoPrevioModal());
-}
 
-document.addEventListener('change', (e) => {
-    if (e.target?.id !== 'task-estado') return;
-    const ini = document.getElementById('task-fecha-inicio-real');
-    if (ini && !ini.value && debeAutocompletarInicioReal(e.target.value)) {
-        ini.value = new Date().toLocaleDateString('en-CA');
-    }
-});
 
 // --- HELPERS DE RECURSOS ---
 function getRecursosDeTarea(pendienteId) {
@@ -1206,7 +1194,7 @@ export async function saveTask(e) {
         payload = {
             estado: estado,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            fecha_inicio_real: fechaInicioReal || null,
+            
             nota: document.getElementById('task-nota').value
         };
     } else {
@@ -1221,7 +1209,7 @@ export async function saveTask(e) {
             fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
             fecha_fin: fechaFinProgramada || null,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            fecha_inicio_real: fechaInicioReal || null,
+            
             nota: document.getElementById('task-nota').value,
             subcontrata: document.getElementById('task-subcontrata')?.value || null
         };
