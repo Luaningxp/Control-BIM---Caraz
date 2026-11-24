@@ -151,7 +151,7 @@ export async function fetchCausas() {
     ]);
     if (ca.error) console.error('fetchCausas causas:', ca.error);
     if (tc.error) console.error('fetchCausas tarea_causas:', tc.error);
-    state.causasTodasCache = ca.data || [];
+    state.causasTodasCache = (ca.data || []).slice().sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es', { sensitivity: 'base' }));
     state.causasCache = state.causasTodasCache.filter(c => c.activo !== false);
     state.tareaCausasCache = tc.data || [];
     state._loaded.causas = true;
@@ -293,7 +293,7 @@ export async function fetchAll() {
         state.actividadRecursosCache = ar.data || [];
         state.planosCache = pl.data || [];
         state.actividadPlanosCache = ap.data || [];
-        state.causasTodasCache = ca.data || [];
+        state.causasTodasCache = (ca.data || []).slice().sort((x, y) => String(x.nombre).localeCompare(String(y.nombre), 'es', { sensitivity: 'base' }));
         state.causasCache = state.causasTodasCache.filter(c => c.activo !== false);
         state.reprogramacionesCache = rp.data || [];
         state.tareaCausasCache = tc.data || [];
