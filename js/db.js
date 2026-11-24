@@ -384,7 +384,7 @@ export async function guardarSnapshotSemanal() {
 
         const causasTop = {};
         (state.tareaCausasCache || []).forEach(tc => {
-            const c = (state.causasCache || []).find(x => x.id === tc.causa_id);
+            const c = (state.causasTodasCache || state.causasCache || []).find(x => x.id === tc.causa_id);
             if (c) causasTop[c.nombre] = (causasTop[c.nombre] || 0) + 1;
         });
 
