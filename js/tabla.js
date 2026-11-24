@@ -248,7 +248,7 @@ function actualizarCausasUI() {
         return;
     }
     box.innerHTML = Array.from(causasSeleccionadas).map(cid => {
-        const c = (state.causasCache || []).find(x => Number(x.id) === Number(cid));
+        const c = (state.causasTodasCache || state.causasCache || []).find(x => Number(x.id) === Number(cid));
         if (!c) return '';
         return `
             <span class="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 px-2 py-0.5 rounded-full text-[11px] font-medium">
