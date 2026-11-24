@@ -100,12 +100,17 @@ export function renderConfig(container) {
                 <div class="overflow-y-auto max-h-64">
                     <table class="w-full text-left text-xs">
                         <tbody id="causas-table" class="divide-y divide-slate-100">
-                            ${(state.causasCache || []).map(c => `
-                                <tr class="hover:bg-slate-50">
-                                    <td class="py-2">${escapeHtml(c.nombre)}</td>
-                                    <td class="py-2 text-right">
-                                        <button onclick="window.openCausaModal(${c.id})" class="text-sky-600 mr-2 hover:text-sky-800"><i class="fa-solid fa-pen"></i></button>
-                                        <button onclick="window.deleteCausa(${c.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                            ${(state.causasTodasCache || state.causasCache || []).map(c => `
+                                <tr class="hover:bg-slate-50 ${c.activo === false ? 'opacity-60' : ''}">
+                                    <td class="py-2">
+                                        ${escapeHtml(c.nombre)}
+                                        ${c.activo === false ? '<span class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-bold uppercase">Inactiva</span>' : ''}
+                                    </td>
+                                    <td class="py-2 text-right whitespace-nowrap">
+                                        <button onclick="window.openCausaModal(${c.id})" class="text-sky-600 mr-2 hover:text-sky-800" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                                        ${c.activo === false
+                                            ? `<button onclick="window.reactivarCausa(${c.id})" class="text-emerald-600 hover:text-emerald-800" title="Reactivar"><i class="fa-solid fa-rotate-left"></i></button>`
+                                            : `<button onclick="window.deleteCausa(${c.id})" class="text-red-500 hover:text-red-700" title="Desactivar o eliminar"><i class="fa-solid fa-trash"></i></button>`}
                                     </td>
                                 </tr>
                             `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin causas</td></tr>'}
@@ -501,7 +506,7 @@ export async function saveCargo(e) {
     closeCargoModal(); await fetchAll(); window.renderView(); toast('Cargo actualizado');
 }
 export function openCausaModal(id) {
-    const c = id ? (state.causasCache || []).find(x => x.id === id) : null;
+    const c = id ? (state.causasTodasCache || state.causasCache || []).find(x => x.id === id) : null;
     document.getElementById('causa-modal-title').innerText = c ? 'Editar causa' : 'Nueva causa';
     document.getElementById('causa-id').value = c?.id || '';
     document.getElementById('causa-nombre').value = c?.nombre || '';
@@ -512,27 +517,59 @@ export function closeCausaModal() { document.getElementById('modal-causa').class
 export async function saveCausa(e) {
     e.preventDefault();
     const id = document.getElementById('causa-id').value;
-    const payload = { nombre: document.getElementById('causa-nombre').value.trim(), activo: true };
-    if (!payload.nombre) { toast('Nombre requerido'); return; }
+    const nombre = document.getElementById('causa-nombre').value.trim();
+    if (!nombre) { toast('Nombre requerido'); return; }
     const { error } = id
-        ? await supabaseClient.from('causas_incumplimiento').update(payload).eq('id', id)
-        : await supabaseClient.from('causas_incumplimiento').insert([payload]);
+        ? await supabaseClient.from('causas_incumplimiento').update({ nombre }).eq('id', id)
+        : await supabaseClient.from('causas_incumplimiento').insert([{ nombre, activo: true }]);
     if (error) { toast('Error: ' + error.message); return; }
     closeCausaModal(); await fetchAll(); window.renderView(); toast('Causa guardada');
 }
 export async function deleteCausa(id) {
-    const c = (state.causasCache || []).find(x => x.id === id);
+    const c = (state.causasTodasCache || state.causasCache || []).find(x => x.id === id);
     if (!c) return;
-    const confirmado = await confirmDelete({ title: 'Eliminar causa', message: `Vas a eliminar "${c.nombre}". Las tareas que la usaban quedarán sin esa causa.` });
+
+    // ¿La causa tiene historial? (cierres tardíos o reprogramaciones)
+    const [tc, rp] = await Promise.all([
+        supabaseClient.from('tarea_causas').select('*', { count: 'exact', head: true }).eq('causa_id', id),
+        supabaseClient.from('reprogramaciones_bim').select('*', { count: 'exact', head: true }).eq('causa_id', id)
+    ]);
+    if (tc.error || rp.error) { toast('No se pudo verificar el uso de la causa.'); return; }
+    const usos = (tc.count || 0) + (rp.count || 0);
+
+    if (usos > 0) {
+        // Con historial: se desactiva (reversible), no se borra
+        const { data, error } = await supabaseClient
+            .from('causas_incumplimiento').update({ activo: false }).eq('id', id).select('id');
+        if (error) { toast('Error: ' + error.message); return; }
+        if (!data || data.length === 0) { toast('No se pudo desactivar: la base de datos no te lo permite.'); return; }
+        await fetchAll(); window.renderView();
+        toast(`Causa desactivada (tiene ${usos} registro${usos === 1 ? '' : 's'}). Se conserva en el historial.`);
+        return;
+    }
+
+    // Sin uso: se puede eliminar
+    const confirmado = await confirmDelete({ title: 'Eliminar causa', message: `Vas a eliminar "${c.nombre}". No tiene registros asociados.` });
     if (!confirmado) return;
-    const { error } = await supabaseClient.from('causas_incumplimiento').delete().eq('id', id);
+    const { data, error } = await supabaseClient
+        .from('causas_incumplimiento').delete().eq('id', id).select('id');
     if (error) { toast('Error: ' + error.message); return; }
+    if (!data || data.length === 0) { toast('No se pudo eliminar: la base de datos no te lo permite.'); return; }
     await fetchAll(); window.renderView(); toast('Causa eliminada');
+}
+
+export async function reactivarCausa(id) {
+    const { data, error } = await supabaseClient
+        .from('causas_incumplimiento').update({ activo: true }).eq('id', id).select('id');
+    if (error) { toast('Error: ' + error.message); return; }
+    if (!data || data.length === 0) { toast('No se pudo reactivar: la base de datos no te lo permite.'); return; }
+    await fetchAll(); window.renderView(); toast('Causa reactivada');
 }
 window.openCausaModal = openCausaModal;
 window.closeCausaModal = closeCausaModal;
 window.saveCausa = saveCausa;
 window.deleteCausa = deleteCausa;
+window.reactivarCausa = reactivarCausa;
 
 // --- CAMBIO DE CONTRASEÑA (solo admin) ---
 window.openPasswordModal = function(userId) {
