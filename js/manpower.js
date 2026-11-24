@@ -321,6 +321,16 @@ window.generarInformeWord = async function() {
 // ============================================================
 // MANPOWER (listado con filtros + conversión a horas)
 // ============================================================
+function puedeGestionarManpower(r) {
+    return !!r && (state.isAdmin || state.isCoordinador || r.usuario_id === state.currentUser?.id);
+}
+
+function ctxManpower() {
+    const editId = document.getElementById('mp-id')?.value || '';
+    const rec = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
+    return { editId, uid: rec ? rec.usuario_id : state.currentUser.id };
+}
+
 export function renderManpower(container) {
     let registros = state.manpowerCache.filter(m => 
         state.isAdmin || state.isCoordinador || state.isSupervisor || m.usuario_id === state.currentUser.id
@@ -391,7 +401,7 @@ export function renderManpower(container) {
                         <th class="p-3">% Día</th>
                         <th class="p-3">Horas</th>
                         <th class="p-3">Nota</th>
-                        ${(state.isAdmin || state.isCoordinador) ? '<th class="p-3 text-center">Acciones</th>' : ''}
+                        <th class="p-3 text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -408,22 +418,25 @@ export function renderManpower(container) {
                             <td class="p-3 text-slate-500">${pct.toFixed(1)}%</td>
                             <td class="p-3 font-bold text-sky-600">${horas.toFixed(2)} h</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
-                            ${(state.isAdmin || state.isCoordinador) ? `
-                                <td class="p-3 text-center whitespace-nowrap">
+                            <td class="p-3 text-center whitespace-nowrap">
+                                ${puedeGestionarManpower(r) ? `
+                                    <button onclick="window.editManpower(${r.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar registro">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
                                     <button onclick="window.deleteManpower(${r.id})" class="text-red-500 hover:text-red-700" title="Eliminar registro">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
-                                </td>
-                            ` : ''}
+                                ` : ''}
+                            </td>
                         </tr>`;
-                    }).join('') || `<tr><td colspan="${state.isAdmin ? 7 : 6}" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
+                    }).join('') || `<tr><td colspan="7" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
                 </tbody>
                 ${registros.length > 0 ? `
                     <tfoot class="bg-slate-50 border-t-2 border-slate-200">
                         <tr>
                             <td colspan="4" class="p-3 text-right font-bold text-slate-700 uppercase text-[10px] tracking-wider">Total del periodo filtrado:</td>
                             <td class="p-3 font-bold text-sky-700 text-sm">${totalHoras.toFixed(2)} h</td>
-                            <td colspan="${state.isAdmin ? 2 : 1}" class="p-3"></td>
+                            <td colspan="2" class="p-3"></td>
                         </tr>
                     </tfoot>
                 ` : ''}
@@ -501,14 +514,15 @@ export function renderManpower(container) {
     }
 }
 
-export function openManpowerModal(pendienteId, fechaPredefinida) {
+export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
             <div id="modal-manpower" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
                 <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
-                    <h3 class="font-bold text-sm text-slate-800">Registrar % del Día</h3>
+                    <h3 id="mp-titulo" class="font-bold text-sm text-slate-800">Registrar % del Día</h3>
                     <p id="mp-restante-info" class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded"></p>
                     <form onsubmit="window.saveManpower(event)" class="space-y-3 text-xs">
+                        <input type="hidden" id="mp-id" value="">
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Actividad</label>
                             <select id="mp-actividad" class="inp">
@@ -551,9 +565,19 @@ export function openManpowerModal(pendienteId, fechaPredefinida) {
     select.innerHTML = '<option value="">— General —</option>' + 
         tareasDisponibles.map(t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml(t.actividad.substring(0,50))}...</option>`).join('');
 
-    select.value = pendienteId || '';
-    document.getElementById('mp-fecha').value = fechaPredefinida || today().toISOString().slice(0,10);
-    document.getElementById('mp-porcentaje').value = '';
+    const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
+    // Al editar, la actividad del registro debe poder verse aunque ya esté cerrada
+    if (rEdit && rEdit.pendiente_id && !tareasDisponibles.some(t => t.id === rEdit.pendiente_id)) {
+        const tx = state.tasksCache.find(t => t.id === rEdit.pendiente_id);
+        if (tx) select.insertAdjacentHTML('beforeend', `<option value="${tx.id}">${escapeHtml(tx.codigo_contenedor || '')} - ${escapeHtml(tx.actividad.substring(0,50))}...</option>`);
+    }
+
+    document.getElementById('mp-id').value = rEdit ? rEdit.id : '';
+    document.getElementById('mp-titulo').textContent = rEdit ? 'Editar registro' : 'Registrar % del Día';
+    select.value = rEdit ? (rEdit.pendiente_id || '') : (pendienteId || '');
+    document.getElementById('mp-fecha').value = rEdit ? rEdit.fecha : (fechaPredefinida || today().toISOString().slice(0,10));
+    document.getElementById('mp-porcentaje').value = rEdit ? parseFloat(rEdit.porcentaje_dia || 0) : '';
+    document.getElementById('mp-desc').value = rEdit ? (rEdit.descripcion || '') : '';
     
     window.actualizarRestanteManpower();
     window.actualizarHorasManpower();
@@ -566,8 +590,9 @@ window.actualizarRestanteManpower = function() {
     const fecha = document.getElementById('mp-fecha').value;
     if (!fecha) return;
     
+    const { editId, uid } = ctxManpower();
     const totalDia = state.manpowerCache
-        .filter(m => m.usuario_id === state.currentUser.id && m.fecha === fecha)
+        .filter(m => m.usuario_id === uid && m.fecha === fecha && String(m.id) !== String(editId))
         .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
     
     const restante = Math.max(0, 100 - totalDia);
@@ -601,15 +626,16 @@ export async function saveManpower(e) {
     const fecha = document.getElementById('mp-fecha').value;
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
 
-    if (!esDiaLaborable(state.currentUser.id, fecha)) {
-        const tipo = tipoDia(state.currentUser.id, fecha);
+    const { editId, uid } = ctxManpower();
+    if (!esDiaLaborable(uid, fecha)) {
+        const tipo = tipoDia(uid, fecha);
         const etiquetas = { DO: 'domingo no laborable', DE: 'descanso', FE: 'feriado' };
         toast(`No puedes registrar en un día no laborable (${etiquetas[tipo] || tipo}).`);
         return;
     }
 
     const totalDia = state.manpowerCache
-        .filter(m => m.usuario_id === state.currentUser.id && m.fecha === fecha)
+        .filter(m => m.usuario_id === uid && m.fecha === fecha && String(m.id) !== String(editId))
         .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
 
     if (totalDia + porcentaje > 100) {
@@ -633,13 +659,20 @@ export async function saveManpower(e) {
     }
 
     try {
-        const { error } = await supabaseClient.from('manpower_registros').insert([payload]);
-        if (error) { toast('Error: ' + error.message); return; }
+        if (editId) {
+            const { usuario_id, ...cambios } = payload; // al editar no se cambia el dueño
+            const { data, error } = await supabaseClient.from('manpower_registros').update(cambios).eq('id', editId).select('id');
+            if (error) { toast('Error: ' + error.message); return; }
+            if (!data || data.length === 0) { toast('No se pudo editar: la base de datos no te lo permite (falta política UPDATE).'); return; }
+        } else {
+            const { error } = await supabaseClient.from('manpower_registros').insert([payload]);
+            if (error) { toast('Error: ' + error.message); return; }
+        }
 
         closeManpowerModal();
         await fetchAll();
         window.renderView();
-        toast(`Registro guardado: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
+        toast(`${editId ? 'Registro actualizado' : 'Registro guardado'}: ${porcentaje}% = ${pctAHoras(porcentaje).toFixed(2)} h`);
     } catch (err) {
         toast('Error inesperado: ' + err.message);
     } finally {
@@ -652,11 +685,16 @@ export async function saveManpower(e) {
     }
 }
 
+window.editManpower = function(id) {
+    const r = state.manpowerCache.find(x => x.id === id);
+    if (!puedeGestionarManpower(r)) { toast('Solo puedes editar tus propios registros.'); return; }
+    openManpowerModal(r.pendiente_id, r.fecha, id);
+};
+
 window.deleteManpower = async function(id) {
-    if (!state.isAdmin && !state.isCoordinador) { toast('Solo administradores o coordinadores pueden eliminar registros.'); return; }
-    
     const r = state.manpowerCache.find(x => x.id === id);
     if (!r) return;
+    if (!puedeGestionarManpower(r)) { toast('Solo puedes eliminar tus propios registros.'); return; }
     
     const p = state.perfilesCache.find(x => x.id === r.usuario_id);
     const t = state.tasksCache.find(x => x.id === r.pendiente_id);
