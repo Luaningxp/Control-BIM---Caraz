@@ -1224,17 +1224,12 @@ export async function saveTask(e) {
         return;
     }
 
-    let payload;
+        let payload;
     if (soloModelador && id) {
         payload = {
             estado: estado,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            payload = {
-            estado: estado,
-            fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
             fecha_inicio_real: fechaInicioReal || null,
-            nota: document.getElementById('task-nota').value
-        };
             nota: document.getElementById('task-nota').value
         };
     } else {
@@ -1249,11 +1244,7 @@ export async function saveTask(e) {
             fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
             fecha_fin: fechaFinProgramada || null,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
-            fecha_fin: fechaFinProgramada || null,
-            fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
             fecha_inicio_real: fechaInicioReal || null,
-            nota: document.getElementById('task-nota').value,
             nota: document.getElementById('task-nota').value,
             subcontrata: document.getElementById('task-subcontrata')?.value || null
         };
