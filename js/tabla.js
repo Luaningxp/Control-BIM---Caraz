@@ -4,6 +4,7 @@ import {
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
     confirmDelete, semaforo
 } from './utils.js';
+import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion } from './reprogramaciones.js';
 
 // --- HELPERS DE RECURSOS ---
 function getRecursosDeTarea(pendienteId) {
@@ -1196,19 +1197,46 @@ export async function saveTask(e) {
         };
     }
     let taskId = id;
+
+    // --- Detección de reprogramación (solo al editar, con roles que pueden mover fechas) ---
+    let reprog = null, motivo = null;
+    if (id && !soloModelador) {
+        reprog = detectarReprogramacion(state.tasksCache.find(t => String(t.id) === String(id)), payload);
+        if (reprog) {
+            motivo = await pedirMotivoReprogramacion(reprog);
+            if (!motivo) {
+                toast('Reprogramación cancelada: no se guardaron los cambios.');
+                if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+                return;
+            }
+        }
+    }
+
     const { data: validacion, error: errVal } = await supabaseClient.rpc('validar_guardado_tarea', {
-    p_id: id ? parseInt(id) : null,
-    p_payload: payload,
-    p_causas_ids: Array.from(causasSeleccionadas)
-});
-if (errVal) { toast('Error validación: ' + errVal.message); return; }
-if (!validacion?.ok) { toast(validacion.error); return; }
+        p_id: id ? parseInt(id) : null,
+        p_payload: payload,
+        p_causas_ids: Array.from(causasSeleccionadas)
+    });
+    if (errVal) {
+        toast('Error validación: ' + errVal.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+        return;
+    }
+    if (!validacion?.ok) {
+        toast(validacion.error);
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+        return;
+    }
     if (id) {
         const { error } = await supabaseClient.from('pendientes_bim').update(payload).eq('id', id);
         if (error) { 
             toast('Error: ' + error.message); 
             if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
             return; 
+        }
+        if (reprog) {
+            const errRep = await registrarReprogramacion(id, reprog, motivo);
+            if (errRep) toast('La actividad se guardó, pero no se registró la reprogramación: ' + errRep.message);
         }
     } else {
         payload.estado_cde = 'WIP'; payload.codigo_aptitud = 'S0'; payload.user_id = state.currentUser.id;
