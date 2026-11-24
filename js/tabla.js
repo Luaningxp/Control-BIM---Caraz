@@ -4,7 +4,7 @@ import {
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
     confirmDelete, semaforo
 } from './utils.js';
-import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion } from './reprogramaciones.js';
+import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
 // Solo se autocompleta cuando la actividad realmente está arrancando
 function debeAutocompletarInicioReal(estadoNuevo) {
@@ -641,7 +641,7 @@ export function renderTabla(container) {
                                     let contenido = '';
                                     switch(col) {
                                         case 'codigo': contenido = `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate ${stickyClass}" style="${colStyle('codigo')} ${stickyStyle}">${t.codigo_contenedor || '–'}</td>`; break;
-                                        case 'actividad': contenido = `<td data-col="actividad" class="p-3 truncate ${stickyClass}" style="${colStyle('actividad')} ${stickyStyle}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px]">${escapeHtml(t.actividad)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>`; break;
+                                        case 'actividad': contenido = `<td data-col="actividad" class="p-3 truncate ${stickyClass}" style="${colStyle('actividad')} ${stickyStyle}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px] flex items-center gap-1.5"><span class="truncate">${escapeHtml(t.actividad)}</span>${badgeReprogramada(t.id)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>`; break;
                                         case 'grupo': contenido = `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>`; break;
                                         case 'responsable': contenido = `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>`; break;
                                         case 'recursos': contenido = `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>`; break;
