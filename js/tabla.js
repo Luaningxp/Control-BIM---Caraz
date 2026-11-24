@@ -6,13 +6,6 @@ import {
 } from './utils.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion } from './reprogramaciones.js';
 
-// --- INICIO REAL: autocompletado ---
-function estadoPrevioModal() {
-    const id = document.getElementById('task-id')?.value;
-    const previa = id ? state.tasksCache.find(t => String(t.id) === String(id)) : null;
-    return previa?.estado || 'No iniciado';
-}
-
 // Solo se autocompleta cuando la actividad realmente está arrancando
 function debeAutocompletarInicioReal(estadoNuevo) {
     return ['En proceso', 'En espera', 'Cerrado'].includes(estadoNuevo)
@@ -857,7 +850,7 @@ export function openModal() {
     if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return;
     document.getElementById('modal-title').innerText = "Nueva Actividad";
     
-        ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-fecha-inicio-real','task-nota'].forEach(id => {
+            ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -926,8 +919,6 @@ export function editTask(id) {
     }
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
-    const iniRealEl = document.getElementById('task-fecha-inicio-real');
-    if (iniRealEl) iniRealEl.value = t.fecha_inicio_real || '';
     document.getElementById('task-nota').value = t.nota || '';
     
     const grSel = document.getElementById('task-grupo'); 
@@ -1004,8 +995,6 @@ export function duplicateTask(id) {
     document.getElementById('task-estado').value = 'No iniciado';
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = '';
-    const iniRealDup = document.getElementById('task-fecha-inicio-real');
-    if (iniRealDup) iniRealDup.value = '';
     document.getElementById('task-nota').value = t.nota || '';
 
     const grSel = document.getElementById('task-grupo');
@@ -1077,13 +1066,13 @@ function aplicarBloqueoModelador() {
         el.classList.toggle('cursor-not-allowed', soloModelador);
     });
 
-        // Inicio programado bloqueado en actividades ya iniciadas (admin/coordinador pueden corregirlo con causa)
+            // Inicio programado bloqueado en actividades ya iniciadas (admin/coordinador pueden corregirlo con causa)
     const iniProg = document.getElementById('task-fecha-inicio');
     const idActual = document.getElementById('task-id')?.value;
     if (iniProg) iniProg.title = '';
     if (iniProg && idActual) {
         const previa = state.tasksCache.find(t => String(t.id) === String(idActual));
-        const iniciada = previa && (previa.fecha_inicio_real || ['En proceso', 'En espera', 'Cerrado'].includes(previa.estado));
+        const iniciada = previa && ['En proceso', 'En espera', 'Cerrado'].includes(previa.estado);
         if (iniciada && !state.isAdmin) {
             iniProg.disabled = true;
             iniProg.classList.add('opacity-60', 'cursor-not-allowed');
@@ -1208,18 +1197,6 @@ export async function saveTask(e) {
 
     if (soloModelador && estado === 'Cerrado') {
         toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
-        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
-        return;
-    }
-
-        // --- Inicio real ---
-    let fechaInicioReal = document.getElementById('task-fecha-inicio-real')?.value || '';
-    if (!fechaInicioReal && debeAutocompletarInicioReal(estado)) {
-        const hoyLocal = new Date().toLocaleDateString('en-CA');
-        fechaInicioReal = (fechaCierre && fechaCierre < hoyLocal) ? fechaCierre : hoyLocal;
-    }
-    if (fechaInicioReal && fechaCierre && fechaCierre < fechaInicioReal) {
-        toast('La fecha de cierre no puede ser anterior al inicio real.');
         if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
     }
