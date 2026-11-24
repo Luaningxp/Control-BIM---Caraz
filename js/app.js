@@ -67,7 +67,7 @@ async function initApp(user) {
 
     // Autorización por rol EXCLUSIVAMENTE.
     // `cargo` NO otorga permisos. Solo se usa para mostrar en UI.
-    state.isAdmin        = state.currentRol === 'admin';
+    state.isAdmin        = state.currentRol === 'admin' || state.currentRol === 'coordinador_bim';
     state.isCoordinador  = state.currentRol === 'coordinador_bim';
     state.isSupervisor   = state.currentRol === 'supervisor_bim';
     state.isModelador    = state.currentRol === 'operador';
