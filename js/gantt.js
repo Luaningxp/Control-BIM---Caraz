@@ -1,6 +1,7 @@
 import { state } from './db.js';
 import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar } from './utils.js';
 import { tipoDia } from './roster.js';
+import { getReprogramaciones } from './reprogramaciones.js';
 
 let ganttState = {
     filterGrupo: '',
@@ -290,6 +291,7 @@ function inicializarGantt(tareas) {
 
     const tasksData = tareas.map(t => {
         const estadoClase = t.estado.replace(/\s/g, '-').toLowerCase();
+        const nRep = getReprogramaciones(t.id).length;
         return {
             id: String(t.id),
             name: `${t.codigo_contenedor || ''} ${t.actividad}`.substring(0, 70),
@@ -723,12 +725,13 @@ function renderOcupacion(container, tareasFiltradas) {
                 const left = seg.ini * anchoDiaPct;
                 const width = (seg.fin - seg.ini + 1) * anchoDiaPct;
                 const esPrimerSegmento = idx === 0;
-                const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}`;
+                const nRep = getReprogramaciones(t.id).length;
+                const titulo = `${t.actividad}\n${fmtDate(t.fecha_inicio_programado)} → ${fmtDate(t.fecha_fin)}\nEstado: ${t.estado}\nCriticidad: ${crit}${nRep ? `\nReprogramada ×${nRep}` : ''}`;
 
                 return `<div onclick="event.stopPropagation(); window.editTask(${t.id})" class="absolute rounded shadow-sm cursor-pointer hover:brightness-110 transition" 
                             style="left:${left}%;width:${width}%;top:${topPx}px;height:18px;background:${bg};border-left:3px solid ${borde};" 
                             title="${escapeHtml(titulo)}">
-                            ${esPrimerSegmento ? `<span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${escapeHtml(t.actividad)}</span>` : ''}
+                            ${esPrimerSegmento ? `<span class="absolute left-1 top-0 bottom-0 flex items-center text-[9px] font-semibold text-white/95 truncate pointer-events-none" style="max-width:calc(100% - 8px);">${nRep ? '↻ ' : ''}${escapeHtml(t.actividad)}</span>` : ''}
                         </div>`;
             }).join('');
         }).join('');
