@@ -22,6 +22,8 @@ export const state = {
     actividadPlanosCache: [],
     causasCache: [],
     tareaCausasCache: [],
+    causasTodasCache: [],
+    reprogramacionesCache: [],
     snapshotsCache: [],
     descansosCache: [],
     feriadosCache: [],
@@ -41,6 +43,7 @@ export const state = {
         planosLigeros: false,   
         planos: false,
         causas: false,
+        reprogramaciones: false,
         roster: false,
         snapshots: false
     }
@@ -143,14 +146,27 @@ export async function fetchPlanosLigeros() {
 export async function fetchCausas() {
     if (state._loaded.causas) return true;
     const [ca, tc] = await Promise.all([
-        supabaseClient.from('causas_incumplimiento').select('*').eq('activo', true).order('orden'),
+        supabaseClient.from('causas_incumplimiento').select('*').order('orden'),
         supabaseClient.from('tarea_causas').select('*')
     ]);
     if (ca.error) console.error('fetchCausas causas:', ca.error);
     if (tc.error) console.error('fetchCausas tarea_causas:', tc.error);
-    state.causasCache = ca.data || [];
+    state.causasTodasCache = ca.data || [];
+    state.causasCache = state.causasTodasCache.filter(c => c.activo !== false);
     state.tareaCausasCache = tc.data || [];
     state._loaded.causas = true;
+    return true;
+}
+
+export async function fetchReprogramaciones() {
+    if (state._loaded.reprogramaciones) return true;
+    const { data, error } = await supabaseClient
+        .from('reprogramaciones_bim')
+        .select('*')
+        .order('created_at', { ascending: false });
+    if (error) console.error('fetchReprogramaciones:', error);
+    state.reprogramacionesCache = data || [];
+    state._loaded.reprogramaciones = true;
     return true;
 }
 
@@ -202,15 +218,15 @@ export async function fetchVista(tab) {
             await Promise.all([fetchSnapshots(), fetchPlanosLigeros(), fetchCausas(), fetchManpower()]);
             break;
         case 'tabla':
-            await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas()]);
+            await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);
             break;
         case 'kanban':
-            await fetchPlanosLigeros();
+            await Promise.all([fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);
             break;
         case 'eisenhower':
             break;
         case 'gantt':
-            // El Gantt no necesita los datos del plano, solo las tareas
+            await Promise.all([fetchCausas(), fetchReprogramaciones()]);
             break;
         case 'log-planos':
             // AQUÍ SÍ CARGAMOS LOS 5,216
@@ -237,7 +253,7 @@ export async function fetchVista(tab) {
 // ------------------------------------------------------------------
 export async function fetchAll() {
     try {
-        const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm] = await Promise.all([
+            const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm, rp] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
@@ -247,14 +263,15 @@ export async function fetchAll() {
             supabaseClient.from('actividad_recursos').select('*'),
             supabaseClient.from('planos').select('*').order('codigo'),
             supabaseClient.from('actividad_planos').select('*'),
-            supabaseClient.from('causas_incumplimiento').select('*').eq('activo', true).order('orden'),
+            supabaseClient.from('causas_incumplimiento').select('*').order('orden'),
             supabaseClient.from('tarea_causas').select('*'),
             supabaseClient.from('snapshots_semanales').select('*').order('semana', { ascending: false }),
             supabaseClient.from('descansos').select('*'),
             supabaseClient.from('feriados').select('*'),
             supabaseClient.from('trabajos_extra').select('*'),
             supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
-            supabaseClient.from('descansos_medicos').select('*')
+            supabaseClient.from('descansos_medicos').select('*'),
+            supabaseClient.from('reprogramaciones_bim').select('*').order('created_at', { ascending: false })
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
@@ -276,7 +293,9 @@ export async function fetchAll() {
         state.actividadRecursosCache = ar.data || [];
         state.planosCache = pl.data || [];
         state.actividadPlanosCache = ap.data || [];
-        state.causasCache = ca.data || [];
+        state.causasTodasCache = ca.data || [];
+        state.causasCache = state.causasTodasCache.filter(c => c.activo !== false);
+        state.reprogramacionesCache = rp.data || [];
         state.tareaCausasCache = tc.data || [];
         state.snapshotsCache = sn.data || [];
         state.descansosCache = de.data || [];
