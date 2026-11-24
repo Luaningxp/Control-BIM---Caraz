@@ -4,6 +4,7 @@ import {
     getCriticidad, fmtDate, daysToDeadline, nombreFormateado, 
     getIniciales, colorAvatar, semaforo
 } from './utils.js';
+import { badgeReprogramada, getReprogramaciones } from './reprogramaciones.js';
 
 let kanbanState = { 
     search: '', 
@@ -18,10 +19,13 @@ let kanbanState = {
     soloVencidas: false, 
     soloPorVencer: false, 
     soloSinFecha: false,
+    soloReprogramadas: false,
     soloAsignadosAMi: true
 };
 
 export function renderKanban(container) {
+        // "Reprogramado" ya no es un estado de trabajo: la columna solo aparece mientras queden actividades antiguas en ese estado
+    const hayReprogramadoLegacy = state.tasksCache.some(t => t.estado === 'Reprogramado');
     const ESTADOS = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
     
     const META = {
@@ -92,6 +96,7 @@ export function renderKanban(container) {
         const matchVencidas = !kanbanState.soloVencidas || semaforo(t) === 'Vencida';
         const matchPorVencer = !kanbanState.soloPorVencer || semaforo(t) === 'Por vencer';
         const matchSinFecha = !kanbanState.soloSinFecha || semaforo(t) === 'Sin fecha';
+        const matchReprog = !kanbanState.soloReprogramadas || getReprogramaciones(t.id).length > 0;
         const matchAsignados = !kanbanState.soloAsignadosAMi || (() => {
         const uid = state.currentUser?.id;
             if (!uid) return false;
@@ -100,7 +105,7 @@ export function renderKanban(container) {
         })();
         return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
                matchIniDesde && matchIniHasta && matchFinDesde && matchFinHasta &&
-               matchVencidas && matchPorVencer && matchSinFecha && matchAsignados;
+                matchVencidas && matchPorVencer && matchSinFecha && matchAsignados && matchReprog;
     });
 
     container.innerHTML = `
@@ -124,7 +129,7 @@ export function renderKanban(container) {
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 overflow-x-auto pb-2">
+        <div class="grid grid-cols-1         <div class="grid grid-cols-1 ${ESTADOS.length === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3 overflow-x-auto pb-2"> gap-3 overflow-x-auto pb-2">
             ${ESTADOS.map(estado => {
                 const items = filteredTasks.filter(t => t.estado === estado);
                 return `
@@ -175,7 +180,10 @@ export function renderKanban(container) {
                                      ondragstart="window.onDragStart(event, ${t.id})" 
                                      ondragend="window.onDragEnd(event)">
                                     <div class="flex justify-between items-start mb-2">
-                                        <span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">${t.codigo_contenedor || '–'}</span>
+                                            <span class="flex items-center gap-1.5">
+                                            <span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">${t.codigo_contenedor || '–'}</span>
+                                            ${badgeReprogramada(t.id)}
+                                        </span>
                                         ${cdeBadge(t.estado_cde, t.codigo_aptitud)}
                                     </div>
                                     <p class="text-[12px] font-semibold text-slate-800 leading-snug mb-2 line-clamp-2">${escapeHtml(t.actividad)}</p>
@@ -310,6 +318,10 @@ export function renderKanban(container) {
                             <input type="checkbox" id="kb-drawer-sinFecha" class="rounded text-sky-600" ${kanbanState.soloSinFecha ? 'checked' : ''} onchange="window.applyKanbanFilter('soloSinFecha', this.checked)">
                             Solo sin fecha
                         </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" class="rounded text-purple-600" ${kanbanState.soloReprogramadas ? 'checked' : ''} onchange="window.applyKanbanFilter('soloReprogramadas', this.checked)">
+                            Solo reprogramadas
+                        </label>
                     </div>
 
                     <div class="border-t border-slate-200 pt-4">
@@ -372,7 +384,7 @@ window.clearKanbanFilters = function() {
         search: '', filterGrupo: '', filterResp: '', filterRecursos: '',
         estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
-        soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
+        soloVencidas: false, soloPorVencer: false, soloSinFecha: false, soloReprogramadas: false,
         soloAsignadosAMi: true
     };
 
