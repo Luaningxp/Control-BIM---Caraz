@@ -1,5 +1,5 @@
 import { supabaseClient, state } from './db.js';
-import { escapeHtml, fmtDate } from './utils.js';
+import { escapeHtml, fmtDate, nombreFormateado } from './utils.js';
 
 export const TIPOS_REPROGRAMACION = {
     desplazamiento: 'Desplazamiento',
@@ -122,3 +122,95 @@ export async function registrarReprogramacion(pendienteId, r, motivo) {
     }]);
     return error;
 }
+// --- INSIGNIA E HISTORIAL ---
+export function getReprogramaciones(pendienteId) {
+    return (state.reprogramacionesCache || []).filter(r => Number(r.pendiente_id) === Number(pendienteId));
+}
+
+export function badgeReprogramada(pendienteId) {
+    const n = getReprogramaciones(pendienteId).length;
+    if (n === 0) return '';
+    return `<button type="button" onclick="event.stopPropagation(); window.verHistorialReprogramaciones(${pendienteId})"
+        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 text-[10px] font-bold hover:bg-purple-200 flex-shrink-0"
+        title="Ver historial de reprogramaciones"><i class="fa-solid fa-calendar-plus text-[9px]"></i> ×${n}</button>`;
+}
+
+window.verHistorialReprogramaciones = function(pendienteId) {
+    const t = state.tasksCache.find(x => Number(x.id) === Number(pendienteId));
+    if (!t) return;
+
+    const eventos = getReprogramaciones(pendienteId)
+        .slice()
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+
+    const causaNombre = (id) => {
+        const c = (state.causasTodasCache || state.causasCache || []).find(x => Number(x.id) === Number(id));
+        return c ? c.nombre : null;
+    };
+    const quien = (uid) => {
+        const p = state.perfilesCache.find(x => x.id === uid);
+        return p ? nombreFormateado(p) : 'Usuario desconocido';
+    };
+    const cambio = (label, ant, nuevo) => {
+        if (!ant || !nuevo || ant === nuevo) return '';
+        const d = diasEntre(ant, nuevo);
+        return `<div class="flex justify-between gap-2">
+            <span class="text-slate-500 dark:text-slate-400">${label}</span>
+            <span class="font-semibold text-slate-800 dark:text-slate-200">${fmtDate(ant)} → ${fmtDate(nuevo)}
+                <span class="${d > 0 ? 'text-red-600' : 'text-emerald-600'}">(${d > 0 ? '+' : ''}${d} d)</span>
+            </span></div>`;
+    };
+
+    const ini0 = t.fecha_inicio_original, fin0 = t.fecha_fin_original;
+    const desvio = (fin0 && t.fecha_fin) ? diasEntre(fin0, t.fecha_fin) : null;
+
+    const tarjetas = eventos.map(r => {
+        const causa = causaNombre(r.causa_id);
+        const fecha = new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+        const detalle = r.es_migrada
+            ? '<div class="text-slate-400 italic">Registro migrado del estado "Reprogramado" (sin detalle de fechas).</div>'
+            : cambio('Inicio', r.inicio_anterior, r.inicio_nuevo) + cambio('Fin', r.fin_anterior, r.fin_nuevo);
+        return `
+            <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 text-[10px] font-bold">${TIPOS_REPROGRAMACION[r.tipo] || 'Otro'}</span>
+                    <span class="text-[10px] text-slate-400">${fecha}</span>
+                </div>
+                <div class="text-[11px] space-y-0.5">${detalle}</div>
+                ${causa ? `<div class="text-[11px]"><span class="text-slate-500 dark:text-slate-400">Causa:</span> <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(causa)}</span></div>` : ''}
+                ${r.comentario ? `<div class="text-[11px] italic text-slate-600 dark:text-slate-300">"${escapeHtml(r.comentario)}"</div>` : ''}
+                <div class="text-[10px] text-slate-400">Por ${escapeHtml(quien(r.usuario_id))}${r.estado_al_reprogramar ? ` · estaba en "${escapeHtml(r.estado_al_reprogramar)}"` : ''}</div>
+            </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4';
+    overlay.style.zIndex = '70';
+    overlay.innerHTML = `
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full max-h-[85vh] flex flex-col">
+            <div class="p-4 border-b border-slate-100 dark:border-slate-700">
+                <h3 class="font-bold text-sm text-slate-800 dark:text-white">
+                    <i class="fa-solid fa-calendar-plus text-purple-600 mr-1"></i> Historial de reprogramaciones
+                </h3>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">${escapeHtml(t.actividad)}</p>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 space-y-1">
+                    <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Plan original</span>
+                        <span class="font-semibold text-slate-800 dark:text-slate-200">${ini0 ? fmtDate(ini0) : '–'} → ${fin0 ? fmtDate(fin0) : '–'}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Plan vigente</span>
+                        <span class="font-semibold text-slate-800 dark:text-slate-200">${t.fecha_inicio_programado ? fmtDate(t.fecha_inicio_programado) : '–'} → ${t.fecha_fin ? fmtDate(t.fecha_fin) : '–'}</span></div>
+                    ${desvio !== null && desvio !== 0 ? `<div class="flex justify-between"><span class="text-slate-500 dark:text-slate-400">Desvío del fin</span>
+                        <span class="font-bold ${desvio > 0 ? 'text-red-600' : 'text-emerald-600'}">${desvio > 0 ? '+' : ''}${desvio} días</span></div>` : ''}
+                </div>
+                ${tarjetas}
+            </div>
+            <div class="p-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                <button type="button" id="hr-cerrar" class="px-4 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-600 dark:text-slate-300">Cerrar</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    const cerrar = () => overlay.remove();
+    overlay.querySelector('#hr-cerrar').onclick = cerrar;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrar(); });
+};
