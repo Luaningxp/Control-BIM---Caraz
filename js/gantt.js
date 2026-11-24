@@ -28,7 +28,7 @@ const COLORES_ESTADO = {
     'No iniciado': '#94a3b8',
     'En proceso': '#0284c7',
     'En espera': '#f59e0b',
-    'Reprogramado': '#7c3aed',
+    
     'Cerrado': '#0d9488'
 };
 
@@ -103,7 +103,7 @@ export function renderGantt(container) {
     const recursosOpts = state.perfilesCache.filter(p => 
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'
     );
-    const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Reprogramado', 'Cerrado'];
+    const estadosOpts = ['No iniciado', 'En proceso', 'En espera', 'Cerrado'];
 
     const filtrosActivos = Object.entries(ganttState).filter(([k, v]) => {
         if (['viewMode', 'currentGantt'].includes(k)) return false;
@@ -598,7 +598,7 @@ function renderOcupacion(container, tareasFiltradas) {
         'No iniciado':  '#64748b',
         'En proceso':   '#0ea5e9',
         'En espera':    '#eab308',
-        'Reprogramado': '#a855f7',
+        
         'Cerrado':      '#10b981'
     };
 
@@ -799,7 +799,7 @@ function renderOcupacion(container, tareasFiltradas) {
             <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#64748b"></span>No iniciado</span>
             <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#0ea5e9"></span>En proceso</span>
             <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#eab308"></span>En espera</span>
-            <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#a855f7"></span>Reprogramado</span>
+            
             <span class="inline-flex items-center gap-1.5"><span class="w-1 h-3 rounded" style="background:#10b981"></span>Cerrado</span>
         </div>
 
