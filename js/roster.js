@@ -68,12 +68,25 @@ export function renderRoster(container) {
     const usuarios = [...state.perfilesCache].sort((a, b) => a.email.localeCompare(b.email));
     const esAdmin = puedeEditarRoster();
 
+        // Resumen: solo el mes seleccionado
     const fechas = [];
     for (let d = 1; d <= diasDelMes; d++) fechas.push(isoDate(year, month, d));
+
+    // Grilla continua: 2 meses antes y 9 después del seleccionado (12 meses)
+    const MESES_ATRAS = 2, MESES_TOTAL = 12;
+    const fechasGrid = [];
+    const mesesGrid = [];
+    for (let k = 0; k < MESES_TOTAL; k++) {
+        const ref = new Date(year, month - MESES_ATRAS + k, 1);
+        const y = ref.getFullYear(), m = ref.getMonth();
+        const n = new Date(y, m + 1, 0).getDate();
+        mesesGrid.push({ label: `${MESES[m]} ${y}`, dias: n, y, m });
+        for (let d = 1; d <= n; d++) fechasGrid.push(isoDate(y, m, d));
+    }
+
     const hoyReal = new Date();
     const hoyStrRoster = isoDate(hoyReal.getFullYear(), hoyReal.getMonth(), hoyReal.getDate());
-    const hoyIdxRoster = fechas.indexOf(hoyStrRoster);
-    const hoyEnRangoRoster = hoyIdxRoster !== -1;
+    const hoyIdxRoster = fechasGrid.indexOf(hoyStrRoster);
     
 
     const resumen = {};
@@ -101,7 +114,7 @@ export function renderRoster(container) {
                     <button onclick="window.openFeriadoModal()" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600"><i class="fa-solid fa-star mr-1"></i> Feriado</button>
                     <button onclick="window.openDescansoMedicoModal()" class="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-semibold hover:bg-orange-600"><i class="fa-solid fa-notes-medical mr-1"></i> Descanso Médico</button>
                     <button onclick="window.openTrabajoExtraModal()" class="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700"><i class="fa-solid fa-briefcase mr-1"></i> Trabajo extra</button>
-                ` : ''}
+                    ` : ''}
             </div>
         </div>
 
@@ -111,23 +124,30 @@ export function renderRoster(container) {
         </div>
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-4">
-            <div class="overflow-x-auto">
+            <div id="roster-scroll" class="overflow-x-auto">
                 <table class="text-left text-xs" style="table-layout: fixed;">
                     <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold">
                         <tr>
-                            <th class="p-2 sticky left-0 bg-slate-100 dark:bg-slate-900 z-10" style="width: 200px; min-width: 200px;">Usuario</th>
-                            ${fechas.map((f, i) => {
+                            <th rowspan="2" class="p-2 sticky left-0 bg-slate-100 dark:bg-slate-900 z-20" style="width: 200px; min-width: 200px;">Usuario</th>
+                            ${mesesGrid.map(mg => `
+                                <th colspan="${mg.dias}" id="roster-mes-${mg.y}-${mg.m}" class="p-1 text-left text-[10px] font-bold border-l border-slate-300 dark:border-slate-600 bg-slate-200/70 dark:bg-slate-800">
+                                    <span class="sticky inline-block" style="left: 210px;">${mg.label}</span>
+                                </th>`).join('')}
+                        </tr>
+                        <tr>
+                            ${fechasGrid.map(f => {
                                 const d = new Date(f + 'T00:00:00');
                                 const esDom = d.getDay() === 0;
-                                const esHoy = i === hoyIdxRoster;
+                                const esHoy = f === hoyStrRoster;
                                 const claseFondo = esHoy
                                     ? 'bg-sky-200 dark:bg-sky-900/60 ring-1 ring-inset ring-sky-500'
                                     : esDom
                                         ? 'bg-slate-200 dark:bg-slate-800'
                                         : '';
-                                return `<th class="p-1 text-center ${claseFondo}" style="width: 34px; min-width: 34px;">
+                                const bordeMes = d.getDate() === 1 ? 'border-l border-slate-300 dark:border-slate-600' : '';
+                                return `<th ${esHoy ? 'id="roster-hoy"' : ''} class="p-1 text-center ${claseFondo} ${bordeMes}" style="width: 34px; min-width: 34px;">
                                     <div class="text-[9px] leading-tight ${esHoy ? 'text-sky-800 dark:text-sky-200 font-bold' : ''}">${DIAS_SEMANA[d.getDay()]}</div>
-                                    <div class="text-[10px] font-bold ${esHoy ? 'text-sky-900 dark:text-white' : ''}">${i + 1}</div>
+                                    <div class="text-[10px] font-bold ${esHoy ? 'text-sky-900 dark:text-white' : ''}">${d.getDate()}</div>
                                 </th>`;
                             }).join('')}
                         </tr>
@@ -144,7 +164,7 @@ export function renderRoster(container) {
                                         </div>
                                     </div>
                                 </td>
-                                ${fechas.map(f => {
+                                    ${fechasGrid.map(f => {
                                     const tipo = clasificarDia(u.id, f);
                                     const est = ESTILO_DIA[tipo];
                                     const esHoy = f === hoyStrRoster;
@@ -211,6 +231,27 @@ export function renderRoster(container) {
             </div>
         </div>
     `;
+    
+    // --- Scroll horizontal: posición inicial y persistencia ---
+    const scroller = document.getElementById('roster-scroll');
+    if (scroller) {
+        const anchor = `${year}-${month}`;
+        if (rosterState.anchor === anchor && rosterState.scrollLeft != null) {
+            scroller.scrollLeft = rosterState.scrollLeft; // re-render por edición: no mover
+        } else {
+            const esMesActual = hoyReal.getFullYear() === year && hoyReal.getMonth() === month;
+            const objetivo = (esMesActual && document.getElementById('roster-hoy'))
+                || document.getElementById(`roster-mes-${year}-${month}`);
+            if (objetivo) {
+                scroller.scrollLeft = Math.max(0, objetivo.offsetLeft - 200 - (esMesActual ? 120 : 0));
+            }
+        }
+        rosterState.anchor = anchor;
+        rosterState.scrollLeft = scroller.scrollLeft;
+        scroller.addEventListener('scroll', () => { rosterState.scrollLeft = scroller.scrollLeft; });
+    }
+
+    
 }
 
 window.rosterPrevMonth = function() {
@@ -223,10 +264,12 @@ window.rosterNextMonth = function() {
     else rosterState.month++;
     window.renderView();
 };
+
 window.rosterToday = function() {
     const h = new Date();
     rosterState.year = h.getFullYear();
     rosterState.month = h.getMonth();
+    rosterState.anchor = null;
     window.renderView();
 };
 
