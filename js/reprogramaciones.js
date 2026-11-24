@@ -1,5 +1,5 @@
 import { supabaseClient, state } from './db.js';
-import { escapeHtml, fmtDate, nombreFormateado } from './utils.js';
+import { escapeHtml, fmtDate, nombreFormateado, toast } from './utils.js';
 
 export const TIPOS_REPROGRAMACION = {
     desplazamiento: 'Desplazamiento',
@@ -164,6 +164,8 @@ window.verHistorialReprogramaciones = function(pendienteId) {
     const ini0 = t.fecha_inicio_original, fin0 = t.fecha_fin_original;
     const desvio = (fin0 && t.fecha_fin) ? diasEntre(fin0, t.fecha_fin) : null;
 
+    const puedeEditarMotivo = !!(state.isAdmin || state.isCoordinador);
+
     const tarjetas = eventos.map(r => {
         const causa = causaNombre(r.causa_id);
         const fecha = new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
@@ -174,7 +176,7 @@ window.verHistorialReprogramaciones = function(pendienteId) {
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-1.5">
                 <div class="flex justify-between items-center">
                     <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200 text-[10px] font-bold">${TIPOS_REPROGRAMACION[r.tipo] || 'Otro'}</span>
-                    <span class="text-[10px] text-slate-400">${fecha}</span>
+                    <span class="text-[10px] text-slate-400">${fecha}${puedeEditarMotivo ? ` <button type="button" onclick="window.editarMotivoReprogramacion(${r.id}, ${t.id})" class="ml-1 text-sky-600 hover:text-sky-800" title="Editar motivo"><i class="fa-solid fa-pen"></i></button>` : ''}</span>
                 </div>
                 <div class="text-[11px] space-y-0.5">${detalle}</div>
                 ${causa ? `<div class="text-[11px]"><span class="text-slate-500 dark:text-slate-400">Causa:</span> <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(causa)}</span></div>` : ''}
@@ -213,4 +215,64 @@ window.verHistorialReprogramaciones = function(pendienteId) {
     const cerrar = () => overlay.remove();
     overlay.querySelector('#hr-cerrar').onclick = cerrar;
     overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrar(); });
+};
+
+
+// Solo admin / coordinador / BIM manager (state.isAdmin ya incluye coordinador)
+window.editarMotivoReprogramacion = function(eventoId, pendienteId) {
+    if (!state.isAdmin && !state.isCoordinador) { toast('Solo coordinador o administrador pueden editar el motivo.'); return; }
+    const r = (state.reprogramacionesCache || []).find(x => Number(x.id) === Number(eventoId));
+    if (!r) return;
+
+    const todas = state.causasTodasCache || state.causasCache || [];
+    const opciones = todas.filter(c => c.activo !== false || Number(c.id) === Number(r.causa_id));
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4';
+    overlay.style.zIndex = '80';
+    overlay.innerHTML = `
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+            <h3 class="font-bold text-sm text-slate-800 dark:text-white"><i class="fa-solid fa-pen text-sky-600 mr-1"></i> Editar motivo</h3>
+            <form id="em-form" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Causa</label>
+                    <select id="em-causa" class="inp">
+                        <option value="">— Sin causa —</option>
+                        ${opciones.map(c => `<option value="${c.id}" ${Number(c.id) === Number(r.causa_id) ? 'selected' : ''}>${escapeHtml(c.nombre)}${c.activo === false ? ' (inactiva)' : ''}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Comentario</label>
+                    <textarea id="em-comentario" rows="3" class="inp">${escapeHtml(r.comentario || '')}</textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <button type="button" id="em-cancelar" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300">Cancelar</button>
+                    <button type="submit" id="em-guardar" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700 disabled:opacity-60">Guardar</button>
+                </div>
+            </form>
+        </div>`;
+    document.body.appendChild(overlay);
+    const cerrar = () => overlay.remove();
+    overlay.querySelector('#em-cancelar').onclick = cerrar;
+
+    overlay.querySelector('#em-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = overlay.querySelector('#em-guardar');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const causaVal = overlay.querySelector('#em-causa').value;
+        const cambios = {
+            causa_id: causaVal ? Number(causaVal) : null,
+            comentario: overlay.querySelector('#em-comentario').value.trim() || null
+        };
+        const { data, error } = await supabaseClient.from('reprogramaciones_bim')
+            .update(cambios).eq('id', eventoId).select('id');
+        if (error) { toast('Error: ' + error.message); btn.disabled = false; return; }
+        if (!data || data.length === 0) { toast('No se pudo editar: la base de datos no te lo permite (falta política UPDATE).'); btn.disabled = false; return; }
+
+        Object.assign(r, cambios);
+        cerrar();
+        document.querySelectorAll('div.fixed').forEach(el => { if (el.querySelector('#hr-cerrar')) el.remove(); });
+        window.verHistorialReprogramaciones(pendienteId);
+        toast('Motivo actualizado');
+    };
 };
