@@ -1,5 +1,5 @@
 import { supabaseClient, state, fetchAll } from './db.js';
-import { escapeHtml, nombreFormateado, getIniciales, colorAvatar, toast, confirmDelete } from './utils.js';
+import { escapeHtml, nombreFormateado, getIniciales, colorAvatar, toast, confirmDelete, today } from './utils.js';
 
 const DIAS_SEMANA = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -84,7 +84,7 @@ export function renderRoster(container) {
         for (let d = 1; d <= n; d++) fechasGrid.push(isoDate(y, m, d));
     }
 
-    const hoyReal = new Date();
+    const hoyReal = today();
     const hoyStrRoster = isoDate(hoyReal.getFullYear(), hoyReal.getMonth(), hoyReal.getDate());
     const hoyIdxRoster = fechasGrid.indexOf(hoyStrRoster);
     
@@ -266,7 +266,7 @@ window.rosterNextMonth = function() {
 };
 
 window.rosterToday = function() {
-    const h = new Date();
+    const h = today();
     rosterState.year = h.getFullYear();
     rosterState.month = h.getMonth();
     rosterState.anchor = null;

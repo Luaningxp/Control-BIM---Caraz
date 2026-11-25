@@ -12,10 +12,100 @@ export const DAY = 86400000;
 
 export const cdeBadge = (e, a) => `<span class="badge-cde" style="${CDE_COLORS[e] || ''}">${e || 'WIP'} · ${a || '—'}</span>`;
 
-export const today = () => { 
-    const d = new Date(); 
-    d.setHours(0,0,0,0); 
-    return d; 
+// ------------------------------------------------------------------
+// FECHAS EN HORA DE LIMA
+// Todo "hoy" de la app se calcula en America/Lima, sin depender de la
+// zona horaria de la computadora del usuario. Las fechas se manejan
+// como texto 'YYYY-MM-DD' (igual que en Supabase).
+// ------------------------------------------------------------------
+export const TZ_PROYECTO = 'America/Lima';
+const fmtLima = new Intl.DateTimeFormat('en-CA', { timeZone: TZ_PROYECTO, year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** Fecha de hoy en Lima, como 'YYYY-MM-DD'. */
+export const hoyLima = () => fmtLima.format(new Date());
+
+/** Convierte un Date (medianoche local) a 'YYYY-MM-DD' sin pasar por UTC. */
+export const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Suma n días calendario a una fecha 'YYYY-MM-DD'. */
+export const sumarDias = (fechaStr, n) => {
+    const d = new Date(fechaStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+};
+
+/** Domingo (fin de semana de trabajo) de la semana lunes–domingo que contiene la fecha. */
+export const domingoDeSemana = (fechaStr) => {
+    const dow = new Date(fechaStr + 'T00:00:00Z').getUTCDay(); // 0 = domingo
+    return sumarDias(fechaStr, dow === 0 ? 0 : 7 - dow);
+};
+
+/** Lunes de la semana lunes–domingo que contiene la fecha. */
+export const lunesDeSemana = (fechaStr) => sumarDias(domingoDeSemana(fechaStr), -6);
+
+/** Medianoche local del día de hoy en Lima (para cálculos con Date). */
+export const today = () => new Date(hoyLima() + 'T00:00:00');
+
+// ------------------------------------------------------------------
+// REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql)
+// ------------------------------------------------------------------
+export const DIAS_GRACIA_CIERRE = 2;
+
+/** Rol con permiso de corregir semanas cerradas (BIM Manager y Coordinador BIM). */
+export const esAdminManpower = (st) => !!(st.isAdmin || st.isCoordinador);
+
+/** Una semana queda cerrada el domingo a las 23:59 (hora de Lima). */
+export const semanaCerrada = (fechaStr, hoy = hoyLima()) => !!fechaStr && domingoDeSemana(fechaStr) < hoy;
+
+/**
+ * Último día (inclusive) en que una actividad cerrada sigue visible para el
+ * modelador: fecha de cierre + 2 días calendario, sin pasar del domingo.
+ */
+export const limiteVisibleCerrada = (fechaCierre) => {
+    if (!fechaCierre) return null;
+    const conGracia = sumarDias(fechaCierre, DIAS_GRACIA_CIERRE);
+    const domingo = domingoDeSemana(fechaCierre);
+    return conGracia < domingo ? conGracia : domingo;
+};
+
+/** ¿La actividad cerrada sigue visible hoy para el modelador? */
+export const cerradaVisibleHoy = (t, hoy = hoyLima()) => {
+    const lim = limiteVisibleCerrada(t.fecha_cierre);
+    return !!lim && hoy <= lim;
+};
+
+/**
+ * Valida un registro de manpower (crear, editar o eliminar) para un usuario sin rol admin.
+ * Devuelve null si es válido o el mensaje de error.
+ * - fecha: fecha del registro; tarea: actividad vinculada (o null si es General).
+ */
+export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
+    if (!fecha) return 'Indica la fecha del registro.';
+    if (fecha > hoy) return 'No puedes registrar horas en una fecha futura.';
+    if (semanaCerrada(fecha, hoy)) return 'Esa semana ya está cerrada (corte del domingo 23:59). Pide la corrección a un administrador.';
+    if (tarea) {
+        if (tarea.estado_cde === 'Archived') return 'La actividad está archivada en el CDE.';
+        if (tarea.estado === 'Cerrado') {
+            if (!tarea.fecha_cierre) return 'La actividad está cerrada.';
+            if (fecha > tarea.fecha_cierre) return 'No puedes cargar horas después de la fecha de cierre de la actividad.';
+            if (hoy > limiteVisibleCerrada(tarea.fecha_cierre)) return 'Ya venció el plazo para cargar horas a esta actividad cerrada.';
+        }
+    }
+    return null;
+};
+
+/**
+ * ¿Un registro que ya existe está bloqueado para editarlo o eliminarlo?
+ * Bloqueado si su semana ya cerró o si su actividad cerrada ya pasó el plazo.
+ * Devuelve null si se puede tocar o el motivo del bloqueo.
+ */
+export const bloqueoRegistroExistente = ({ fecha, tarea, hoy = hoyLima() }) => {
+    if (semanaCerrada(fecha, hoy)) return 'Ese registro es de una semana ya cerrada (corte del domingo 23:59).';
+    if (tarea && tarea.estado_cde === 'Archived') return 'La actividad del registro está archivada en el CDE.';
+    if (tarea && tarea.estado === 'Cerrado' && tarea.fecha_cierre && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) {
+        return 'Ya venció el plazo para modificar horas de esta actividad cerrada.';
+    }
+    return null;
 };
 
 export const fmtDate = (iso) => !iso ? '–' : `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(2,4)}`;

@@ -1,5 +1,5 @@
 import { state } from './db.js';
-import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar } from './utils.js';
+import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar, today, hoyLima, isoLocal } from './utils.js';
 import { tipoDia } from './roster.js';
 import { getReprogramaciones } from './reprogramaciones.js';
 
@@ -306,7 +306,7 @@ function inicializarGantt(tareas) {
         };
     });
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = hoyLima();
     tasksData.push({
         id: 'today-line',
         name: 'HOY',
@@ -368,7 +368,7 @@ function inicializarGantt(tareas) {
             } else {
                 const scroller = document.querySelector('.gantt-container .gantt');
                 if (scroller) {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = hoyLima();
                     const tick = document.querySelector(`.gantt-container .grid-header .tick[data-date="${today}"]`);
                     if (tick) tick.scrollIntoView({ behavior: 'smooth', inline: 'center' });
                 }
@@ -555,7 +555,7 @@ window.clearGanttFilters = function() {
     window.renderView();
 };
 function rangoOcupacion() {
-    const hoy = new Date();
+    const hoy = today();
     hoy.setHours(0, 0, 0, 0);
     const inicio = new Date(hoy);
     inicio.setDate(hoy.getDate() + ocupacionState.semanaOffset * 7 - 3);
@@ -580,7 +580,7 @@ function renderOcupacion(container, tareasFiltradas) {
     const totalDias = dias.length;
     const anchoDiaPct = 100 / totalDias;
 
-    const hoyDate = new Date();
+    const hoyDate = today();
     hoyDate.setHours(0, 0, 0, 0);
     const hoyIdx = Math.round((hoyDate - inicio) / 86400000);
     const hoyEnRango = hoyIdx >= 0 && hoyIdx < totalDias;
@@ -657,7 +657,7 @@ function renderOcupacion(container, tareasFiltradas) {
                 // 1. SIEMPRE bloquear los días no laborables (DO, DE, FE, DM)
         const franjasNoLaborables = [];
         for (let i = 0; i < dias.length; i++) {
-            const dStr = dias[i].toISOString().split('T')[0];
+            const dStr = isoLocal(dias[i]);
             const tipo = tipoDia(p.id, dStr);
             
             // Marcamos como no laborable si es Domingo, Descanso, Feriado o Descanso Médico
@@ -702,7 +702,7 @@ function renderOcupacion(container, tareasFiltradas) {
             let inicioSegmento = null;
 
             for (let i = iniIdx; i <= finIdx; i++) {
-                const dStr = dias[i].toISOString().split('T')[0];
+                const dStr = isoLocal(dias[i]);
                 const tipo = tipoDia(p.id, dStr);
                 const esLaborable = (tipo === 'T' || tipo === 'TE');
 
@@ -764,7 +764,7 @@ function renderOcupacion(container, tareasFiltradas) {
         <div>
             <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Ocupación por modelador</h4>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                ${fmtDate(inicio.toISOString().split('T')[0])} → ${fmtDate(fin.toISOString().split('T')[0])} 
+                ${fmtDate(isoLocal(inicio))} → ${fmtDate(isoLocal(fin))} 
                 · Fondo gris = día no laborable (domingo, descanso o feriado)
             </p>
         </div>
@@ -900,12 +900,12 @@ window.openExportModal = function() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     // Fechas por defecto basadas en las tareas reales
-    const hoy = new Date();
+    const hoy = today();
     const haceUnMes = new Date(hoy); haceUnMes.setMonth(hoy.getMonth() - 1);
     const dentroUnMes = new Date(hoy); dentroUnMes.setMonth(hoy.getMonth() + 1);
     
-    document.getElementById('exp-fecha-ini').value = haceUnMes.toISOString().split('T')[0];
-    document.getElementById('exp-fecha-fin').value = dentroUnMes.toISOString().split('T')[0];
+    document.getElementById('exp-fecha-ini').value = isoLocal(haceUnMes);
+    document.getElementById('exp-fecha-fin').value = isoLocal(dentroUnMes);
 
     document.getElementById('form-export-gantt').onsubmit = async (e) => {
         e.preventDefault();
@@ -953,7 +953,7 @@ async function generarPDFGantt() {
     // 2. TAREAS FANTASMA EXACTAS
     const fFinMasUnDia = new Date(fFin + 'T00:00:00');
     fFinMasUnDia.setDate(fFinMasUnDia.getDate() + 1);
-    const fFinStr = fFinMasUnDia.toISOString().split('T')[0];
+    const fFinStr = isoLocal(fFinMasUnDia);
 
     const tareasFantasma = [
         { id: 'corte-inicio', name: '', start: fIni, end: fIni, progress: 0, dependencies: '', custom_class: 'gantt-corte', _isPhantom: true },

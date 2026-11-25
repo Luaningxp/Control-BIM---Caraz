@@ -1,3 +1,4 @@
+import { today, isoLocal } from './utils.js';
 export const supabaseClient = window.supabase.createClient(
     'https://zsrczkdpluafuoczfokw.supabase.co',
     'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A'
@@ -326,13 +327,13 @@ export function invalidarCache(keys) {
 // ------------------------------------------------------------------
 export async function guardarSnapshotSemanal() {
     try {
-        const hoy = new Date();
+        const hoy = today();
         hoy.setHours(0, 0, 0, 0);
         const dia = hoy.getDay();
         const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
         const lunes = new Date(hoy); lunes.setDate(diff);
         lunes.setHours(0, 0, 0, 0);
-        const semana = lunes.toISOString().split('T')[0];
+        const semana = isoLocal(lunes);
 
         const { data: existente, error: errExiste } = await supabaseClient
             .from('snapshots_semanales')
