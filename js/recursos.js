@@ -1,5 +1,5 @@
 import { state } from './db.js';
-import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal } from './utils.js';
+import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, latenciaPromedio } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -126,13 +126,33 @@ export function renderRecursos(container) {
         .filter(r => r.fecha && new Date(r.fecha + 'T00:00:00') >= inicioSemana)
         .reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
 
-    const ayer = new Date(hoy);
-    ayer.setDate(ayer.getDate() - 1);
-    while (ayer.getDay() === 0) ayer.setDate(ayer.getDate() - 1);
-    const ayerStr = isoLocal(ayer);
-    const hoyStr = isoLocal(hoy);
-    const modeladoresPendientesHoy = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
-    const modeladoresPendientesAyer = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100).length;
+    // Pendientes según el roster de cada modelador (no cuenta a quien descansa)
+    const hoyStr = hoyLima();
+    const ultimoLaborableAntes = (uid) => {
+        for (let i = 1; i <= 7; i++) {
+            const f = sumarDias(hoyStr, -i);
+            if (esDiaLaborable(uid, f)) return f;
+        }
+        return null;
+    };
+    const laboranHoy = modeladores.filter(p => esDiaLaborable(p.id, hoyStr));
+    const modeladoresPendientesHoy = laboranHoy.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
+    const modeladoresPendientesAyer = modeladores.filter(p => {
+        const f = ultimoLaborableAntes(p.id);
+        return f && (pctPorUsuarioDia[`${p.id}|${f}`] || 0) < 100;
+    }).length;
+
+    // Capacidad de la semana (lunes a hoy) según roster: 9.33 h por día laborable de cada modelador
+    const lunesStr = lunesDeSemana(hoyStr);
+    let capacidadSemana = 0;
+    modeladores.forEach(p => {
+        for (let f = lunesStr; f <= hoyStr; f = sumarDias(f, 1)) if (esDiaLaborable(p.id, f)) capacidadSemana += HORAS_POR_100;
+    });
+    const idsModeladores = new Set(modeladores.map(p => p.id));
+    const horasSemanaModeladores = registros
+        .filter(r => r.fecha && r.fecha >= lunesStr && r.fecha <= hoyStr && idsModeladores.has(r.usuario_id))
+        .reduce((acc, r) => acc + pctAHoras(r.porcentaje_dia), 0);
+    const ocupacionSemana = capacidadSemana > 0 ? Math.round(horasSemanaModeladores * 100 / capacidadSemana) : null;
 
     const porGrupo = {};
     registros.forEach(r => {
@@ -227,10 +247,30 @@ export function renderRecursos(container) {
         return t ? (t.grupo || 'Sin grupo') : 'General';
     });
    
+    const espNombre = (id) => (state.especialidadesTodasCache || []).find(e => String(e.id) === String(id))?.nombre || 'GENERAL';
     const serieNivel = buildSeries(registros, semanas, r => {
         const t = state.tasksCache.find(x => x.id === r.pendiente_id);
-        return t ? (t.importancia || 'Medio') : 'Sin tarea';
+        return t ? espNombre(t.especialidad_id) : 'Sin actividad';
     });
+
+    // Horas planificadas vs no planificadas por semana (no planificada = creada en esa semana con fin en ella)
+    const lunesDe = (f) => lunesDeSemana(f);
+    const fechaLima = (ts) => ts ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts)) : null;
+    const planifPorSemana = {};
+    registros.forEach(r => {
+        if (!r.fecha) return;
+        const sk = semanaKey(r.fecha);
+        planifPorSemana[sk] = planifPorSemana[sk] || { plan: 0, noPlan: 0, general: 0 };
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const h = pctAHoras(r.porcentaje_dia);
+        if (!t) { planifPorSemana[sk].general += h; return; }
+        const creada = fechaLima(t.created_at);
+        const finRef = t.fecha_fin_original || t.fecha_fin;
+        const lun = lunesDe(r.fecha);
+        const noPlan = creada && creada >= lun && creada <= sumarDias(lun, 6) && finRef && finRef >= lun && finRef <= sumarDias(lun, 6);
+        if (noPlan) planifPorSemana[sk].noPlan += h; else planifPorSemana[sk].plan += h;
+    });
+    const semanasPlanif = semanas.slice(-8);
 
     const semanasRecientes = semanas.slice(-6);
     const hoyLocalStr = hoyLima(); // YYYY-MM-DD en hora local
@@ -271,202 +311,10 @@ export function renderRecursos(container) {
         };
     });
 
-    // === LATENCIA PROMEDIO (VENTANA 8 SEMANAS) ===
-    const hoyLatencia = today();
-    hoyLatencia.setHours(0, 0, 0, 0);
-    const hace8Semanas = new Date(hoyLatencia);
-    hace8Semanas.setDate(hace8Semanas.getDate() - 56);
-
-    const cierresRecientesTarde = state.tasksCache.filter(t => 
-        t.fecha_cierre && 
-        t.fecha_fin && 
-        new Date(t.fecha_cierre + 'T00:00:00') > new Date(t.fecha_fin + 'T00:00:00') &&
-        new Date(t.fecha_cierre + 'T00:00:00') >= hace8Semanas
-    );
-
-    let latenciaPromedio = 0;
-    if (cierresRecientesTarde.length > 0) {
-        const sumaAtrasos = cierresRecientesTarde.reduce((s, t) => {
-            const dias = Math.round(
-                (new Date(t.fecha_cierre + 'T00:00:00') - new Date(t.fecha_fin + 'T00:00:00')) / 86400000
-            );
-            return s + dias;
-        }, 0);
-        latenciaPromedio = sumaAtrasos / cierresRecientesTarde.length;
-    }
-
-    const PENALIZACION_MINIMA = latenciaPromedio > 0 ? latenciaPromedio : 3;
-    // === FIN LATENCIA ===
-
-    // === SOBRECARGA POR MODELADOR (REPARTO GESTIÓN / EJECUCIÓN) ===
-    const CAPACIDAD_SEMANAL_H = 40;
-    const PESO_IMPORTANCIA = { 'Muy alto': 1.65, 'Alto': 1.4, 'Medio': 1.2, 'Bajo': 1.0 };
-    const hoyStrCap = hoyLima();
-
-    const cargaPorModelador = {};
-    state.perfilesCache.forEach(p => {
-        const esModelador = (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
-        if (!esModelador) return;
-        cargaPorModelador[p.id] = { 
-            nombre: nombreFormateado(p), avatar: p.id, 
-            tareas: 0, dias: 0, horasEstimadas: 0, horasReales: 0,
-            tareasVencidas: 0
-        };
-    });
-
-    const tareasPorResponsable = {};
-    state.tasksCache.filter(t => t.estado !== 'Cerrado' && t.responsable_id).forEach(t => {
-        tareasPorResponsable[t.responsable_id] = (tareasPorResponsable[t.responsable_id] || 0) + 1;
-    });
-
-    state.tasksCache.filter(t => t.estado !== 'Cerrado').forEach(t => {
-        let dias = 0;
-        let esVencida = false;
-        if (t.fecha_fin) {
-            const fin = new Date(t.fecha_fin + 'T00:00:00');
-            const hoyD = new Date(hoyStrCap + 'T00:00:00');
-            const diasRestantes = Math.ceil((fin - hoyD) / 86400000);
-            
-            if (diasRestantes > 0) {
-                dias = diasRestantes;
-            } else {
-                dias = Math.max(PENALIZACION_MINIMA, Math.abs(diasRestantes));
-                esVencida = true;
-            }
-        } else {
-            dias = PENALIZACION_MINIMA;
-        }
-        
-        const peso = PESO_IMPORTANCIA[t.importancia] || 1;
-        const esfuerzoTotal = dias * 8 * peso;
-
-        const recursosIds = [...new Set(
-            (state.actividadRecursosCache || [])
-                .filter(r => r.pendiente_id === t.id)
-                .map(r => r.usuario_id)
-        )];
-        
-        let esfuerzoResponsable = 0;
-        let esfuerzoPorRecurso = 0;
-
-        if (t.responsable_id && recursosIds.length > 0) {
-            const N = tareasPorResponsable[t.responsable_id] || 1;
-            esfuerzoResponsable = esfuerzoTotal / N;
-            const remanente = esfuerzoTotal - esfuerzoResponsable;
-            esfuerzoPorRecurso = remanente / recursosIds.length;
-        } else if (t.responsable_id && recursosIds.length === 0) {
-            esfuerzoResponsable = esfuerzoTotal;
-        } else if (!t.responsable_id && recursosIds.length > 0) {
-            esfuerzoPorRecurso = esfuerzoTotal / recursosIds.length;
-        }
-
-        if (t.responsable_id && cargaPorModelador[t.responsable_id]) {
-            cargaPorModelador[t.responsable_id].tareas += 1;
-            cargaPorModelador[t.responsable_id].dias += esfuerzoResponsable / 8;
-            cargaPorModelador[t.responsable_id].horasEstimadas += esfuerzoResponsable;
-            if (esVencida) cargaPorModelador[t.responsable_id].tareasVencidas += 1;
-        }
-
-        recursosIds.forEach(uid => {
-            if (!cargaPorModelador[uid]) return;
-            if (uid === t.responsable_id) return; 
-            
-            cargaPorModelador[uid].tareas += 1;
-            cargaPorModelador[uid].dias += esfuerzoPorRecurso / 8; 
-            cargaPorModelador[uid].horasEstimadas += esfuerzoPorRecurso;
-            if (esVencida) cargaPorModelador[uid].tareasVencidas += 1;
-        });
-    });
-
-    registros.forEach(r => {
-        if (cargaPorModelador[r.usuario_id]) {
-            cargaPorModelador[r.usuario_id].horasReales += pctAHoras(r.porcentaje_dia);
-        }
-    });
-
-    const listaCarga = Object.values(cargaPorModelador).map(m => {
-        const semanasEquivalentes = m.horasEstimadas / CAPACIDAD_SEMANAL_H;
-        let estado, color;
-        if (semanasEquivalentes > 4) { estado = 'Sobrecargado'; color = 'text-red-700'; }
-        else if (semanasEquivalentes > 2) { estado = 'Alto'; color = 'text-amber-700'; }
-        else if (semanasEquivalentes > 0.5) { estado = 'Normal'; color = 'text-emerald-700'; }
-        else { estado = 'Libre'; color = 'text-slate-500'; }
-        return { ...m, semanasEquivalentes, estado, color };
-    }).sort((a, b) => b.semanasEquivalentes - a.semanasEquivalentes);
-    // === FIN SOBRECARGA ===
-
-    // === CONCENTRACIÓN DE RIESGO (REPARTO) ===
-    const PESO_CRITICO = { 'Muy alto': 3, 'Alto': 2 };
-    const hoyStrRiesgo = hoyLima();
-
-    const cargaCriticaPorModelador = {};
-    state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador').forEach(p => {
-        cargaCriticaPorModelador[p.id] = { nombre: nombreFormateado(p), avatar: p.id, horasCriticas: 0, tareasCriticas: 0 };
-    });
-
-    state.tasksCache.filter(t => t.estado !== 'Cerrado' && PESO_CRITICO[t.importancia]).forEach(t => {
-        let dias = 0;
-        if (t.fecha_fin) {
-            const fin = new Date(t.fecha_fin + 'T00:00:00');
-            const hoyD = new Date(hoyStrRiesgo + 'T00:00:00');
-            const diasRestantes = Math.ceil((fin - hoyD) / 86400000);
-            if (diasRestantes > 0) dias = diasRestantes;
-            else dias = Math.max(PENALIZACION_MINIMA, Math.abs(diasRestantes));
-        } else {
-            dias = PENALIZACION_MINIMA;
-        }
-
-        const esfuerzoTotal = dias * 8 * PESO_CRITICO[t.importancia];
-        const recursosIds = [...new Set(
-            (state.actividadRecursosCache || [])
-                .filter(r => r.pendiente_id === t.id)
-                .map(r => r.usuario_id)
-        )];
-        
-        let esfuerzoResponsable = 0;
-        let esfuerzoPorRecurso = 0;
-
-        if (t.responsable_id && recursosIds.length > 0) {
-            const N = tareasPorResponsable[t.responsable_id] || 1;
-            esfuerzoResponsable = esfuerzoTotal / N;
-            esfuerzoPorRecurso = (esfuerzoTotal - esfuerzoResponsable) / recursosIds.length;
-        } else if (t.responsable_id && recursosIds.length === 0) {
-            esfuerzoResponsable = esfuerzoTotal;
-        } else if (!t.responsable_id && recursosIds.length > 0) {
-            esfuerzoPorRecurso = esfuerzoTotal / recursosIds.length;
-        }
-
-        if (t.responsable_id && cargaCriticaPorModelador[t.responsable_id]) {
-            cargaCriticaPorModelador[t.responsable_id].horasCriticas += esfuerzoResponsable;
-            cargaCriticaPorModelador[t.responsable_id].tareasCriticas += 1;
-        }
-
-        recursosIds.forEach(uid => {
-            if (!cargaCriticaPorModelador[uid] || uid === t.responsable_id) return;
-            cargaCriticaPorModelador[uid].horasCriticas += esfuerzoPorRecurso;
-            cargaCriticaPorModelador[uid].tareasCriticas += 1;
-        });
-    });
-
-    const totalHorasCriticas = Object.values(cargaCriticaPorModelador).reduce((s, m) => s + m.horasCriticas, 0);
-
-    const concentracionRiesgo = Object.values(cargaCriticaPorModelador).map(m => {
-        const pct = totalHorasCriticas > 0 ? (m.horasCriticas / totalHorasCriticas) * 100 : 0;
-        let nivel, color;
-        if (pct >= 40) { nivel = 'Crítico'; color = 'text-red-700'; }
-        else if (pct >= 25) { nivel = 'Alto'; color = 'text-amber-700'; }
-        else if (pct >= 10) { nivel = 'Medio'; color = 'text-sky-700'; }
-        else { nivel = 'Bajo'; color = 'text-slate-500'; }
-        return { ...m, pct, nivel, color };
-    }).sort((a, b) => b.horasCriticas - a.horasCriticas);
-
-    // Filtramos solo a los que realmente tienen horas críticas para que no ensucien el Top
-    const concentracionValidos = concentracionRiesgo.filter(m => m.horasCriticas > 0);
-    const concentracionTop1 = concentracionValidos[0]?.pct || 0;
-    const concentracionTop2 = concentracionValidos.slice(0, 2).reduce((sum, m) => sum + m.pct, 0);
-    // === FIN CONCENTRACIÓN DE RIESGO ===
-
-    window.__debugRiesgo = { concentracionRiesgo, totalHorasCriticas, concentracionTop1, concentracionTop2 };
+    // === SOBRECARGA POR TRABAJO EN PARALELO (WIP) · próximas 2 semanas ===
+    const wip = calcularWIP(modeladores);
+    // === RIESGO POR DEPENDENCIA (solo modeladores) ===
+    const riesgo = calcularRiesgo(modeladores, registros);
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
@@ -479,9 +327,9 @@ export function renderRecursos(container) {
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div class="card kpi-card p-3 border-l-4 border-sky-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Horas</p>
-                <p class="text-2xl font-bold mt-1 text-sky-700">${totalHoras.toFixed(1)} h</p>
-                <p class="text-[10px] text-slate-400">Histórico</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Ocupación registrada</p>
+                <p class="text-2xl font-bold mt-1 text-sky-700">${ocupacionSemana === null ? '—' : ocupacionSemana + '%'}</p>
+                <p class="text-[10px] text-slate-400">${horasSemanaModeladores.toFixed(1)} h de ${capacidadSemana.toFixed(1)} h disponibles (roster, lun–hoy)</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 border-teal-500">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Horas de la Semana</p>
@@ -491,12 +339,12 @@ export function renderRecursos(container) {
             <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesHoy > 0 ? 'border-red-500' : 'border-emerald-500'}">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Hoy</p>
                 <p class="text-2xl font-bold mt-1 ${modeladoresPendientesHoy > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesHoy}</p>
-                <p class="text-[10px] text-slate-400">No llenaron el 100%</p>
+                <p class="text-[10px] text-slate-400">De ${laboranHoy.length} que laboran hoy</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesAyer > 0 ? 'border-red-500' : 'border-emerald-500'}">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Ayer</p>
                 <p class="text-2xl font-bold mt-1 ${modeladoresPendientesAyer > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesAyer}</p>
-                <p class="text-[10px] text-slate-400">Del día anterior</p>
+                <p class="text-[10px] text-slate-400">Su último día laborable < 100%</p>
             </div>
         </div>
 
@@ -507,19 +355,20 @@ export function renderRecursos(container) {
             </div>
             
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Nivel (importancia)</h4>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Horas por semana · por Especialidad</h4>
                 <div class="chart-box" style="height: 260px;"><canvas id="chart-linea-nivel"></canvas></div>
             </div>
         </div>
 
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Horas por Grupo (acumulado)</h4>
-                <div class="chart-box" style="height: 260px;"><canvas id="chart-grupos"></canvas></div>
+                <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Horas planificadas vs. no planificadas</h4>
+                <p class="text-[11px] text-slate-500 mb-2">No planificada = actividad creada durante la semana con fin en esa misma semana.</p>
+                <div class="chart-box" style="height: 240px;"><canvas id="chart-planif"></canvas></div>
             </div>
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Distribución de Modeladores</h4>
-                <p class="text-[11px] text-slate-500 mb-2">Puntos indican qué modelador está bajo el mando de qué jefe.</p>
+                <p class="text-[11px] text-slate-500 mb-2">Estimada: se asigna a cada modelador el jefe que es responsable de la mayoría de sus actividades abiertas.</p>
                 <div class="chart-box" style="height: 300px;"><canvas id="chart-equipos"></canvas></div>
             </div>
         </div>
@@ -600,103 +449,9 @@ export function renderRecursos(container) {
             </table>
         </div>
 
-        <div class="card overflow-x-auto mb-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Sobrecarga por Modelador</h4>
-                    <p class="text-[11px] text-slate-500">
-                        Estimación: el esfuerzo total (días × 8h × peso) se reparte. 
-                        El responsable asume Esfuerzo / N (sus tareas a cargo) y los recursos el remanente.
-                        Tareas vencidas usan penalización: max(latencia (${latenciaPromedio > 0 ? latenciaPromedio.toFixed(1) : '3'} d), atraso).
-                    </p>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Modelador</th>
-                        <th class="p-3">Tareas abiertas</th>
-                        <th class="p-3">Días restantes</th>
-                        <th class="p-3">Horas estimadas</th>
-                        <th class="p-3">Horas reales</th>
-                        <th class="p-3">Semanas equiv.</th>
-                        <th class="p-3">Estado</th>
-                        <th class="p-3 text-center">Vencidas</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    ${listaCarga.map(m => `
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-3 flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
-                                <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
-                            </td>
-                            <td class="p-3">${m.tareas}</td>
-                            <td class="p-3">${Number(m.dias).toFixed(2)}</td>
-                            <td class="p-3 font-bold text-sky-700">${m.horasEstimadas.toFixed(0)} h</td>
-                            <td class="p-3 font-bold text-teal-700">${m.horasReales.toFixed(1)} h</td>
-                            <td class="p-3">${m.semanasEquivalentes.toFixed(1)}</td>
-                            <td class="p-3 font-bold ${m.color}">${m.estado}</td>
-                            <td class="p-3 text-center ${m.tareasVencidas > 0 ? 'text-red-700 font-bold' : 'text-slate-400'}">${m.tareasVencidas || 0}</td>
-                        </tr>
-                    `).join('') || '<tr><td colspan="8" class="text-center py-4 text-slate-400">Sin datos</td></tr>'}
-                </tbody>
-            </table>
-        </div>
+        ${seccionWIP(wip)}
 
-        <div class="card overflow-x-auto mt-4">
-            <div class="p-4 pb-2">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                    <div>
-                        <h4 class="font-semibold text-sm text-slate-800 dark:text-white">Concentración de Riesgo</h4>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Horas críticas (importancia Muy alto / Alto) por modelador. Dependencia operativa del equipo.</p>
-                    </div>
-                    <div class="flex items-center gap-3 text-xs">
-                        <span class="text-slate-500 dark:text-slate-400">Top 1: <b class="${concentracionTop1 >= 40 ? 'text-red-700' : concentracionTop1 >= 25 ? 'text-amber-700' : 'text-emerald-700'}">${concentracionTop1.toFixed(1)}%</b></span>
-                        <span class="text-slate-500 dark:text-slate-400">Top 2: <b class="${concentracionTop2 >= 70 ? 'text-red-700' : concentracionTop2 >= 50 ? 'text-amber-700' : 'text-emerald-700'}">${concentracionTop2.toFixed(1)}%</b></span>
-                    </div>
-                </div>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Modelador</th>
-                        <th class="p-3">Tareas críticas</th>
-                        <th class="p-3">Horas críticas</th>
-                        <th class="p-3">% del total crítico</th>
-                        <th class="p-3">Nivel de riesgo</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                    ${concentracionRiesgo.map(m => `
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                            <td class="p-3 flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.avatar)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
-                                <span class="font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(m.nombre)}</span>
-                            </td>
-                            <td class="p-3 text-slate-600 dark:text-slate-400">${m.tareasCriticas}</td>
-                            <td class="p-3 font-bold text-sky-700 dark:text-sky-400">${m.horasCriticas.toFixed(0)} h</td>
-                            <td class="p-3">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                        <div class="h-full ${m.pct >= 40 ? 'bg-red-500' : m.pct >= 25 ? 'bg-amber-500' : m.pct >= 10 ? 'bg-sky-500' : 'bg-slate-400'}" style="width: ${Math.min(m.pct, 100)}%"></div>
-                                    </div>
-                                    <span class="font-bold ${m.color}">${m.pct.toFixed(1)}%</span>
-                                </div>
-                            </td>
-                            <td class="p-3 font-bold ${m.color}">${m.nivel}</td>
-                        </tr>
-                    `).join('') || '<tr><td colspan="5" class="text-center py-4 text-slate-400">Sin carga crítica asignada</td></tr>'}
-                </tbody>
-            </table>
-            ${concentracionTop1 >= 40 ? `
-                <div class="p-3 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-                    <p class="text-[11px] text-red-800 dark:text-red-300"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Un solo modelador concentra más del 40% de la carga crítica. Riesgo de dependencia operativa.</p>
-                </div>
-            ` : concentracionTop2 >= 70 ? `
-                <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200 dark:border-amber-800">
-                    <p class="text-[11px] text-amber-800 dark:text-amber-300"><i class="fa-solid fa-circle-exclamation mr-1"></i> Los dos modeladores principales concentran más del 70% de la carga crítica. Considera redistribuir.</p>
-                </div>
-            ` : ''}
-        </div>
+        ${seccionRiesgo(riesgo)}
 
         <div class="card overflow-x-auto">
             <div class="p-4 pb-2">
@@ -744,7 +499,7 @@ export function renderRecursos(container) {
         </div>
     `;
 
-    ['horasSemana', 'grupos', 'lineaGrupo', 'lineaCargo', 'lineaNivel', 'equipos'].forEach(k => {
+    ['horasSemana', 'grupos', 'planif', 'wip', 'lineaGrupo', 'lineaCargo', 'lineaNivel', 'equipos'].forEach(k => {
         if (state.charts[k]) { state.charts[k].destroy(); state.charts[k] = null; }
     });
 
@@ -766,57 +521,25 @@ export function renderRecursos(container) {
         type: 'line', data: serieNivel, options: optsLinea
     });
 
-    const gruposLabels = Object.keys(porGrupo);
-    const totalGrupos = gruposLabels.reduce((s, g) => s + porGrupo[g], 0);
-
-    state.charts.grupos = new Chart(document.getElementById('chart-grupos'), {
-        type: 'doughnut',
+    state.charts.planif = new Chart(document.getElementById('chart-planif'), {
+        type: 'bar',
         data: {
-            labels: gruposLabels,
-            datasets: [{
-                data: gruposLabels.map(g => porGrupo[g].toFixed(1)),
-                backgroundColor: PALETA,
-                borderWidth: 2, borderColor: '#fff'
-            }]
+            labels: semanasPlanif.map(sk => `Sem ${fmtDate(sk).slice(0, 5)}`),
+            datasets: [
+                { label: 'Planificadas', data: semanasPlanif.map(sk => +((planifPorSemana[sk]?.plan) || 0).toFixed(1)), backgroundColor: '#0284c7' },
+                { label: 'No planificadas', data: semanasPlanif.map(sk => +((planifPorSemana[sk]?.noPlan) || 0).toFixed(1)), backgroundColor: '#f59e0b' },
+                { label: 'General (sin actividad)', data: semanasPlanif.map(sk => +((planifPorSemana[sk]?.general) || 0).toFixed(1)), backgroundColor: '#cbd5e1' }
+            ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        boxWidth: 10,
-                        font: { size: 10 },
-                        generateLabels: (chart) => {
-                            const data = chart.data;
-                            return data.labels.map((label, i) => {
-                                const valor = parseFloat(data.datasets[0].data[i]);
-                                const pct = totalGrupos > 0 ? ((valor / totalGrupos) * 100).toFixed(1) : '0.0';
-                                return {
-                                    text: `${label} · ${pct}%`,
-                                    fillStyle: data.datasets[0].backgroundColor[i],
-                                    strokeStyle: data.datasets[0].backgroundColor[i],
-                                    lineWidth: 0,
-                                    hidden: false,
-                                    index: i
-                                };
-                            });
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const valor = parseFloat(ctx.parsed);
-                            const pct = totalGrupos > 0 ? ((valor / totalGrupos) * 100).toFixed(1) : '0.0';
-                            return `${ctx.label}: ${valor.toFixed(1)} h (${pct}%)`;
-                        }
-                    }
-                }
-            }
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                       tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} h` } } },
+            scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => v + ' h' } } }
         }
     });
+
+    dibujarWIP(wip);
 
     if (state.charts.equipos) state.charts.equipos.destroy();
 
@@ -865,4 +588,268 @@ export function renderRecursos(container) {
             }
         }
     });
+}
+
+// ============================================================
+// SOBRECARGA POR TRABAJO EN PARALELO (WIP)
+// Para cada modelador y cada día laborable (roster) de las próximas 2 semanas
+// se cuentan las actividades activas en paralelo donde produce. Su día
+// (9.33 h) se reparte entre ellas. Sobrecarga = paralelo por encima del límite.
+// Vencidas: se proyectan por la latencia promedio (8 semanas; 3 días si no hay datos).
+// Sin fecha fin: no entran (aún no programadas).
+// ============================================================
+const DIAS_VENTANA = 14;
+
+function esModeladorPerfil(p) {
+    return (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador';
+}
+
+function limitesWIP() {
+    const prm = state.parametrosApp || {};
+    return {
+        modelador: Number(prm.wip_modelador) > 0 ? Number(prm.wip_modelador) : 3,
+        supervisor: Number(prm.wip_supervisor) > 0 ? Number(prm.wip_supervisor) : 8
+    };
+}
+
+/** Modeladores que producen en la actividad: recursos modeladores; si no hay, el responsable si es modelador. */
+function ejecutoresDe(t, idsModeladores) {
+    const rec = [...new Set((state.actividadRecursosCache || []).filter(r => r.pendiente_id === t.id).map(r => r.usuario_id))]
+        .filter(uid => idsModeladores.has(uid));
+    if (rec.length) return rec;
+    return t.responsable_id && idsModeladores.has(t.responsable_id) ? [t.responsable_id] : [];
+}
+
+function actividadAbierta(t) {
+    return t.estado !== 'Cerrado' && t.estado !== 'Cancelado' && t.estado !== 'Anulado' && t.estado_cde !== 'Archived';
+}
+
+function calcularWIP(modeladores) {
+    const hoy = hoyLima();
+    const dias = Array.from({ length: DIAS_VENTANA }, (_, i) => sumarDias(hoy, i));
+    const lat = latenciaPromedio(state.tasksCache, 8);
+    const extraVencida = lat > 0 ? Math.ceil(lat) : 3;
+    const lim = limitesWIP();
+    const ids = new Set(modeladores.map(p => p.id));
+    const fechaLima = (ts) => ts ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts)) : null;
+
+    const activas = state.tasksCache.filter(t => actividadAbierta(t) && t.fecha_fin).map(t => {
+        const vencida = t.fecha_fin < hoy;
+        return {
+            t, vencida,
+            ini: t.fecha_inicio_programado || fechaLima(t.created_at) || hoy,
+            fin: vencida ? sumarDias(hoy, extraVencida - 1) : t.fecha_fin,
+            ejec: ejecutoresDe(t, ids)
+        };
+    });
+    const sinFecha = state.tasksCache.filter(t => actividadAbierta(t) && !t.fecha_fin).length;
+
+    const porPersona = (uid, filtro) => {
+        const serie = [];
+        dias.forEach(d => {
+            if (!esDiaLaborable(uid, d)) return;
+            const lista = activas.filter(a => filtro(a) && a.ini <= d && a.fin >= d);
+            serie.push({ d, n: lista.length, lista });
+        });
+        return serie;
+    };
+    const resumen = (serie, limite) => {
+        const lab = serie.length;
+        const prom = lab ? serie.reduce((s, x) => s + x.n, 0) / lab : 0;
+        const pico = serie.reduce((m, x) => x.n > m.n ? x : m, { n: 0, d: null, lista: [] });
+        const sobre = serie.filter(x => x.n > limite).length;
+        let estado = 'Normal', color = 'text-emerald-700', hex = '#059669';
+        if (lab === 0) { estado = 'Sin días laborables'; color = 'text-slate-400'; hex = '#cbd5e1'; }
+        else if (prom > limite) { estado = 'Sobrecargado'; color = 'text-red-700'; hex = '#dc2626'; }
+        else if (pico.n > limite) { estado = 'Picos'; color = 'text-amber-700'; hex = '#f59e0b'; }
+        else if (prom < 1) { estado = 'Disponible'; color = 'text-sky-700'; hex = '#0284c7'; }
+        return { lab, prom, pico, sobre, estado, color, hex };
+    };
+
+    const filasMod = modeladores.map(p => {
+        const serie = porPersona(p.id, a => a.ejec.includes(p.id));
+        const r = resumen(serie, lim.modelador);
+        const vencidas = activas.filter(a => a.vencida && a.ejec.includes(p.id)).length;
+        return { id: p.id, nombre: nombreFormateado(p), ...r, vencidas,
+                 hPorActPico: r.pico.n ? HORAS_POR_100 / r.pico.n : null };
+    }).sort((a, b) => b.prom - a.prom || b.pico.n - a.pico.n);
+
+    const idsResp = [...new Set(activas.map(a => a.t.responsable_id).filter(uid => uid && !ids.has(uid)))];
+    const filasSup = idsResp.map(uid => {
+        const p = state.perfilesCache.find(x => x.id === uid);
+        if (!p) return null;
+        const serie = porPersona(uid, a => a.t.responsable_id === uid);
+        const r = resumen(serie, lim.supervisor);
+        const aCargo = new Set();
+        activas.filter(a => a.t.responsable_id === uid && a.fin >= hoy && a.ini <= dias[dias.length - 1]).forEach(a => a.ejec.forEach(e => aCargo.add(e)));
+        return { id: uid, nombre: nombreFormateado(p), cargo: p.cargo || '', ...r, aCargo: aCargo.size };
+    }).filter(Boolean).sort((a, b) => b.prom - a.prom);
+
+    return { filasMod, filasSup, lim, lat, extraVencida, sinFecha, desde: dias[0], hasta: dias[dias.length - 1] };
+}
+
+function seccionWIP(w) {
+    const nombreAct = a => `${a.t.codigo_contenedor || ''} ${a.t.actividad || ''}`.trim();
+    return `
+        <div class="card mb-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Sobrecarga · trabajo en paralelo (WIP)</h4>
+                <p class="text-[11px] text-slate-500">
+                    Próximas 2 semanas (${fmtDate(w.desde)} → ${fmtDate(w.hasta)}), solo días laborables según roster. Cuenta las actividades activas a la vez en las que produce cada modelador; su día (${HORAS_POR_100.toFixed(2)} h) se reparte entre ellas.
+                    Límite: <b>${w.lim.modelador}</b> en paralelo por modelador. Vencidas proyectadas ${w.extraVencida} día(s) (latencia promedio${w.lat > 0 ? '' : ': sin datos, 3 d por defecto'}).
+                    ${w.sinFecha ? `<span class="text-amber-700">${w.sinFecha} actividad(es) sin fecha fin no entran al cálculo.</span>` : ''}
+                </p>
+            </div>
+            <div class="px-4"><div class="chart-box" style="height: 260px;"><canvas id="chart-wip"></canvas></div></div>
+            <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs mt-2">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Modelador</th>
+                        <th class="p-3 text-center">Promedio en paralelo</th>
+                        <th class="p-3 text-center">Pico</th>
+                        <th class="p-3 text-center">Días sobre el límite</th>
+                        <th class="p-3 text-center">h por actividad (pico)</th>
+                        <th class="p-3 text-center">Vencidas</th>
+                        <th class="p-3">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${w.filasMod.map(m => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full ${colorAvatar(m.id)} text-white text-[9px] font-bold flex items-center justify-center">${getIniciales(m.nombre).toUpperCase()}</div>
+                                <span class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</span>
+                            </td>
+                            <td class="p-3 text-center font-bold">${m.prom.toFixed(1)}</td>
+                            <td class="p-3 text-center" title="${m.pico.d ? escapeHtml(fmtDate(m.pico.d) + ': ' + m.pico.lista.map(nombreAct).join(' · ')) : ''}">${m.pico.n}${m.pico.d ? ` <span class="text-slate-400 text-[10px]">${fmtDate(m.pico.d).slice(0, 5)}</span>` : ''}</td>
+                            <td class="p-3 text-center ${m.sobre ? 'text-red-700 font-bold' : 'text-slate-400'}">${m.sobre} / ${m.lab}</td>
+                            <td class="p-3 text-center">${m.hPorActPico ? m.hPorActPico.toFixed(1) + ' h' : '—'}</td>
+                            <td class="p-3 text-center ${m.vencidas ? 'text-red-700 font-bold' : 'text-slate-400'}">${m.vencidas}</td>
+                            <td class="p-3 font-bold ${m.color}">${m.estado}</td>
+                        </tr>`).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin modeladores</td></tr>'}
+                </tbody>
+            </table>
+            </div>
+            ${w.filasSup.length ? `
+            <div class="p-4 pt-3 border-t border-slate-100">
+                <h5 class="font-semibold text-xs text-slate-700 mb-1">Responsables (gestión) · límite ${w.lim.supervisor} actividades lideradas en paralelo</h5>
+                <table class="w-full text-left text-xs">
+                    <thead class="text-slate-500 uppercase text-[10px]"><tr><th class="py-1">Responsable</th><th class="py-1 text-center">Promedio liderando</th><th class="py-1 text-center">Pico</th><th class="py-1 text-center">Modeladores a cargo</th><th class="py-1">Estado</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${w.filasSup.map(s => `<tr><td class="py-1.5"><b>${escapeHtml(s.nombre)}</b> <span class="text-slate-400">${escapeHtml(s.cargo)}</span></td><td class="py-1.5 text-center">${s.prom.toFixed(1)}</td><td class="py-1.5 text-center">${s.pico.n}</td><td class="py-1.5 text-center">${s.aCargo}</td><td class="py-1.5 font-bold ${s.color}">${s.estado}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>` : ''}
+        </div>`;
+}
+
+function dibujarWIP(w) {
+    const el = document.getElementById('chart-wip');
+    if (!el) return;
+    const filas = w.filasMod.filter(m => m.lab > 0);
+    state.charts.wip = new Chart(el, {
+        data: {
+            labels: filas.map(m => m.nombre),
+            datasets: [
+                { type: 'bar', label: 'Promedio en paralelo', data: filas.map(m => +m.prom.toFixed(2)), backgroundColor: filas.map(m => m.hex), order: 2 },
+                { type: 'bar', label: 'Pico', data: filas.map(m => m.pico.n), backgroundColor: filas.map(m => m.hex + '55'), order: 3 },
+                { type: 'line', label: `Límite (${w.lim.modelador})`, data: filas.map(() => w.lim.modelador), borderColor: '#dc2626', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, order: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Actividades en paralelo', font: { size: 10 } } },
+                      x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 0 }, grid: { display: false } } }
+        }
+    });
+}
+
+// ============================================================
+// RIESGO POR DEPENDENCIA (solo modeladores)
+// "Si este modelador se va, ¿qué pierdo?"
+// - Sin respaldo: actividades abiertas donde es el ÚNICO modelador (el supervisor no cuenta).
+// - Conocimiento: % de las horas en actividades críticas (Alto/Muy alto) de las últimas 4 semanas.
+// ============================================================
+function calcularRiesgo(modeladores, registros) {
+    const ids = new Set(modeladores.map(p => p.id));
+    const hoy = hoyLima();
+    const desde = sumarDias(hoy, -27);
+    const esCritica = t => t && (t.importancia === 'Muy alto' || t.importancia === 'Alto');
+    const abiertas = state.tasksCache.filter(actividadAbierta);
+
+    const porMod = {};
+    modeladores.forEach(p => porMod[p.id] = { id: p.id, nombre: nombreFormateado(p), sinRespaldo: [], horasCrit: 0 });
+    abiertas.forEach(t => {
+        const ej = ejecutoresDe(t, ids);
+        if (ej.length === 1 && porMod[ej[0]]) porMod[ej[0]].sinRespaldo.push(t);
+    });
+    let totalCrit = 0;
+    registros.forEach(r => {
+        if (!r.fecha || r.fecha < desde || r.fecha > hoy || !ids.has(r.usuario_id)) return;
+        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        if (!esCritica(t)) return;
+        const h = pctAHoras(r.porcentaje_dia);
+        porMod[r.usuario_id].horasCrit += h;
+        totalCrit += h;
+    });
+
+    const NIVELES = [
+        { nivel: 'Crítico', color: 'red' },
+        { nivel: 'Alto', color: 'amber' },
+        { nivel: 'Medio', color: 'sky' },
+        { nivel: 'Bajo', color: 'slate' }
+    ];
+    const filas = Object.values(porMod).map(m => {
+        const criticasSR = m.sinRespaldo.filter(esCritica).length;
+        const conocimiento = totalCrit > 0 ? m.horasCrit * 100 / totalCrit : 0;
+        let i = 3;
+        if (criticasSR >= 3 || conocimiento >= 40) i = 0;
+        else if (criticasSR >= 1 || conocimiento >= 25) i = 1;
+        else if (m.sinRespaldo.length >= 1 || conocimiento >= 10) i = 2;
+        return { ...m, criticasSR, conocimiento, ...NIVELES[i], orden: i };
+    }).sort((a, b) => a.orden - b.orden || b.criticasSR - a.criticasSR || b.conocimiento - a.conocimiento);
+
+    const top = filas.slice().sort((a, b) => b.conocimiento - a.conocimiento);
+    return { filas, top1: top[0]?.conocimiento || 0, top2: (top[0]?.conocimiento || 0) + (top[1]?.conocimiento || 0) };
+}
+
+function seccionRiesgo(rg) {
+    const item = t => `<li class="truncate"><span class="font-mono text-[10px] text-slate-400">${escapeHtml(t.codigo_contenedor || '')}</span> ${escapeHtml(t.actividad || '')}${(t.importancia === 'Muy alto' || t.importancia === 'Alto') ? ' <span class="text-red-600 font-bold">●</span>' : ''}</li>`;
+    return `
+        <div class="card p-4 mb-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-3">
+                <div>
+                    <h4 class="font-semibold text-sm text-slate-800">Riesgo por modelador · ¿qué pierdo si se va?</h4>
+                    <p class="text-[11px] text-slate-500">Sin respaldo = actividades abiertas donde es el único modelador (el supervisor no cuenta). Conocimiento = % de las horas en actividades críticas de las últimas 4 semanas.
+                    Crítico: ≥ 3 críticas sin respaldo o ≥ 40% del conocimiento · Alto: ≥ 1 crítica sin respaldo o ≥ 25% · Medio: alguna sin respaldo o ≥ 10%.</p>
+                </div>
+                <div class="flex items-center gap-3 text-xs whitespace-nowrap">
+                    <span class="text-slate-500">Top 1: <b class="${rg.top1 >= 40 ? 'text-red-700' : rg.top1 >= 25 ? 'text-amber-700' : 'text-emerald-700'}">${rg.top1.toFixed(0)}%</b></span>
+                    <span class="text-slate-500">Top 2: <b class="${rg.top2 >= 70 ? 'text-red-700' : rg.top2 >= 50 ? 'text-amber-700' : 'text-emerald-700'}">${rg.top2.toFixed(0)}%</b></span>
+                </div>
+            </div>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${rg.filas.map(m => `
+                    <div class="rounded-lg border border-${m.color}-200 bg-${m.color}-50 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-7 h-7 rounded-full ${colorAvatar(m.id)} text-white text-[10px] font-bold flex items-center justify-center shrink-0">${getIniciales(m.nombre).toUpperCase()}</div>
+                                <span class="font-semibold text-slate-800 text-xs truncate">${escapeHtml(m.nombre)}</span>
+                            </div>
+                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-${m.color}-600 text-white">${m.nivel}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-center mb-2">
+                            <div><p class="text-xl font-bold text-slate-800">${m.sinRespaldo.length}</p><p class="text-[10px] text-slate-500">sin respaldo (${m.criticasSR} críticas)</p></div>
+                            <div><p class="text-xl font-bold text-slate-800">${m.conocimiento.toFixed(0)}%</p><p class="text-[10px] text-slate-500">de horas críticas</p></div>
+                        </div>
+                        ${m.sinRespaldo.length ? `
+                        <details class="text-[11px] text-slate-700">
+                            <summary class="cursor-pointer text-slate-500">Ver actividades sin respaldo</summary>
+                            <ul class="mt-1 space-y-0.5 max-h-32 overflow-y-auto">${m.sinRespaldo.map(item).join('')}</ul>
+                        </details>` : '<p class="text-[11px] text-slate-400">Todas sus actividades tienen respaldo.</p>'}
+                    </div>`).join('') || '<p class="text-[11px] text-slate-400">Sin modeladores.</p>'}
+            </div>
+        </div>`;
 }

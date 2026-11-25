@@ -28,6 +28,7 @@ export const state = {
     semanasDashboard: [],
     especialidadesCache: [],
     especialidadesTodasCache: [],
+    parametrosApp: {},
     descansosCache: [],
     feriadosCache: [],
     subcontratasCache: [],
@@ -64,7 +65,8 @@ export async function fetchCore() {
             supabaseClient.from('propiedades_def').select('*').eq('activo', true).order('orden'),
             supabaseClient.from('actividad_recursos').select('*'),
             supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
-            supabaseClient.from('especialidades').select('*').order('orden').order('nombre')
+            supabaseClient.from('especialidades').select('*').order('orden').order('nombre'),
+            fetchParametros()
         ]);
 
         if (t.error) console.error('fetchCore tareas:', t.error);
@@ -201,6 +203,14 @@ function setEspecialidades(res) {
     state.especialidadesCache = state.especialidadesTodasCache.filter(e => e.activo !== false);
 }
 
+// Parámetros clave/valor (límites WIP, etc.). Si la tabla no existe aún, se usan los valores por defecto.
+export async function fetchParametros() {
+    const { data, error } = await supabaseClient.from('parametros_app').select('clave,valor');
+    if (error) { console.warn('parametros_app no disponible (se usan valores por defecto):', error.message); state.parametrosApp = {}; return false; }
+    state.parametrosApp = Object.fromEntries((data || []).map(r => [r.clave, Number(r.valor)]));
+    return true;
+}
+
 export async function fetchEspecialidades() {
     setEspecialidades(await supabaseClient.from('especialidades').select('*').order('orden').order('nombre'));
 }
@@ -296,7 +306,8 @@ export async function fetchAll() {
             supabaseClient.from('descansos_medicos').select('*'),
             supabaseClient.from('reprogramaciones_bim').select('*').order('created_at', { ascending: false }),
             supabaseClient.from('especialidades').select('*').order('orden').order('nombre'),
-            fetchSemanasDashboard()
+            fetchSemanasDashboard(),
+            fetchParametros()
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);

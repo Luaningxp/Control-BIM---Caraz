@@ -1,5 +1,5 @@
 import { escapeHtml, toast, confirmDelete, hoyLima } from './utils.js';
-import { supabaseClient, state, fetchAll } from './db.js';
+import { supabaseClient, state, fetchAll, fetchParametros } from './db.js';
 
 export function renderConfig(container) {
     container.innerHTML = `
@@ -147,6 +147,27 @@ export function renderConfig(container) {
                             `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin especialidades (ejecuta sql/dashboard_ppc_especialidades.sql)</td></tr>'}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- 4c. LÍMITES WIP -->
+            <div class="card p-4">
+                <div class="mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Límites WIP (Recursos)</h3>
+                    <p class="text-[10px] text-slate-500">Actividades en paralelo por día antes de marcar sobrecarga.</p>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-center justify-between gap-2">
+                        <span>Modelador</span>
+                        <input id="wip-modelador" type="number" min="1" step="1" value="${state.parametrosApp?.wip_modelador ?? 3}" ${state.isAdmin ? '' : 'disabled'} class="w-20 border border-slate-300 rounded px-2 py-1 text-right">
+                    </label>
+                    <label class="flex items-center justify-between gap-2">
+                        <span>Supervisor (lideradas)</span>
+                        <input id="wip-supervisor" type="number" min="1" step="1" value="${state.parametrosApp?.wip_supervisor ?? 8}" ${state.isAdmin ? '' : 'disabled'} class="w-20 border border-slate-300 rounded px-2 py-1 text-right">
+                    </label>
+                    ${state.isAdmin
+                        ? '<button onclick="window.guardarLimitesWIP()" class="w-full mt-1 px-2 py-1.5 bg-sky-600 text-white rounded hover:bg-sky-700">Guardar límites</button>'
+                        : '<p class="text-[10px] text-slate-400">Solo el administrador puede modificarlos.</p>'}
                 </div>
             </div>
 
@@ -749,3 +770,17 @@ window.openSubcontrataModal = openSubcontrataModal;
 window.closeSubcontrataModal = closeSubcontrataModal;
 window.saveSubcontrata = saveSubcontrata;
 window.deleteSubcontrata = deleteSubcontrata;
+
+window.guardarLimitesWIP = async () => {
+    if (!state.isAdmin) { toast('Solo el administrador puede modificar los límites.'); return; }
+    const mod = parseInt(document.getElementById('wip-modelador')?.value, 10);
+    const sup = parseInt(document.getElementById('wip-supervisor')?.value, 10);
+    if (!(mod >= 1) || !(sup >= 1)) { toast('Los límites deben ser números enteros mayores a 0.'); return; }
+    const { error } = await supabaseClient.from('parametros_app').upsert([
+        { clave: 'wip_modelador', valor: mod },
+        { clave: 'wip_supervisor', valor: sup }
+    ], { onConflict: 'clave' });
+    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
+    await fetchParametros();
+    toast('Límites WIP guardados.');
+};
