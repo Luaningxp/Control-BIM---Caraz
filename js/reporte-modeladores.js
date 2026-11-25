@@ -10,6 +10,9 @@
 //   hay, la fecha de creación (Lima). Sin fecha fin vigente = no entra.
 // - Se incluye si el modelador es responsable o recurso de la actividad.
 // - Se excluyen canceladas/anuladas. Las archivadas no llegan (tasksCache).
+// - Roster: solo cuentan los días laborables del modelador. Una actividad entra
+//   si toca al menos uno de sus días laborables de esa semana. Si no tiene
+//   ningún día laborable en la semana, la celda dice "Descanso".
 // - Sin riesgo, horas ni respaldo: es un resumen para residencia.
 // ============================================================
 import { hoyLima, lunesDeSemana, sumarDias, nombreFormateado, TZ_PROYECTO } from './utils.js';
@@ -42,9 +45,10 @@ export function semanasReporte(hoy, nCerradas) {
 
 /**
  * Arma la matriz modelador × semana con las actividades planificadas.
- * @returns {{ semanas, filas: [{ id, nombre, celdas: [[{ actividad, especialidad, codigo }]] }] }}
+ * @param esLaborable (usuarioId, 'YYYY-MM-DD') => boolean, según el Roster.
+ * @returns {{ semanas, filas: [{ id, nombre, descanso: [bool], celdas: [[{ actividad, especialidad, codigo }]] }] }}
  */
-export function armarReporteModeladores({ modeladores, tareas, recursos, especialidades, hoy = hoyLima(), nCerradas = 4 }) {
+export function armarReporteModeladores({ modeladores, tareas, recursos, especialidades, hoy = hoyLima(), nCerradas = 4, esLaborable = () => true }) {
     const semanas = semanasReporte(hoy, nCerradas);
     const desde = semanas[0].lunes, hasta = semanas[semanas.length - 1].domingo;
     const espNombre = {};
@@ -71,11 +75,13 @@ export function armarReporteModeladores({ modeladores, tareas, recursos, especia
 
     const filas = modeladores.map(p => {
         const propias = actividades.filter(a => a.personas.has(p.id));
-        const celdas = semanas.map(s => propias
-            .filter(a => a.ini <= s.domingo && a.fin >= s.lunes)
+        const laborables = semanas.map(s => Array.from({ length: 7 }, (_, i) => sumarDias(s.lunes, i)).filter(d => esLaborable(p.id, d)));
+        const descanso = laborables.map(l => l.length === 0);
+        const celdas = semanas.map((s, i) => propias
+            .filter(a => laborables[i].some(d => a.ini <= d && a.fin >= d))
             .sort((x, y) => x.especialidad.localeCompare(y.especialidad) || x.actividad.localeCompare(y.actividad))
             .map(({ actividad, especialidad, codigo }) => ({ actividad, especialidad, codigo })));
-        return { id: p.id, nombre: nombreFormateado(p) || p.nombre || p.email || 'Sin nombre', celdas };
+        return { id: p.id, nombre: nombreFormateado(p) || p.nombre || p.email || 'Sin nombre', descanso, celdas };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     return { semanas, filas };
@@ -171,6 +177,11 @@ export function exportarPDFModeladores(datos, { generado = new Date() } = {}) {
 
         celdas.forEach((lineas, i) => {
             const x0 = M + anchoNombre + anchoSemana * i + pad;
+            if (f.descanso[i]) {
+                pdf.setTextColor(...C.gris); pdf.setFont('helvetica', 'bolditalic'); pdf.setFontSize(fs);
+                pdf.text('Descanso', x0, y + pad + 2.8);
+                return;
+            }
             if (!lineas.length) {
                 pdf.setTextColor(...C.grisClaro); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(fs);
                 pdf.text('—', x0, y + pad + 2.8);
@@ -195,7 +206,7 @@ export function exportarPDFModeladores(datos, { generado = new Date() } = {}) {
         pdf.text('No hay modeladores registrados.', M + pad, y + 6); y += 8;
     }
 
-    const nota = 'Una actividad aparece en una semana si sus fechas de inicio y fin vigente tocan algún día de esa semana. Se incluyen las actividades donde el modelador es responsable o recurso.';
+    const nota = 'Una actividad aparece en una semana si sus fechas de inicio y fin vigente tocan algún día de esa semana. Se incluyen las actividades donde el modelador es responsable o recurso. Solo cuentan sus días laborables según el Roster; "Descanso" = sin días laborables esa semana.';
     if (y + 8 > bottom) { pdf.addPage(); encabezadoPagina(); y = top; }
     pdf.setTextColor(...C.gris); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7.5);
     pdf.text(pdf.splitTextToSize(nota, W - 2 * M), M, y + 6);

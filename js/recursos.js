@@ -872,7 +872,8 @@ window.exportarReporteModeladores = function () {
             tareas: state.tasksCache,
             recursos: state.actividadRecursosCache,
             especialidades: state.especialidadesTodasCache,
-            nCerradas
+            nCerradas,
+            esLaborable: esDiaLaborable
         });
         exportarPDFModeladores(datos);
     } catch (e) {
