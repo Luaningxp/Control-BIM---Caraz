@@ -1,29 +1,105 @@
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
-import { TIPOS_REPROGRAMACION } from './reprogramaciones.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO } from './utils.js';
 
 
-function metricasReprogramaciones() {
-    const rps = (state.reprogramacionesCache || []).filter(r => !r.es_migrada);
+// ------------------------------------------------------------------
+// PARETO 80/20: reprogramaciones e incumplimientos
+// Cuenta eventos (cada reprogramación o causa registrada vale 1).
+// Excluye reprogramaciones migradas. Lo que no tiene causa va en "Sin causa".
+// ------------------------------------------------------------------
+let paretoState = { semanas: 8, especialidad: '' };
+
+window.setParetoFiltro = function(clave, valor) {
+    paretoState[clave] = clave === 'semanas' ? Number(valor) : valor;
+    window.renderView();
+};
+
+/** Primer día del periodo (lunes de hace N-1 semanas, hora de Lima). null = todo el proyecto. */
+function inicioPeriodoPareto() {
+    if (!paretoState.semanas) return null;
+    return sumarDias(lunesDeSemana(hoyLima()), -7 * (paretoState.semanas - 1));
+}
+
+function tareaPasaFiltro(pendienteId) {
+    if (!paretoState.especialidad) return true;
+    const t = state.tasksCache.find(x => String(x.id) === String(pendienteId));
+    return !!t && String(t.especialidad_id) === String(paretoState.especialidad);
+}
+
+function nombreCausa(causaId) {
+    if (!causaId) return 'Sin causa';
     const causas = state.causasTodasCache || state.causasCache || [];
-    const porCausa = {}, porTipo = {};
-    rps.forEach(r => {
-        const n = r.causa_id ? (causas.find(c => Number(c.id) === Number(r.causa_id))?.nombre || 'Causa eliminada') : 'Sin causa';
-        porCausa[n] = (porCausa[n] || 0) + 1;
-        porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1;
+    return causas.find(c => Number(c.id) === Number(causaId))?.nombre || 'Causa eliminada';
+}
+
+/** Ordena de mayor a menor y calcula % acumulado; "vitales" = hasta cruzar el 80% inclusive. */
+function calcularPareto(conteo) {
+    const filas = Object.entries(conteo).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+    const total = filas.reduce((acc, [, n]) => acc + n, 0);
+    let acum = 0, cruzo = false;
+    return {
+        total,
+        filas: filas.map(([nombre, n]) => {
+            const vital = !cruzo;
+            acum += n;
+            const pctAcum = total ? Math.round(acum * 1000 / total) / 10 : 0;
+            if (pctAcum >= 80) cruzo = true;
+            return { nombre, n, pct: total ? Math.round(n * 1000 / total) / 10 : 0, pctAcum, vital };
+        })
+    };
+}
+
+function paretoReprogramaciones() {
+    const desde = inicioPeriodoPareto();
+    const conteo = {};
+    (state.reprogramacionesCache || []).forEach(r => {
+        if (r.es_migrada) return;
+        const fecha = r.created_at ? fmtLimaDia(r.created_at) : null;
+        if (desde && (!fecha || fecha < desde)) return;
+        if (!tareaPasaFiltro(r.pendiente_id)) return;
+        const n = nombreCausa(r.causa_id);
+        conteo[n] = (conteo[n] || 0) + 1;
     });
-    const ord = o => Object.entries(o).sort((a, b) => b[1] - a[1]);
+    return calcularPareto(conteo);
+}
+
+function paretoIncumplimientos() {
+    const desde = inicioPeriodoPareto();
+    const conteo = {};
+    const tareas = new Map(state.tasksCache.map(t => [String(t.id), t]));
+    const conCausa = new Set();
+    (state.tareaCausasCache || []).forEach(tc => {
+        const t = tareas.get(String(tc.pendiente_id));
+        if (!t || !t.fecha_cierre) return;
+        if (desde && t.fecha_cierre < desde) return;
+        if (!tareaPasaFiltro(t.id)) return;
+        conCausa.add(String(t.id));
+        const n = nombreCausa(tc.causa_id);
+        conteo[n] = (conteo[n] || 0) + 1;
+    });
+    // Cierres tardíos sin causa registrada
+    state.tasksCache.forEach(t => {
+        if (!t.fecha_cierre || !t.fecha_fin || t.fecha_cierre <= t.fecha_fin) return;
+        if (desde && t.fecha_cierre < desde) return;
+        if (!tareaPasaFiltro(t.id) || conCausa.has(String(t.id))) return;
+        conteo['Sin causa'] = (conteo['Sin causa'] || 0) + 1;
+    });
+    return calcularPareto(conteo);
+}
+
+/** Fecha 'YYYY-MM-DD' en Lima de un timestamp. */
+function fmtLimaDia(ts) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: TZ_PROYECTO, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts));
+}
+
+function metricasCierreVsPlan() {
     const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / DAY);
+    const conRep = new Set((state.reprogramacionesCache || []).filter(r => !r.es_migrada).map(r => r.pendiente_id));
     const cerradas = state.tasksCache.filter(t => t.estado === 'Cerrado' && t.fecha_cierre && t.fecha_fin_original);
     const desvios = cerradas.map(t => dias(t.fecha_fin_original, t.fecha_cierre));
-    const conRep = new Set(rps.map(r => r.pendiente_id));
     const avg = a => a.length ? Math.round(a.reduce((s, v) => s + v, 0) / a.length * 10) / 10 : 0;
     return {
-        total: rps.length,
-        actividades: conRep.size,
-        causas: ord(porCausa).slice(0, 6),
-        tipos: ord(porTipo),
         cerradasN: cerradas.length,
         aTiempoOriginal: desvios.filter(d => d <= 0).length,
         desvioProm: avg(desvios),
@@ -31,40 +107,94 @@ function metricasReprogramaciones() {
     };
 }
 
-function seccionReprogramaciones() {
-    const m = metricasReprogramaciones();
-    const barras = (lista, color, etiqueta) => lista.length
-        ? lista.map(([n, v]) => `
-            <div class="mb-1.5">
-                <div class="flex justify-between text-[11px] text-slate-600"><span class="truncate pr-2">${escapeHtml(etiqueta ? etiqueta(n) : n)}</span><span class="font-bold">${v}</span></div>
-                <div class="h-1.5 rounded bg-slate-100"><div class="h-1.5 rounded" style="width:${Math.round(v / lista[0][1] * 100)}%;background:${color}"></div></div>
-            </div>`).join('')
-        : '<p class="text-[11px] text-slate-400 italic">Sin reprogramaciones registradas.</p>';
+function bloquePareto(id, titulo, subtitulo, pareto) {
+    const vitales = pareto.filas.filter(f => f.vital);
+    return `
+        <div class="card p-4">
+            <h4 class="font-semibold text-sm text-slate-800">${titulo}</h4>
+            <p class="text-[11px] text-slate-500 mb-2">${subtitulo} · ${pareto.total} evento${pareto.total === 1 ? '' : 's'}</p>
+            ${pareto.total === 0
+                ? '<p class="text-[11px] text-slate-400 italic py-10 text-center">Sin registros en el periodo.</p>'
+                : `<div class="chart-box" style="height: 260px;"><canvas id="${id}"></canvas></div>
+                   <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-3 mb-1">Pocas vitales (${vitales.length} de ${pareto.filas.length} causas ≈ ${vitales.length ? vitales[vitales.length - 1].pctAcum : 0}%)</p>
+                   <ul class="text-[11px] text-slate-700 space-y-0.5">
+                       ${vitales.map(f => `<li class="flex justify-between"><span class="truncate pr-2">${escapeHtml(f.nombre)}</span><span class="whitespace-nowrap"><b>${f.n}</b> · ${f.pct}%</span></li>`).join('')}
+                   </ul>`}
+        </div>`;
+}
+
+function seccionParetos() {
+    const esps = state.especialidadesCache || [];
+    const m = metricasCierreVsPlan();
     const pct = m.cerradasN ? Math.round(m.aTiempoOriginal / m.cerradasN * 100) : 0;
     const signo = v => (v > 0 ? '+' : '') + v;
+    const periodoTxt = paretoState.semanas ? `Últimas ${paretoState.semanas} semanas` : 'Todo el proyecto';
     return `
-        <div class="card p-4 mb-4">
-            <h4 class="font-semibold text-sm text-slate-800">Reprogramaciones</h4>
-            <p class="text-[11px] text-slate-500 mb-3">${m.total} evento${m.total === 1 ? '' : 's'} en ${m.actividades} actividad${m.actividades === 1 ? '' : 'es'} (sin contar migradas).</p>
-            <div class="grid md:grid-cols-3 gap-4">
+        <div class="mb-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
                 <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Causas más frecuentes</p>
-                    ${barras(m.causas, '#7c3aed')}
+                    <h4 class="font-semibold text-sm text-slate-800">Pareto 80/20 de causas</h4>
+                    <p class="text-[11px] text-slate-500">Las barras resaltadas son las pocas causas que explican ~80% de los casos: atacarlas primero.</p>
                 </div>
-                <div>
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Por tipo</p>
-                    ${barras(m.tipos, '#F59E0B', t => TIPOS_REPROGRAMACION[t] || t)}
+                <div class="flex gap-2 text-xs">
+                    <select class="inp" onchange="window.setParetoFiltro('semanas', this.value)">
+                        ${[[4, 'Últimas 4 semanas'], [8, 'Últimas 8 semanas'], [0, 'Todo el proyecto']].map(([v, t]) => `<option value="${v}" ${paretoState.semanas === v ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                    <select class="inp" onchange="window.setParetoFiltro('especialidad', this.value)">
+                        <option value="">Todas las especialidades</option>
+                        ${esps.map(e => `<option value="${e.id}" ${String(paretoState.especialidad) === String(e.id) ? 'selected' : ''}>${escapeHtml(e.nombre)}</option>`).join('')}
+                    </select>
                 </div>
-                <div>
+            </div>
+            <div class="grid lg:grid-cols-5 gap-3">
+                <div class="lg:col-span-2">${bloquePareto('chart-pareto-reprog', 'Reprogramaciones por motivo', periodoTxt, paretoReprogramaciones())}</div>
+                <div class="lg:col-span-2">${bloquePareto('chart-pareto-incump', 'Incumplimientos por causa', `${periodoTxt} · cierres tardíos`, paretoIncumplimientos())}</div>
+                <div class="card p-4">
                     <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Cierre real vs. plan original</p>
                     <p class="text-2xl font-bold text-slate-800">${pct}%</p>
-                    <p class="text-[10px] text-slate-400 mb-2">cerradas en o antes del fin original (${m.aTiempoOriginal} de ${m.cerradasN})</p>
+                    <p class="text-[10px] text-slate-400 mb-2">cerradas en o antes del fin original (${m.aTiempoOriginal} de ${m.cerradasN}) · todo el proyecto</p>
                     <p class="text-[11px] text-slate-600">Desvío promedio: <b>${signo(m.desvioProm)} d</b></p>
                     <p class="text-[11px] text-slate-600">Solo reprogramadas: <b>${signo(m.desvioPromReprog)} d</b></p>
                 </div>
             </div>
-        </div>
-`;
+        </div>`;
+}
+
+function dibujarPareto(canvasId, pareto, colorVital) {
+    const el = document.getElementById(canvasId);
+    if (!el || !pareto.total) return;
+    const corto = n => n.length > 22 ? n.slice(0, 21) + '…' : n;
+    state.charts[canvasId] = new Chart(el, {
+        data: {
+            labels: pareto.filas.map(f => corto(f.nombre)),
+            datasets: [
+                { type: 'bar', label: 'Eventos', data: pareto.filas.map(f => f.n), yAxisID: 'y',
+                  backgroundColor: pareto.filas.map(f => f.vital ? colorVital : '#cbd5e1'), order: 2 },
+                { type: 'line', label: '% acumulado', data: pareto.filas.map(f => f.pctAcum), yAxisID: 'y1',
+                  borderColor: '#0f172a', backgroundColor: '#0f172a', pointRadius: 3, tension: 0, order: 1 },
+                { type: 'line', label: '80%', data: pareto.filas.map(() => 80), yAxisID: 'y1',
+                  borderColor: '#dc2626', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, order: 0 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: { callbacks: { title: items => pareto.filas[items[0].dataIndex].nombre } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%', font: { size: 10 } } },
+                x: { ticks: { font: { size: 9 }, maxRotation: 60, minRotation: 30 } }
+            }
+        }
+    });
+}
+
+function renderParetos() {
+    ['chart-pareto-reprog', 'chart-pareto-incump'].forEach(id => { if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; } });
+    dibujarPareto('chart-pareto-reprog', paretoReprogramaciones(), '#7c3aed');
+    dibujarPareto('chart-pareto-incump', paretoIncumplimientos(), '#dc2626');
 }
 
 // ------------------------------------------------------------------
@@ -289,7 +419,7 @@ export function renderDashboard(container) {
             </div>
         </div>
 
-        ${seccionReprogramaciones()}
+        ${seccionParetos()}
 
         <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
@@ -316,6 +446,7 @@ export function renderDashboard(container) {
     `;
 
     renderCharts(inicioSemana, finSemana);
+    renderParetos();
     renderPerfTable(inicioSemana, finSemana);
 }
 
