@@ -2,7 +2,7 @@ import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, cdeBadge, nombreResponsable, critColor, toast, 
     getCriticidad, fmtDate, daysToDeadline, nombreFormateado, 
-    getIniciales, colorAvatar, semaforo
+    getIniciales, colorAvatar, semaforo, resolverCierre, validarFechaCierre
 } from './utils.js';
 import { badgeReprogramada, getReprogramaciones } from './reprogramaciones.js';
 
@@ -421,20 +421,24 @@ export async function onDrop(e, nuevoEstado) {
         return;
     }
 
-    // Regla: si se mueve a "Cerrado", debe tener fecha de cierre
-    if (nuevoEstado === 'Cerrado' && !t.fecha_cierre) {
-        toast('Para cerrar la actividad registra primero la Fecha de Cierre Real.');
+    // Regla: marcar Cerrado sin fecha -> fecha de cierre = hoy (Lima).
+    // Si eso deja el cierre después del Fin Prog., se abre el modal para registrar la causa.
+    const { estado: estadoFinal, fechaCierre } = resolverCierre({ estado: nuevoEstado, fechaCierre: nuevoEstado === 'Cerrado' ? t.fecha_cierre : null, previa: t });
+    const errFecha = validarFechaCierre({ fechaCierre, fechaInicio: t.fecha_inicio_programado });
+    if (errFecha) { toast(errFecha); return; }
+    if (estadoFinal === 'Cerrado' && t.fecha_fin && fechaCierre > t.fecha_fin) {
+        toast('El cierre queda después del Fin Prog.: registra la causa de incumplimiento.');
         window.editTask(id);
         setTimeout(() => {
             const sel = document.getElementById('task-estado');
             if (sel) sel.value = 'Cerrado';
-            document.getElementById('task-fecha-cierre')?.focus();
+            const fc = document.getElementById('task-fecha-cierre');
+            if (fc) { fc.value = fechaCierre; fc.dispatchEvent(new Event('change')); }
         }, 50);
         return;
     }
-    
-    const updateData = { estado: nuevoEstado };
-    if (nuevoEstado !== 'Cerrado') updateData.fecha_cierre = null;
+
+    const updateData = { estado: estadoFinal, fecha_cierre: fechaCierre };
 
     const { error } = await supabaseClient.from('pendientes_bim').update(updateData).eq('id', id);
     if (error) { toast('Error al mover: ' + error.message); return; }

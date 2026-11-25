@@ -1,4 +1,4 @@
-import { state } from './db.js';
+import { state, tareaPorId } from './db.js';
 import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, latenciaPromedio } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
@@ -156,7 +156,7 @@ export function renderRecursos(container) {
 
     const porGrupo = {};
     registros.forEach(r => {
-        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const t = tareaPorId(r.pendiente_id);
         const grupo = t ? t.grupo || 'Sin grupo' : 'General';
         porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
     });
@@ -243,13 +243,13 @@ export function renderRecursos(container) {
     const semanas = semanasEntre(semanaKey(primera), semanaKey(ultima));
 
     const serieGrupo = buildSeries(registros, semanas, r => {
-        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const t = tareaPorId(r.pendiente_id);
         return t ? (t.grupo || 'Sin grupo') : 'General';
     });
    
     const espNombre = (id) => (state.especialidadesTodasCache || []).find(e => String(e.id) === String(id))?.nombre || 'GENERAL';
     const serieNivel = buildSeries(registros, semanas, r => {
-        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const t = tareaPorId(r.pendiente_id);
         return t ? espNombre(t.especialidad_id) : 'Sin actividad';
     });
 
@@ -261,7 +261,7 @@ export function renderRecursos(container) {
         if (!r.fecha) return;
         const sk = semanaKey(r.fecha);
         planifPorSemana[sk] = planifPorSemana[sk] || { plan: 0, noPlan: 0, general: 0 };
-        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const t = tareaPorId(r.pendiente_id);
         const h = pctAHoras(r.porcentaje_dia);
         if (!t) { planifPorSemana[sk].general += h; return; }
         const creada = fechaLima(t.created_at);

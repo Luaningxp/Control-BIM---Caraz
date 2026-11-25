@@ -240,7 +240,7 @@ window.handleFileUpload = (e) => {
             
             if (json.length < 2) { toast('El archivo está vacío.'); return; }
             
-            if (!confirm(`Se encontraron ${json.length - 1} filas.\n\n¿Deseas REEMPLAZAR la base de datos actual?`)) return;
+            if (!confirm(`Se encontraron ${json.length - 1} filas.\n\n¿Deseas REEMPLAZAR la base de datos actual?\n(Las actividades actuales se archivan, no se borran.)`)) return;
 
             const headers = json[0].map(h => String(h).trim().toLowerCase());
             const findCol = (names) => {
@@ -334,8 +334,9 @@ window.handleFileUpload = (e) => {
 
             if (inserts.length === 0) { toast('No se encontraron datos válidos.'); return; }
 
-            const { error: delError } = await supabaseClient.from('pendientes_bim').delete().neq('id', 0);
-            if (delError) throw new Error("Error al borrar: " + delError.message);
+            // Reemplazar = archivar las actividades vigentes (nunca se borran: se conservan sus HH)
+            const { error: delError } = await supabaseClient.rpc('archivar_todas_actividades');
+            if (delError) throw new Error("Error al archivar las actividades actuales: " + delError.message);
 
             for (let i = 0; i < inserts.length; i += 50) {
                 const { error } = await supabaseClient.from('pendientes_bim').insert(inserts.slice(i, i + 50));

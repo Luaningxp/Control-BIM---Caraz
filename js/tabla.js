@@ -2,7 +2,7 @@ import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
-    confirmDelete, semaforo, hoyLima } from './utils.js';
+    confirmDelete, semaforo, hoyLima, resolverCierre, validarFechaCierre, ESTADO_REAPERTURA_DEFAULT } from './utils.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
 
@@ -416,6 +416,7 @@ export function canEdit(t) {
     return false;
 }
 export function canDelete() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
+export function canRestore() { return state.isAdmin || state.isCoordinador; }
 export function canTransition() { return state.isAdmin || state.isCoordinador || state.isSupervisor; }
 
 function esMia(t) {
@@ -531,7 +532,58 @@ function stopResize(e) {
     e.preventDefault(); e.stopPropagation();
 }
 
+let verArchivadas = false;
+
+window.toggleVerArchivadas = function() { verArchivadas = !verArchivadas; window.renderView(); };
+
+// Vista "Archivadas": solo admins (BIM Manager / Coordinador BIM) ven y restauran
+function renderArchivadas(container) {
+    const q = (tableState.filters.search || '').toLowerCase();
+    const archivadas = (state.tasksTodasCache || [])
+        .filter(t => t.archivada_en)
+        .filter(t => !q || String(t.actividad || '').toLowerCase().includes(q) || String(t.codigo_contenedor || '').toLowerCase().includes(q))
+        .sort((a, b) => String(b.archivada_en).localeCompare(String(a.archivada_en)));
+    const quien = (uid) => { const p = state.perfilesCache.find(x => x.id === uid); return p ? nombreFormateado(p) : '—'; };
+    const cuando = (ts) => ts ? new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(ts)) : '–';
+
+    container.innerHTML = `
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm mb-4">
+            <div class="flex items-center gap-2 w-full">
+                <div class="relative w-full max-w-xs">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="tbl-search-arch" placeholder="Buscar archivada..." value="${escapeHtml(tableState.filters.search)}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
+                </div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Actividades eliminadas: no aparecen en ninguna vista, pero conservan sus HH y siguen en las semanas de PPC ya cerradas.</p>
+            </div>
+            <button onclick="window.toggleVerArchivadas()" class="px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-arrow-left mr-1"></i> Volver a la tabla</button>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 dark:bg-slate-800 text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-300">
+                    <tr><th class="p-3">Código</th><th class="p-3">Actividad</th><th class="p-3">Grupo</th><th class="p-3">Estado</th><th class="p-3">Fin Prog.</th><th class="p-3">Eliminada el</th><th class="p-3">Eliminada por</th><th class="p-3 text-center">Acción</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    ${archivadas.length === 0 ? '<tr><td colspan="8" class="p-6 text-center text-slate-400 italic">No hay actividades archivadas.</td></tr>' : archivadas.map(t => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                            <td class="p-3 text-slate-500">${escapeHtml(t.codigo_contenedor || '#' + t.id)}</td>
+                            <td class="p-3 font-semibold text-slate-700 dark:text-slate-200">${escapeHtml(t.actividad)}</td>
+                            <td class="p-3 text-slate-500">${escapeHtml(t.grupo || '—')}</td>
+                            <td class="p-3 text-slate-500">${escapeHtml(t.estado || '—')}</td>
+                            <td class="p-3 text-slate-500">${fmtDate(t.fecha_fin)}</td>
+                            <td class="p-3 text-slate-500">${cuando(t.archivada_en)}</td>
+                            <td class="p-3 text-slate-500">${escapeHtml(quien(t.archivada_por))}</td>
+                            <td class="p-3 text-center"><button onclick="window.restaurarTask(${t.id})" class="px-2.5 py-1 rounded border border-sky-600 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/30 text-[11px] font-semibold"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar</button></td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+
+    const inp = document.getElementById('tbl-search-arch');
+    if (inp) inp.addEventListener('change', (e) => { tableState.filters.search = e.target.value; window.renderView(); });
+}
+
 export function renderTabla(container) {
+    if (verArchivadas && canRestore()) { renderArchivadas(container); return; }
     const tasks = getProcessedTasks();
     const gruposOpts = [...new Set(state.tasksCache.map(t => t.grupo).filter(Boolean))].sort();
             const respOpts = state.perfilesCache
@@ -570,6 +622,7 @@ export function renderTabla(container) {
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 dark:border-slate-700 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
                     </div>
                 </div>
+                ${canRestore() ? `<button onclick="window.toggleVerArchivadas()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5" title="Actividades eliminadas (solo administradores)"><i class="fa-solid fa-box-archive"></i> Archivadas (${(state.tasksTodasCache || []).filter(t => t.archivada_en).length})</button>` : ''}
                 <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Refrescar</button>
             </div>
         </div>
@@ -1112,10 +1165,19 @@ function aplicarBloqueoModelador() {
         el.classList.toggle('opacity-60', soloModelador);
     });
 
-    ['task-fecha-cierre', 'task-nota', 'task-estado'].forEach(id => {
+    ['task-nota', 'task-estado'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = false;
     });
+    // Poner fecha de cierre cierra la actividad: los modeladores no cierran
+    const fcEl = document.getElementById('task-fecha-cierre');
+    if (fcEl) {
+        fcEl.disabled = soloModelador;
+        fcEl.classList.toggle('opacity-60', soloModelador);
+        fcEl.title = soloModelador ? 'Solo supervisores o administradores cierran actividades.' : '';
+    }
+
+    configurarCierreModal();
 
     const subSel = document.getElementById('task-subcontrata');
     if (subSel) subSel.disabled = soloModelador;
@@ -1165,6 +1227,60 @@ function renderCustomProps(pendienteId) {
     }).join('');
 }
 
+// --- CIERRE AUTOMÁTICO EN EL MODAL (misma regla que resolverCierre / trigger SQL) ---
+function configurarCierreModal() {
+    const estadoSel = document.getElementById('task-estado');
+    const fc = document.getElementById('task-fecha-cierre');
+    const ini = document.getElementById('task-fecha-inicio');
+    const fin = document.getElementById('task-fecha-fin');
+    if (!estadoSel || !fc) return;
+
+    const idActual = document.getElementById('task-id')?.value;
+    const previa = idActual ? state.tasksCache.find(t => String(t.id) === String(idActual)) : null;
+
+    fc.max = hoyLima();
+    fc.min = ini?.value || '';
+    // Estado al que se vuelve si se borra la fecha de cierre
+    estadoSel.dataset.previo = estadoSel.value !== 'Cerrado'
+        ? estadoSel.value
+        : (previa?.estado_antes_cierre && previa.estado_antes_cierre !== 'Cerrado' ? previa.estado_antes_cierre : ESTADO_REAPERTURA_DEFAULT);
+
+    const asegurarOpcionCerrado = () => {
+        if (![...estadoSel.options].some(o => o.value === 'Cerrado')) estadoSel.insertAdjacentHTML('beforeend', '<option>Cerrado</option>');
+    };
+    const actualizarCausas = () => {
+        const tarde = fc.value && fin?.value && fc.value > fin.value;
+        document.getElementById('causas-container')?.classList.toggle('hidden', !tarde);
+        if (tarde) actualizarCausasUI();
+    };
+
+    fc.onchange = () => {
+        if (fc.value) {
+            const err = validarFechaCierre({ fechaCierre: fc.value, fechaInicio: ini?.value || previa?.fecha_inicio_programado });
+            if (err) { toast(err); fc.value = ''; }
+        }
+        if (fc.value && estadoSel.value !== 'Cerrado') {
+            estadoSel.dataset.previo = estadoSel.value;
+            asegurarOpcionCerrado();
+            estadoSel.value = 'Cerrado';
+        } else if (!fc.value && estadoSel.value === 'Cerrado') {
+            estadoSel.value = estadoSel.dataset.previo || ESTADO_REAPERTURA_DEFAULT;
+        }
+        actualizarCausas();
+    };
+    estadoSel.onchange = () => {
+        if (estadoSel.value === 'Cerrado') {
+            if (!fc.value) fc.value = hoyLima();
+        } else {
+            estadoSel.dataset.previo = estadoSel.value;
+            fc.value = '';
+        }
+        actualizarCausas();
+    };
+    if (ini) ini.onchange = () => { fc.min = ini.value || ''; };
+    if (fin) fin.onchange = actualizarCausas;
+}
+
 export function closeModal() { 
     document.getElementById('modal-task').classList.add('hidden'); 
     document.getElementById('modal-task').classList.remove('flex'); 
@@ -1186,12 +1302,21 @@ export async function saveTask(e) {
     const respId = document.getElementById('task-responsable').value || null;
     const respPerfil = respId ? state.perfilesCache.find(p => p.id === respId) : null;
     
-    const estado = document.getElementById('task-estado').value;
-    const fechaCierre = document.getElementById('task-fecha-cierre').value;
     const fechaFinProgramada = document.getElementById('task-fecha-fin').value;
+    const previaTarea = id ? state.tasksCache.find(t => String(t.id) === String(id)) : null;
 
-    if (estado === 'Cerrado' && !fechaCierre) {
-        toast('No puedes cerrar la actividad sin una Fecha de Cierre Real.');
+    // Cierre automático: con fecha -> Cerrado; Cerrado sin fecha -> hoy (Lima); sin fecha -> estado anterior
+    const { estado, fechaCierre } = resolverCierre({
+        estado: document.getElementById('task-estado').value,
+        fechaCierre: document.getElementById('task-fecha-cierre').value,
+        previa: previaTarea
+    });
+    const errFechaCierre = validarFechaCierre({
+        fechaCierre,
+        fechaInicio: document.getElementById('task-fecha-inicio')?.value || previaTarea?.fecha_inicio_programado || null
+    });
+    if (errFechaCierre) {
+        toast(errFechaCierre);
         document.getElementById('task-fecha-cierre').focus();
         if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
@@ -1391,6 +1516,7 @@ window.handleDrop = function(e, targetCol) {
     draggedCol = null;
 };
 
+// Eliminar = SIEMPRE archivar (borrado lógico). Las HH registradas se conservan.
 export async function deleteTask(id) {
     if (!canDelete()) return;
     const t = state.tasksCache.find(x => x.id === id);
@@ -1398,13 +1524,20 @@ export async function deleteTask(id) {
     
     const confirmado = await confirmDelete({
         title: 'Eliminar actividad',
-        message: `Vas a eliminar la actividad "${nombre}". Se borrarán también sus propiedades, recursos y planos. Esta acción no se puede deshacer.`
+        message: `Vas a eliminar la actividad "${nombre}". Dejará de verse en todas las vistas, pero se archiva: sus horas de Manpower, planos y causas se conservan y sigue contando en las semanas de PPC ya cerradas. Solo un administrador puede restaurarla.`
     });
     if (!confirmado) return;
     
-    const { error } = await supabaseClient.from('pendientes_bim').delete().eq('id', id);
+    const { error } = await supabaseClient.rpc('archivar_actividad', { p_id: id });
     if (error) { toast('Error: ' + error.message); return; }
-    await fetchAll(); window.renderView(); toast('Actividad eliminada');
+    await fetchAll(); window.renderView(); toast('Actividad eliminada (archivada)');
+}
+
+export async function restaurarTask(id) {
+    if (!canRestore()) return;
+    const { error } = await supabaseClient.rpc('restaurar_actividad', { p_id: id });
+    if (error) { toast('Error: ' + error.message); return; }
+    await fetchAll(); window.renderView(); toast('Actividad restaurada');
 }
 
 export function openModalCDE(id) {

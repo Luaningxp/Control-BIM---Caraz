@@ -96,6 +96,7 @@ export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
     if (fecha > hoy) return 'No puedes registrar horas en una fecha futura.';
     if (semanaCerrada(fecha, hoy)) return 'Esa semana ya está cerrada (corte del domingo 23:59). Pide la corrección a un administrador.';
     if (tarea) {
+        if (tarea.archivada_en) return 'La actividad fue eliminada (archivada).';
         if (tarea.estado_cde === 'Archived') return 'La actividad está archivada en el CDE.';
         if (tarea.estado === 'Cerrado') {
             if (!tarea.fecha_cierre) return 'La actividad está cerrada.';
@@ -113,11 +114,54 @@ export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
  */
 export const bloqueoRegistroExistente = ({ fecha, tarea, hoy = hoyLima() }) => {
     if (semanaCerrada(fecha, hoy)) return 'Ese registro es de una semana ya cerrada (corte del domingo 23:59).';
+    if (tarea && tarea.archivada_en) return 'La actividad del registro fue eliminada (archivada).';
     if (tarea && tarea.estado_cde === 'Archived') return 'La actividad del registro está archivada en el CDE.';
     if (tarea && tarea.estado === 'Cerrado' && tarea.fecha_cierre && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) {
         return 'Ya venció el plazo para modificar horas de esta actividad cerrada.';
     }
     return null;
+};
+
+// ------------------------------------------------------------------
+// REGLAS DE CIERRE Y ARCHIVO (deben coincidir con sql/archivar_actividades_cierre.sql)
+// ------------------------------------------------------------------
+/** Estado al que vuelve una actividad si se le borra la fecha de cierre y no hay registro previo. */
+export const ESTADO_REAPERTURA_DEFAULT = 'En proceso';
+
+/** ¿La actividad fue eliminada? (eliminar = archivar, borrado lógico) */
+export const esArchivada = (t) => !!(t && t.archivada_en);
+
+/**
+ * Valida la fecha de cierre real. Devuelve null si es válida o el mensaje de error.
+ * - Nunca futura: como máximo hoy en hora de Lima.
+ * - No anterior a la fecha de inicio programada.
+ */
+export const validarFechaCierre = ({ fechaCierre, fechaInicio, hoy = hoyLima() }) => {
+    if (!fechaCierre) return null;
+    if (fechaCierre > hoy) return `La fecha de cierre real no puede ser futura (hoy es ${fmtDate(hoy)}).`;
+    if (fechaInicio && fechaCierre < fechaInicio) return `La fecha de cierre real no puede ser anterior a la fecha de inicio (${fmtDate(fechaInicio)}).`;
+    return null;
+};
+
+/**
+ * Estado y fecha de cierre resultantes (misma regla que el trigger):
+ * - con fecha de cierre -> 'Cerrado'
+ * - 'Cerrado' sin fecha -> fecha = hoy (Lima)
+ * - se borra la fecha de una cerrada -> vuelve a estadoAntesCierre
+ * - se reabre cambiando el estado -> se limpia la fecha
+ */
+export const resolverCierre = ({ estado, fechaCierre, previa = null, hoy = hoyLima() }) => {
+    let e = estado, f = fechaCierre || null;
+    if (previa && previa.estado === 'Cerrado') {
+        if (e === 'Cerrado' && previa.fecha_cierre && !f) {
+            e = (previa.estado_antes_cierre && previa.estado_antes_cierre !== 'Cerrado') ? previa.estado_antes_cierre : ESTADO_REAPERTURA_DEFAULT;
+        } else if (e !== 'Cerrado' && f === (previa.fecha_cierre || null)) {
+            f = null;
+        }
+    }
+    if (f && e !== 'Cerrado') e = 'Cerrado';
+    else if (e === 'Cerrado' && !f) f = hoy;
+    return { estado: e, fechaCierre: f };
 };
 
 export const fmtDate = (iso) => !iso ? '–' : `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(2,4)}`;

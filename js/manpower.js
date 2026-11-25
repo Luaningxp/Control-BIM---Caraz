@@ -1,4 +1,4 @@
-import { supabaseClient, state, fetchAll } from './db.js';
+import { supabaseClient, state, fetchAll, tareaPorId } from './db.js';
 import { 
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
     getIniciales, colorAvatar, confirmDelete, nombreResponsable, hoyLima, isoLocal,
@@ -332,7 +332,7 @@ function puedeGestionarManpower(r) {
 
 function tareaDe(pendienteId) {
     if (!pendienteId) return null;
-    return state.tasksCache.find(t => String(t.id) === String(pendienteId)) || null;
+    return tareaPorId(pendienteId);
 }
 
 /** Motivo de bloqueo de un registro existente (null si está libre). */
@@ -392,7 +392,7 @@ export function renderManpower(container) {
     }
 
     registros = registros.filter(r => {
-        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+        const t = tareaPorId(r.pendiente_id);
         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
         const nombre = p ? nombreFormateado(p) : 'Desconocido';
         const grupo = t ? (t.grupo || '') : '';
@@ -458,7 +458,7 @@ export function renderManpower(container) {
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     ${registros.map(r => {
-                        const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+                        const t = tareaPorId(r.pendiente_id);
                         const p = state.perfilesCache.find(x => x.id === r.usuario_id);
                         const nombre = p ? nombreFormateado(p) : 'Desconocido';
                         const pct = parseFloat(r.porcentaje_dia || 0);
@@ -466,7 +466,7 @@ export function renderManpower(container) {
                         return `<tr class="hover:bg-slate-50">
                             <td class="p-3 text-slate-600">${fmtDate(r.fecha)}</td>
                             <td class="p-3 font-semibold text-slate-700">${escapeHtml(nombre)}</td>
-                            <td class="p-3 text-slate-700">${escapeHtml(t ? t.actividad : 'General')}</td>
+                            <td class="p-3 text-slate-700">${escapeHtml(t ? t.actividad : 'General')}${t && t.archivada_en ? ' <span class="text-[10px] text-slate-400 italic">(eliminada)</span>' : ''}</td>
                             <td class="p-3 text-slate-500">${pct.toFixed(1)}%</td>
                             <td class="p-3 font-bold text-sky-600">${horas.toFixed(2)} h</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
@@ -814,7 +814,7 @@ window.deleteManpower = async function(id) {
     if (bloqueoEl) { toast(bloqueoEl + ' Pide la corrección a un administrador.'); return; }
     
     const p = state.perfilesCache.find(x => x.id === r.usuario_id);
-    const t = state.tasksCache.find(x => x.id === r.pendiente_id);
+    const t = tareaPorId(r.pendiente_id);
     const nombreUsuario = p ? nombreFormateado(p) : 'Desconocido';
     const nombreActividad = t ? t.actividad : 'General';
     const pct = parseFloat(r.porcentaje_dia || 0);
