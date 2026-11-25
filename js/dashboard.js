@@ -1,7 +1,120 @@
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio } from './utils.js';
 
+
+// ------------------------------------------------------------------
+// ESTADO DEL PORTAFOLIO (vista ejecutiva para gerencia)
+// Todas las actividades (sin canceladas/anuladas) en una categoría exclusiva.
+// ------------------------------------------------------------------
+const CATEGORIAS_PORTAFOLIO = [
+    { key: 'cerradaATiempo', label: 'Cerradas a tiempo', color: '#059669' },
+    { key: 'cerradaTarde',   label: 'Cerradas con atraso', color: '#a7f3d0' },
+    { key: 'enPlazo',        label: 'Abiertas en plazo', color: '#0284c7' },
+    { key: 'porVencer',      label: 'Abiertas por vencer (≤ 7 d)', color: '#f59e0b' },
+    { key: 'vencida',        label: 'Abiertas vencidas', color: '#dc2626' },
+    { key: 'sinFecha',       label: 'Sin fecha', color: '#cbd5e1' }
+];
+
+function categoriaPortafolio(t) {
+    if (isCerrado(t)) return (t.fecha_fin && t.fecha_cierre && t.fecha_cierre > t.fecha_fin) ? 'cerradaTarde' : 'cerradaATiempo';
+    const s = semaforo(t);
+    if (s === 'Sin fecha') return 'sinFecha';
+    if (s === 'Vencida') return 'vencida';
+    if (s === 'Por vencer') return 'porVencer';
+    return 'enPlazo';
+}
+
+function datosPortafolio() {
+    const tareas = state.tasksCache.filter(t => t.estado !== 'Cancelado' && t.estado !== 'Anulado');
+    const conRep = new Set((state.reprogramacionesCache || []).map(r => String(r.pendiente_id)));
+    const vacio = () => Object.fromEntries(CATEGORIAS_PORTAFOLIO.map(c => [c.key, 0]));
+    const total = vacio();
+    const porEsp = {};
+    const esps = state.especialidadesTodasCache || [];
+    tareas.forEach(t => {
+        const c = categoriaPortafolio(t);
+        total[c]++;
+        const nombre = esps.find(e => String(e.id) === String(t.especialidad_id))?.nombre || 'GENERAL';
+        porEsp[nombre] = porEsp[nombre] || vacio();
+        porEsp[nombre][c]++;
+    });
+    const n = tareas.length;
+    const cerradas = total.cerradaATiempo + total.cerradaTarde;
+    return {
+        n, cerradas, total, porEsp,
+        avance: n ? Math.round(cerradas * 100 / n) : 0,
+        abiertas: n - cerradas,
+        vencidas: total.vencida,
+        reprogramadas: tareas.filter(t => conRep.has(String(t.id))).length
+    };
+}
+
+function seccionPortafolio() {
+    const d = datosPortafolio();
+    const sa = semanaActualDashboard();
+    const ppc = sa && sa.ppc !== null && sa.ppc !== undefined ? sa.ppc + '%' : '—';
+    const tarjetas = [
+        { label: 'Total', value: d.n, sub: 'actividades', color: 'sky' },
+        { label: 'Avance', value: d.avance + '%', sub: `${d.cerradas} cerradas`, color: 'emerald' },
+        { label: 'Abiertas', value: d.abiertas, sub: 'en curso', color: 'slate' },
+        { label: 'Vencidas', value: d.vencidas, sub: 'requieren acción', color: 'red' },
+        { label: 'Reprogramadas', value: d.reprogramadas, sub: 'con ≥ 1 reprogramación', color: 'violet' },
+        { label: 'PPC semana', value: ppc, sub: 'Last Planner', color: 'teal' }
+    ];
+    const filas = 1 + Object.keys(d.porEsp).length;
+    return `
+        <div class="card p-4 mb-4">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h4 class="font-bold text-sm text-slate-800">Estado del portafolio</h4>
+                    <p class="text-[11px] text-slate-500">Situación actual de todas las actividades (sin canceladas ni anuladas) · ${fmtDate(hoyLima())}</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                ${tarjetas.map(x => `
+                    <div class="rounded-lg bg-${x.color}-50 border border-${x.color}-100 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-${x.color}-800">${x.label}</p>
+                        <p class="text-3xl font-bold text-${x.color}-700 leading-tight">${x.value}</p>
+                        <p class="text-[10px] text-slate-500">${x.sub}</p>
+                    </div>`).join('')}
+            </div>
+            ${d.n ? `<div class="chart-box" style="height: ${Math.min(80 + filas * 34, 520)}px;"><canvas id="chart-portafolio"></canvas></div>`
+                  : '<p class="text-[11px] text-slate-400 italic text-center py-6">Sin actividades.</p>'}
+        </div>`;
+}
+
+function renderPortafolio() {
+    if (state.charts.portafolio) { state.charts.portafolio.destroy(); state.charts.portafolio = null; }
+    const el = document.getElementById('chart-portafolio');
+    if (!el) return;
+    const d = datosPortafolio();
+    const filas = [['PROYECTO', d.total], ...Object.entries(d.porEsp).sort((a, b) => a[0].localeCompare(b[0], 'es'))];
+    const totales = filas.map(([, c]) => Object.values(c).reduce((x, y) => x + y, 0));
+    state.charts.portafolio = new Chart(el, {
+        type: 'bar',
+        data: {
+            labels: filas.map(([n], i) => `${n} (${totales[i]})`),
+            datasets: CATEGORIAS_PORTAFOLIO.map(c => ({
+                label: c.label,
+                data: filas.map(([, cnt], i) => totales[i] ? Math.round(cnt[c.key] * 1000 / totales[i]) / 10 : 0),
+                _abs: filas.map(([, cnt]) => cnt[c.key]),
+                backgroundColor: c.color
+            }))
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.dataset._abs[ctx.dataIndex]} (${ctx.parsed.x}%)` } }
+            },
+            scales: {
+                x: { stacked: true, max: 100, ticks: { callback: v => v + '%', font: { size: 10 } } },
+                y: { stacked: true, ticks: { font: { size: 10, weight: 'bold' } } }
+            }
+        }
+    });
+}
 
 // ------------------------------------------------------------------
 // PARETO 80/20: reprogramaciones e incumplimientos
@@ -321,20 +434,7 @@ export function renderDashboard(container) {
         return f >= inicioSemana && f <= finSemana;
     }).length;
 
-    const vencidasSinCerrar = state.tasksCache.filter(t => 
-        !isCerrado(t) && semaforo(t) === 'Vencida'
-    ).length;
-
-    const latenciaPromedio = (() => {
-        const cerradas = state.tasksCache.filter(t => t.fecha_cierre && t.fecha_fin);
-        const conAtraso = cerradas.filter(t => new Date(t.fecha_cierre + 'T00:00:00') > new Date(t.fecha_fin + 'T00:00:00'));
-        if (conAtraso.length === 0) return 0;
-        const suma = conAtraso.reduce((s, t) => {
-            const dias = Math.round((new Date(t.fecha_cierre + 'T00:00:00') - new Date(t.fecha_fin + 'T00:00:00')) / DAY);
-            return s + dias;
-        }, 0);
-        return suma / conAtraso.length;
-    })();
+    const latencia = latenciaPromedio(state.tasksCache, 8);
 
     const KPI = [
         (() => {
@@ -350,15 +450,13 @@ export function renderDashboard(container) {
         })(),
         { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
         { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
-        { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
-        { label: 'Latencia', value: latenciaPromedio.toFixed(1) + ' d', sub: 'promedio de atraso', color: 'orange', icon: 'fa-hourglass-half' },
-        { label: 'Total', value: k.total, sub: 'actividades', color: 'sky', icon: 'fa-cubes' }
+        { label: 'Latencia', value: latencia.toFixed(1) + ' d', sub: 'atraso promedio · 8 semanas', color: 'orange', icon: 'fa-hourglass-half' }
     ];
 
     const COMPLEMENTARIAS = [
+        { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
         { label: 'Cerradas esta semana', value: cerradasEstaSemana.length, sub: 'todas, a tiempo o tarde', color: 'emerald', icon: 'fa-circle-check' },
         { label: 'Reprogramadas', value: reprogramadasEstaSemana, sub: 'esta semana', color: 'violet', icon: 'fa-calendar-plus' },
-        { label: 'Vencidas sin cerrar', value: vencidasSinCerrar, sub: 'requieren acción', color: 'red', icon: 'fa-bell' },
         { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
     ];
 
@@ -371,7 +469,10 @@ export function renderDashboard(container) {
             <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        ${seccionPortafolio()}
+
+        <h4 class="font-semibold text-sm text-slate-800 mb-2">Operación de la semana</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             ${KPI.map(x => `
                 <div class="card kpi-card p-3 border-l-4 border-${x.color}-500">
                     <div class="flex items-center justify-between">
@@ -397,15 +498,9 @@ export function renderDashboard(container) {
             `).join('')}
         </div>
 
-        <div class="grid lg:grid-cols-3 gap-3 mb-4">
-            <div class="card p-4 lg:col-span-2">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Evolución del PPC (últimas 8 semanas)</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-ppc"></canvas></div>
-            </div>
-            <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Distribución por Estado</h4>
-                <div class="chart-box" style="height: 250px;"><canvas id="chart-estados"></canvas></div>
-            </div>
+        <div class="card p-4 mb-4">
+            <h4 class="font-semibold text-sm text-slate-800 mb-2">Evolución del PPC (últimas 8 semanas)</h4>
+            <div class="chart-box" style="height: 250px;"><canvas id="chart-ppc"></canvas></div>
         </div>
 
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
@@ -447,6 +542,7 @@ export function renderDashboard(container) {
 
     renderCharts(inicioSemana, finSemana);
     renderParetos();
+    renderPortafolio();
     renderPerfTable(inicioSemana, finSemana);
 }
 
@@ -585,7 +681,7 @@ function renderCharts(inicioSemana, finSemana) {
     const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#0d9488'];
     const totalEstados = counts.reduce((s, v) => s + v, 0);
 
-    state.charts.estados = new Chart(document.getElementById('chart-estados'), {
+    if (document.getElementById('chart-estados')) state.charts.estados = new Chart(document.getElementById('chart-estados'), {
         type: 'doughnut',
         data: { 
             labels: estados, 

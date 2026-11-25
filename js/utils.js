@@ -46,6 +46,18 @@ export const lunesDeSemana = (fechaStr) => sumarDias(domingoDeSemana(fechaStr), 
 /** Medianoche local del día de hoy en Lima (para cálculos con Date). */
 export const today = () => new Date(hoyLima() + 'T00:00:00');
 
+/**
+ * Latencia promedio (días de atraso) de los cierres tardíos de las últimas N semanas.
+ * Única definición para Dashboard y Recursos. Devuelve 0 si no hay cierres tardíos.
+ */
+export const latenciaPromedio = (tareas, semanas = 8) => {
+    const desde = sumarDias(hoyLima(), -7 * semanas);
+    const tarde = (tareas || []).filter(t => t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin && t.fecha_cierre >= desde);
+    if (!tarde.length) return 0;
+    const dias = t => Math.round((new Date(t.fecha_cierre + 'T00:00:00Z') - new Date(t.fecha_fin + 'T00:00:00Z')) / 86400000);
+    return tarde.reduce((acc, t) => acc + dias(t), 0) / tarde.length;
+};
+
 // ------------------------------------------------------------------
 // REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql)
 // ------------------------------------------------------------------
