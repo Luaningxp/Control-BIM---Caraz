@@ -274,7 +274,8 @@ begin
         'total_tareas',      (select count(*) from estado_corte),
         'abiertas',          (select count(*) from estado_corte where not cerrada),
         'vencidas',          (select count(*) from estado_corte where not cerrada and v_corte < ref),
-        'por_vencer',        (select count(*) from estado_corte where not cerrada and v_corte between ref and ref + 7)
+        'por_vencer',        (select count(*) from estado_corte where not cerrada and v_corte between ref and ref + 7),
+        'sin_fecha',         (select count(*) from estado_corte where not cerrada and v_corte is null)
     ) into res;
     return res;
 end;
@@ -306,16 +307,21 @@ begin
     end if;
     s := public.ppc_calcular_semana(L);
     delete from public.snapshots_semanales where semana::date = L;
+    -- Las columnas antiguas (planos WIP/Shared/Published/Archived, causas_top) ya no se usan:
+    -- se guardan en 0 / {} porque la tabla las exige.
     insert into public.snapshots_semanales (
-        semana, total_tareas, abiertas, cerradas, vencidas, por_vencer, ppc, horas_semana,
+        semana, total_tareas, abiertas, cerradas, vencidas, por_vencer, sin_fecha, ppc, horas_semana,
+        planos_wip, planos_shared, planos_published, planos_archived, causas_top,
         comprometidas, cumplidas, adelantadas, no_planificadas, horas_no_planificadas,
         no_planificadas_por_especialidad, planos_contractuales, planos_detalle,
         version, congelado_en
     ) values (
         L, (s->>'total_tareas')::int, (s->>'abiertas')::int,
         (s->>'total_tareas')::int - (s->>'abiertas')::int,
-        (s->>'vencidas')::int, (s->>'por_vencer')::int, (s->>'ppc')::numeric,
+        (s->>'vencidas')::int, (s->>'por_vencer')::int, (s->>'sin_fecha')::int,
+        (s->>'ppc')::numeric,
         (s->>'horas_semana')::numeric,
+        0, 0, 0, 0, '{}'::jsonb,
         (s->>'comprometidas')::int, (s->>'cumplidas')::int, (s->>'adelantadas')::int,
         (s->>'no_planificadas')::int, (s->>'horas_no_planificadas')::numeric,
         s->'no_planificadas_por_especialidad',
