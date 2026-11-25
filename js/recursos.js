@@ -1,6 +1,7 @@
 import { state, tareaPorId } from './db.js';
-import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, latenciaPromedio } from './utils.js';
+import { toast, fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, latenciaPromedio } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
+import { armarReporteModeladores, exportarPDFModeladores } from './reporte-modeladores.js';
 
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) { return (parseFloat(pct || 0) * HORAS_POR_100) / 100; }
@@ -825,7 +826,15 @@ function seccionRiesgo(rg) {
                     <p class="text-[11px] text-slate-500">Sin respaldo = actividades abiertas donde es el único modelador (el supervisor no cuenta). Conocimiento = % de las horas en actividades críticas de las últimas 4 semanas.
                     Crítico: ≥ 3 críticas sin respaldo o ≥ 40% del conocimiento · Alto: ≥ 1 crítica sin respaldo o ≥ 25% · Medio: alguna sin respaldo o ≥ 10%.</p>
                 </div>
-                <div class="flex items-center gap-3 text-xs whitespace-nowrap">
+                <div class="flex flex-wrap items-center gap-3 text-xs whitespace-nowrap">
+                    <div class="flex items-center gap-1" title="Actividades planificadas por modelador y semana, para presentar a residencia">
+                        <select id="rep-mod-semanas" class="text-xs border rounded px-1 py-1">
+                            <option value="4" selected>4 semanas + en curso</option>
+                            <option value="8">8 semanas + en curso</option>
+                            <option value="12">12 semanas + en curso</option>
+                        </select>
+                        <button onclick="window.exportarReporteModeladores()" class="px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold hover:bg-sky-700 transition"><i class="fa-solid fa-file-pdf mr-1"></i>Exportar PDF</button>
+                    </div>
                     <span class="text-slate-500">Top 1: <b class="${rg.top1 >= 40 ? 'text-red-700' : rg.top1 >= 25 ? 'text-amber-700' : 'text-emerald-700'}">${rg.top1.toFixed(0)}%</b></span>
                     <span class="text-slate-500">Top 2: <b class="${rg.top2 >= 70 ? 'text-red-700' : rg.top2 >= 50 ? 'text-amber-700' : 'text-emerald-700'}">${rg.top2.toFixed(0)}%</b></span>
                 </div>
@@ -853,3 +862,22 @@ function seccionRiesgo(rg) {
             </div>
         </div>`;
 }
+
+// Botón "Exportar PDF": actividades planificadas por modelador y semana (para residencia).
+window.exportarReporteModeladores = function () {
+    try {
+        const nCerradas = Number(document.getElementById('rep-mod-semanas')?.value) || 4;
+        const datos = armarReporteModeladores({
+            modeladores: state.perfilesCache.filter(esModeladorPerfil),
+            tareas: state.tasksCache,
+            recursos: state.actividadRecursosCache,
+            especialidades: state.especialidadesTodasCache,
+            nCerradas,
+            esLaborable: esDiaLaborable
+        });
+        exportarPDFModeladores(datos);
+    } catch (e) {
+        console.error('Error al generar el PDF de modeladores:', e);
+        toast('No se pudo generar el PDF. Revisa la consola.');
+    }
+};
