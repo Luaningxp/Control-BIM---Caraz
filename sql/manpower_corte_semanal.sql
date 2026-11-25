@@ -6,6 +6,11 @@
 -- Se puede volver a ejecutar sin romper nada.
 -- Ejecutarlo ANTES de publicar la versión de la app que lo usa.
 --
+-- OJO: este archivo ya no es la versión final de las reglas. Si alguna vez lo vuelves
+-- a ejecutar, ejecuta DESPUÉS, en este orden:
+--   sql/archivar_actividades_cierre.sql
+--   sql/manpower_justificar_retraso.sql
+--
 -- Reglas (deben coincidir con js/utils.js):
 --   1. "Hoy" = fecha actual en America/Lima.
 --   2. La semana va de lunes a domingo; se cierra el domingo 23:59.

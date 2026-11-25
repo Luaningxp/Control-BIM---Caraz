@@ -59,7 +59,8 @@ export const latenciaPromedio = (tareas, semanas = 8) => {
 };
 
 // ------------------------------------------------------------------
-// REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql)
+// REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql,
+// sql/archivar_actividades_cierre.sql y sql/manpower_justificar_retraso.sql)
 // ------------------------------------------------------------------
 export const DIAS_GRACIA_CIERRE = 2;
 
@@ -86,12 +87,24 @@ export const cerradaVisibleHoy = (t, hoy = hoyLima()) => {
     return !!lim && hoy <= lim;
 };
 
+export const MSG_RETRASO_CERRADA = 'Pasó el plazo de 2 días desde el cierre de la actividad: justifica el retraso.';
+
 /**
- * Valida un registro de manpower (crear, editar o eliminar) para un usuario sin rol admin.
+ * ¿El motivo lo puede justificar cualquier usuario (no solo un admin)?
+ * Solo el retraso al cargar en una actividad cerrada, siempre dentro de la semana en curso.
+ */
+export const esMotivoJustificableTodos = (motivo) => motivo === MSG_RETRASO_CERRADA;
+
+/**
+ * Valida un registro de manpower (crear o editar) para un usuario sin rol admin.
  * Devuelve null si es válido o el mensaje de error.
  * - fecha: fecha del registro; tarea: actividad vinculada (o null si es General).
+ * - omitirPlazo: true al corregir un registro existente sin cambiar su actividad
+ *   (corregir lo ya cargado no pide justificación).
+ * Si el único problema es el plazo de la cerrada, devuelve MSG_RETRASO_CERRADA:
+ * cualquier usuario puede guardar justificando el retraso.
  */
-export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
+export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima(), omitirPlazo = false }) => {
     if (!fecha) return 'Indica la fecha del registro.';
     if (fecha > hoy) return 'No puedes registrar horas en una fecha futura.';
     if (semanaCerrada(fecha, hoy)) return 'Esa semana ya está cerrada (corte del domingo 23:59). Pide la corrección a un administrador.';
@@ -101,7 +114,7 @@ export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
         if (tarea.estado === 'Cerrado') {
             if (!tarea.fecha_cierre) return 'La actividad está cerrada.';
             if (fecha > tarea.fecha_cierre) return 'No puedes cargar horas después de la fecha de cierre de la actividad.';
-            if (hoy > limiteVisibleCerrada(tarea.fecha_cierre)) return 'Ya venció el plazo para cargar horas a esta actividad cerrada.';
+            if (!omitirPlazo && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) return MSG_RETRASO_CERRADA;
         }
     }
     return null;
@@ -109,16 +122,14 @@ export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima() }) => {
 
 /**
  * ¿Un registro que ya existe está bloqueado para editarlo o eliminarlo?
- * Bloqueado si su semana ya cerró o si su actividad cerrada ya pasó el plazo.
+ * Bloqueado si su semana ya cerró o si su actividad está archivada.
+ * Dentro de la semana en curso se corrige libremente, aunque la actividad haya cerrado hace más de 2 días.
  * Devuelve null si se puede tocar o el motivo del bloqueo.
  */
 export const bloqueoRegistroExistente = ({ fecha, tarea, hoy = hoyLima() }) => {
     if (semanaCerrada(fecha, hoy)) return 'Ese registro es de una semana ya cerrada (corte del domingo 23:59).';
     if (tarea && tarea.archivada_en) return 'La actividad del registro fue eliminada (archivada).';
     if (tarea && tarea.estado_cde === 'Archived') return 'La actividad del registro está archivada en el CDE.';
-    if (tarea && tarea.estado === 'Cerrado' && tarea.fecha_cierre && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) {
-        return 'Ya venció el plazo para modificar horas de esta actividad cerrada.';
-    }
     return null;
 };
 

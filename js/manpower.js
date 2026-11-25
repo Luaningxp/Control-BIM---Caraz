@@ -3,7 +3,7 @@ import {
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
     getIniciales, colorAvatar, confirmDelete, nombreResponsable, hoyLima, isoLocal,
     esAdminManpower, semanaCerrada, cerradaVisibleHoy, limiteVisibleCerrada, lunesDeSemana,
-    validarRegistroManpower, bloqueoRegistroExistente } from './utils.js';
+    validarRegistroManpower, bloqueoRegistroExistente, esMotivoJustificableTodos } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -20,10 +20,11 @@ let manpowerState = {
     soloRegistradosPorMi: true
 };
 
-function isUserInvolved(t) {
-    const esResponsable = t.responsable_id === state.currentUser.id;
+/** ¿El usuario (por defecto, el actual) es responsable o recurso de la actividad? */
+function isUserInvolved(t, uid = state.currentUser.id) {
+    const esResponsable = t.responsable_id === uid;
     const esRecurso = state.actividadRecursosCache.some(
-        r => r.pendiente_id === t.id && r.usuario_id === state.currentUser.id
+        r => r.pendiente_id === t.id && r.usuario_id === uid
     );
     return esResponsable || esRecurso;
 }
@@ -566,6 +567,49 @@ export function renderManpower(container) {
     }
 }
 
+// Listas del formulario abierto (se repinta al pulsar "Cargar más actividades cerradas")
+let listaModalManpower = null;
+
+/** Cerradas más recientes primero. */
+function ordenarCerradas(lista) {
+    return lista.sort((a, b) => String(b.fecha_cierre || '').localeCompare(String(a.fecha_cierre || '')));
+}
+
+function pintarListaActividades(valor) {
+    const select = document.getElementById('mp-actividad');
+    const L = listaModalManpower;
+    if (!select || !L) return;
+    const opcionTarea = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0,50))}...</option>`;
+    const opcionCerrada = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0,40))}... (cerró ${fmtDate(t.fecha_cierre)})</option>`;
+    select.innerHTML = '<option value="">— General —</option>' +
+        (L.activas.length ? `<optgroup label="Activas">${L.activas.map(opcionTarea).join('')}</optgroup>` : '') +
+        (L.cerradasVisibles.length ? `<optgroup label="Cerradas (solo fechas hasta su cierre)">${L.cerradasVisibles.map(opcionTarea).join('')}</optgroup>` : '') +
+        (L.mostrarExtra && L.cerradasExtra.length ? `<optgroup label="Cerradas fuera de plazo (requieren justificación)">${L.cerradasExtra.map(opcionCerrada).join('')}</optgroup>` : '') +
+        (L.extraFija ? opcionTarea(L.extraFija) : '');
+    select.value = valor ?? '';
+
+    const btn = document.getElementById('mp-mas-cerradas');
+    if (btn) {
+        const hay = L.cerradasExtra.length > 0;
+        btn.classList.toggle('hidden', !hay);
+        btn.querySelector('span').textContent = L.mostrarExtra
+            ? 'Ocultar actividades cerradas fuera de plazo'
+            : `Cargar más actividades cerradas (${L.cerradasExtra.length})`;
+    }
+}
+
+window.cargarMasCerradasManpower = function() {
+    if (!listaModalManpower) return;
+    const select = document.getElementById('mp-actividad');
+    const actual = select?.value || '';
+    listaModalManpower.mostrarExtra = !listaModalManpower.mostrarExtra;
+    // Si se ocultan y la elegida era una de ellas, vuelve a "General"
+    const sigue = listaModalManpower.mostrarExtra
+        || !listaModalManpower.cerradasExtra.some(t => String(t.id) === actual);
+    pintarListaActividades(sigue ? actual : '');
+    window.actualizarJustificacionManpower();
+};
+
 export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
@@ -580,6 +624,9 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
                             <select id="mp-actividad" class="inp" onchange="window.actualizarJustificacionManpower()">
                                 <option value="">— General —</option>
                             </select>
+                            <button type="button" id="mp-mas-cerradas" onclick="window.cargarMasCerradasManpower()" class="hidden mt-1 text-[11px] text-sky-700 hover:underline">
+                                <i class="fa-solid fa-clock-rotate-left mr-1"></i><span></span>
+                            </button>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
@@ -614,33 +661,35 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
 
     const esAdm = esAdminManpower(state);
     const hoy = hoyLima();
-    const tareasDisponibles = state.tasksCache.filter(t => {
-        if (t.estado_cde === 'Archived') return false;
-        if (!esAdm && !isUserInvolved(t)) return false;
-        // Cerradas: el modelador las ve hasta cierre + 2 días (tope domingo).
-        // Un admin las ve siempre, para correcciones justificadas.
-        if (t.estado === 'Cerrado') return esAdm || cerradaVisibleHoy(t, hoy);
-        return true;
-    });
-    const opcionTarea = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml(t.actividad.substring(0,50))}...</option>`;
-    const activas = tareasDisponibles.filter(t => t.estado !== 'Cerrado');
-    const cerradas = tareasDisponibles.filter(t => t.estado === 'Cerrado');
-
-    const select = document.getElementById('mp-actividad');
-    select.innerHTML = '<option value="">— General —</option>' +
-        (activas.length ? `<optgroup label="Activas">${activas.map(opcionTarea).join('')}</optgroup>` : '') +
-        (cerradas.length ? `<optgroup label="Cerradas (solo fechas hasta su cierre)">${cerradas.map(opcionTarea).join('')}</optgroup>` : '');
-
     const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
-    // Al editar, la actividad del registro debe poder verse aunque ya esté cerrada
-    if (rEdit && rEdit.pendiente_id && !tareasDisponibles.some(t => t.id === rEdit.pendiente_id)) {
-        const tx = state.tasksCache.find(t => t.id === rEdit.pendiente_id);
-        if (tx) select.insertAdjacentHTML('beforeend', `<option value="${tx.id}">${escapeHtml(tx.codigo_contenedor || '')} - ${escapeHtml(tx.actividad.substring(0,50))}...</option>`);
-    }
+    // La lista muestra las actividades del DUEÑO del registro (responsable o recurso),
+    // también para los admins. Si un admin corrige el registro de otra persona, salen las de esa persona.
+    const uidLista = rEdit ? rEdit.usuario_id : state.currentUser.id;
+    const lunes = lunesDeSemana(hoy);
+    const propias = state.tasksCache.filter(t => t.estado_cde !== 'Archived' && isUserInvolved(t, uidLista));
+    const activas = propias.filter(t => t.estado !== 'Cerrado');
+    // Cerradas: visibles hasta cierre + 2 días (tope domingo), igual para todos.
+    const cerradasVisibles = propias.filter(t => t.estado === 'Cerrado' && cerradaVisibleHoy(t, hoy));
+    // "Cargar más": cerradas fuera del plazo. Sin rol admin, solo las que cerraron en la semana en curso
+    // (las de semanas ya cerradas no admiten horas); un admin ve todas.
+    const cerradasExtra = propias.filter(t => t.estado === 'Cerrado' && !cerradaVisibleHoy(t, hoy)
+        && (esAdm || (t.fecha_cierre && t.fecha_cierre >= lunes)));
+    ordenarCerradas(cerradasExtra);
+
+    // Al editar, la actividad del registro debe poder verse aunque ya no esté en la lista
+    const enLista = id => [...activas, ...cerradasVisibles, ...cerradasExtra].some(t => t.id === id);
+    const extraFija = (rEdit && rEdit.pendiente_id && !enLista(rEdit.pendiente_id)) ? tareaPorId(rEdit.pendiente_id) : null;
+
+    const idInicial = rEdit ? (rEdit.pendiente_id || null) : (pendienteId || null);
+    listaModalManpower = {
+        activas, cerradasVisibles, cerradasExtra, extraFija,
+        // Si la actividad elegida es una cerrada fuera de plazo, se muestran directamente
+        mostrarExtra: !!idInicial && cerradasExtra.some(t => String(t.id) === String(idInicial))
+    };
+    pintarListaActividades(idInicial || '');
 
     document.getElementById('mp-id').value = rEdit ? rEdit.id : '';
     document.getElementById('mp-titulo').textContent = rEdit ? 'Editar registro' : 'Registrar % del Día';
-    select.value = rEdit ? (rEdit.pendiente_id || '') : (pendienteId || '');
     document.getElementById('mp-fecha').value = rEdit ? rEdit.fecha : (fechaPredefinida || hoyLima());
     document.getElementById('mp-porcentaje').value = rEdit ? parseFloat(rEdit.porcentaje_dia || 0) : '';
     document.getElementById('mp-desc').value = rEdit ? (rEdit.descripcion || '') : '';
@@ -680,7 +729,8 @@ window.actualizarRestanteManpower = function() {
 /**
  * Evalúa el formulario abierto. Devuelve { error, justificar }:
  * - error: motivo por el que no se puede guardar (usuarios sin rol admin, o fecha futura).
- * - justificar: motivo por el que un admin debe justificar el cambio.
+ * - justificar: motivo por el que hay que justificar el cambio. Un admin justifica cualquier
+ *   excepción; cualquier usuario justifica el retraso al cargar en una cerrada fuera de plazo.
  */
 function evaluarFormularioManpower() {
     const fecha = document.getElementById('mp-fecha')?.value;
@@ -690,10 +740,14 @@ function evaluarFormularioManpower() {
     const hoy = hoyLima();
 
     if (fecha && fecha > hoy) return { error: 'No puedes registrar horas en una fecha futura.', justificar: null };
-    const motivo = validarRegistroManpower({ fecha, tarea, hoy })
-        || (rEdit ? bloqueoDe(rEdit) : null);
+    // Corregir un registro sin cambiarle la actividad no pide justificación por el plazo
+    const mismaActividad = !!rEdit && String(rEdit.pendiente_id || '') === String(tarea?.id || '');
+    const motivoExistente = rEdit ? bloqueoDe(rEdit) : null;
+    const motivoNuevo = validarRegistroManpower({ fecha, tarea, hoy, omitirPlazo: mismaActividad });
+    const motivo = motivoExistente || motivoNuevo;
     if (!motivo) return { error: null, justificar: null };
-    return esAdminManpower(state) ? { error: null, justificar: motivo } : { error: motivo, justificar: null };
+    if (esAdminManpower(state) || esMotivoJustificableTodos(motivo)) return { error: null, justificar: motivo };
+    return { error: motivo, justificar: null };
 }
 
 window.actualizarJustificacionManpower = function() {
@@ -702,6 +756,10 @@ window.actualizarJustificacionManpower = function() {
     const { justificar } = evaluarFormularioManpower();
     box.classList.toggle('hidden', !justificar);
     document.getElementById('mp-justif-motivo').textContent = justificar || '';
+    const txt = document.getElementById('mp-justif');
+    if (txt) txt.placeholder = esMotivoJustificableTodos(justificar)
+        ? '¿Por qué no registraste a tiempo?'
+        : '¿Por qué se corrige fuera del corte?';
 };
 
 window.actualizarHorasManpower = function() {
@@ -733,7 +791,7 @@ export async function saveManpower(e) {
     if (evaluacion.error) { toast(evaluacion.error); return; }
     const justificacion = (document.getElementById('mp-justif')?.value || '').trim();
     if (evaluacion.justificar && !justificacion) {
-        toast('Escribe la justificación de la corrección.');
+        toast('Escribe la justificación.');
         document.getElementById('mp-justif')?.focus();
         return;
     }
