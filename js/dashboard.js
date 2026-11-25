@@ -1,3 +1,4 @@
+import { colorTema } from './tema.js';
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
 import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio } from './utils.js';
@@ -11,7 +12,7 @@ const CATEGORIAS_PORTAFOLIO = [
     { key: 'cerradaATiempo', label: 'Cerradas a tiempo', color: '#059669' },
     { key: 'cerradaTarde',   label: 'Cerradas con atraso', color: '#a7f3d0' },
     { key: 'enPlazo',        label: 'Abiertas en plazo', color: '#0284c7' },
-    { key: 'porVencer',      label: 'Abiertas por vencer (≤ 7 d)', color: '#f59e0b' },
+    { key: 'porVencer',      label: 'Abiertas por vencer (≤ 7 d)', color: '#ea580c' },
     { key: 'vencida',        label: 'Abiertas vencidas', color: '#dc2626' },
     { key: 'sinFecha',       label: 'Sin fecha', color: '#cbd5e1' }
 ];
@@ -284,7 +285,7 @@ function dibujarPareto(canvasId, pareto, colorVital) {
                 { type: 'bar', label: 'Eventos', data: pareto.filas.map(f => f.n), yAxisID: 'y',
                   backgroundColor: pareto.filas.map(f => f.vital ? colorVital : '#cbd5e1'), order: 2 },
                 { type: 'line', label: '% acumulado', data: pareto.filas.map(f => f.pctAcum), yAxisID: 'y1',
-                  borderColor: '#0f172a', backgroundColor: '#0f172a', pointRadius: 3, tension: 0, order: 1 },
+                  borderColor: colorTema('--chart-line', '#0F1D30'), backgroundColor: colorTema('--chart-line', '#0F1D30'), pointRadius: 3, tension: 0, order: 1 },
                 { type: 'line', label: '80%', data: pareto.filas.map(() => 80), yAxisID: 'y1',
                   borderColor: '#dc2626', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5, order: 0 }
             ]

@@ -661,7 +661,7 @@ function calcularWIP(modeladores) {
         let estado = 'Normal', color = 'text-emerald-700', hex = '#059669';
         if (lab === 0) { estado = 'Sin días laborables'; color = 'text-slate-400'; hex = '#cbd5e1'; }
         else if (prom > limite) { estado = 'Sobrecargado'; color = 'text-red-700'; hex = '#dc2626'; }
-        else if (pico.n > limite) { estado = 'Picos'; color = 'text-amber-700'; hex = '#f59e0b'; }
+        else if (pico.n > limite) { estado = 'Picos'; color = 'text-amber-700'; hex = '#ea580c'; }
         else if (prom < 1) { estado = 'Disponible'; color = 'text-sky-700'; hex = '#0284c7'; }
         return { lab, prom, pico, sobre, estado, color, hex };
     };

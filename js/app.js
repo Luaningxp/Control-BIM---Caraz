@@ -1,3 +1,4 @@
+import { aplicarTemaCharts } from './tema.js';
 import { supabaseClient, state, fetchCore, fetchVista, fetchAll } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
@@ -196,6 +197,9 @@ window.toggleDarkMode = function() {
         icon.classList.remove('fa-moon');
         icon.classList.add('fa-sun');
     }
+    // Las gráficas no leen CSS: se redibuja la vista con los colores del tema nuevo.
+    aplicarTemaCharts();
+    if (document.getElementById('view-container')?.children.length) window.renderView();
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -207,4 +211,5 @@ window.addEventListener('DOMContentLoaded', () => {
             icon.classList.add('fa-sun');
         }
     }
+    aplicarTemaCharts();
 });
