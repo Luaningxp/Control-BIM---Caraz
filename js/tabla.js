@@ -2,8 +2,7 @@ import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
-    confirmDelete, semaforo
-} from './utils.js';
+    confirmDelete, semaforo, hoyLima } from './utils.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
 
@@ -310,7 +309,7 @@ window.quitarCausa = function(cid) {
 function calcularCargaModeladores() {
     const CAPACIDAD_SEMANAL_H = 40;
     const PESO_IMPORTANCIA = { 'Muy alto': 3, 'Alto': 2, 'Medio': 1, 'Bajo': 0.5 };
-    const hoyStr = new Date().toISOString().split('T')[0];
+    const hoyStr = hoyLima();
 
     const modeladores = state.perfilesCache.filter(p =>
         (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador'

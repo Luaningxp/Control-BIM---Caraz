@@ -1,4 +1,4 @@
-import { escapeHtml, toast, confirmDelete } from './utils.js';
+import { escapeHtml, toast, confirmDelete, hoyLima } from './utils.js';
 import { supabaseClient, state, fetchAll } from './db.js';
 
 export function renderConfig(container) {
@@ -170,7 +170,7 @@ window.exportToExcel = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Base de Datos");
-    XLSX.writeFile(wb, `Control_BIM_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `Control_BIM_Export_${hoyLima()}.xlsx`);
 };
 
 // --- LÓGICA DE IMPORTAR (REEMPLAZAR) ---

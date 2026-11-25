@@ -1,7 +1,7 @@
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
 import { TIPOS_REPROGRAMACION } from './reprogramaciones.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal } from './utils.js';
 
 
 function metricasReprogramaciones() {
@@ -74,7 +74,7 @@ export function renderDashboard(container) {
 
     const k = calcularKPIs();
     
-    const hoy = new Date();
+    const hoy = today();
     hoy.setHours(0,0,0,0);
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
@@ -229,7 +229,7 @@ export function renderDashboard(container) {
                 </thead>
                                 <tbody class="divide-y divide-slate-100">
                     ${(() => {
-                        const hoy = new Date();
+                        const hoy = today();
                         hoy.setHours(0, 0, 0, 0);
                         const dia = hoy.getDay();
                         const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
@@ -242,7 +242,7 @@ export function renderDashboard(container) {
                         for (let i = 0; i < 8; i++) {
                             const lunes = new Date(lunesActual);
                             lunes.setDate(lunesActual.getDate() - (i * 7));
-                            const semanaStr = lunes.toISOString().split('T')[0];
+                            const semanaStr = isoLocal(lunes);
                             
                             const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
 
@@ -365,7 +365,7 @@ function calcularKPIs() {
     const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
     const sinFecha = abiertas.filter(t => !t.fecha_fin);
 
-    const hoy = new Date();
+    const hoy = today();
     hoy.setHours(0, 0, 0, 0);
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);

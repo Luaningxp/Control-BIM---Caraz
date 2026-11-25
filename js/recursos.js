@@ -1,5 +1,5 @@
 import { state } from './db.js';
-import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar } from './utils.js';
+import { fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -10,7 +10,7 @@ function semanaKey(fechaStr) {
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const lunes = new Date(d.setDate(diff));
-    return lunes.toISOString().split('T')[0];
+    return isoLocal(lunes);
 }
 
 function semanasEntre(desde, hasta) {
@@ -18,7 +18,7 @@ function semanasEntre(desde, hasta) {
     const cur = new Date(desde + 'T00:00:00');
     const end = new Date(hasta + 'T00:00:00');
     while (cur <= end) {
-        out.push(cur.toISOString().split('T')[0]);
+        out.push(isoLocal(cur));
         cur.setDate(cur.getDate() + 7);
     }
     return out;
@@ -62,7 +62,7 @@ export function renderRecursos(container) {
         return;
     }
 
-    const hoy = new Date();
+    const hoy = today();
     hoy.setHours(0, 0, 0, 0);
     const diaSemana = hoy.getDay();
     const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
@@ -89,7 +89,7 @@ export function renderRecursos(container) {
         const cursor = new Date(inicioMes);
 
         while (cursor <= finMes) {
-            const fechaStr = cursor.toISOString().split('T')[0];
+            const fechaStr = isoLocal(cursor);
             if (esDiaLaborable(p.id, fechaStr)) {
                 if (cursor <= hoy) {
                     diasDelMes.push(fechaStr); // Días hábiles hasta hoy
@@ -129,8 +129,8 @@ export function renderRecursos(container) {
     const ayer = new Date(hoy);
     ayer.setDate(ayer.getDate() - 1);
     while (ayer.getDay() === 0) ayer.setDate(ayer.getDate() - 1);
-    const ayerStr = ayer.toISOString().split('T')[0];
-    const hoyStr = hoy.toISOString().split('T')[0];
+    const ayerStr = isoLocal(ayer);
+    const hoyStr = isoLocal(hoy);
     const modeladoresPendientesHoy = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${hoyStr}`] || 0) < 100).length;
     const modeladoresPendientesAyer = modeladores.filter(p => (pctPorUsuarioDia[`${p.id}|${ayerStr}`] || 0) < 100).length;
 
@@ -150,7 +150,7 @@ export function renderRecursos(container) {
     const distribucionEquipos = {};
     jefesValidos.forEach(j => distribucionEquipos[j.id] = { nombre: nombreFormateado(j), cargo: j.cargo, modeladores: new Set() });
     
-    const hoyFechaStr = new Date().toISOString().split('T')[0];
+    const hoyFechaStr = hoyLima();
     const modeladoresLaborandoHoy = modeladores.filter(m => {
         const tipo = tipoDia(m.id, hoyFechaStr);
         return tipo === 'T' || tipo === 'TE';
@@ -233,7 +233,7 @@ export function renderRecursos(container) {
     });
 
     const semanasRecientes = semanas.slice(-6);
-    const hoyLocalStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+    const hoyLocalStr = hoyLima(); // YYYY-MM-DD en hora local
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
         cumplimientoSemanal[p.id] = { nombre: nombreFormateado(p), avatar: p.id, semanas: {} };
@@ -244,7 +244,7 @@ export function renderRecursos(container) {
             let laborables = 0;      // días laborables de la semana según roster
             const evaluables = [];   // laborables que ya ocurrieron (<= hoy)
             for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
-                const fechaStr = d.toISOString().split('T')[0];
+                const fechaStr = isoLocal(d);
                 if (!esDiaLaborable(p.id, fechaStr)) continue;
                 laborables++;
                 if (fechaStr <= hoyLocalStr) evaluables.push(fechaStr);
@@ -272,7 +272,7 @@ export function renderRecursos(container) {
     });
 
     // === LATENCIA PROMEDIO (VENTANA 8 SEMANAS) ===
-    const hoyLatencia = new Date();
+    const hoyLatencia = today();
     hoyLatencia.setHours(0, 0, 0, 0);
     const hace8Semanas = new Date(hoyLatencia);
     hace8Semanas.setDate(hace8Semanas.getDate() - 56);
@@ -301,7 +301,7 @@ export function renderRecursos(container) {
     // === SOBRECARGA POR MODELADOR (REPARTO GESTIÓN / EJECUCIÓN) ===
     const CAPACIDAD_SEMANAL_H = 40;
     const PESO_IMPORTANCIA = { 'Muy alto': 1.65, 'Alto': 1.4, 'Medio': 1.2, 'Bajo': 1.0 };
-    const hoyStrCap = new Date().toISOString().split('T')[0];
+    const hoyStrCap = hoyLima();
 
     const cargaPorModelador = {};
     state.perfilesCache.forEach(p => {
@@ -397,7 +397,7 @@ export function renderRecursos(container) {
 
     // === CONCENTRACIÓN DE RIESGO (REPARTO) ===
     const PESO_CRITICO = { 'Muy alto': 3, 'Alto': 2 };
-    const hoyStrRiesgo = new Date().toISOString().split('T')[0];
+    const hoyStrRiesgo = hoyLima();
 
     const cargaCriticaPorModelador = {};
     state.perfilesCache.filter(p => (p.cargo || '').toLowerCase().includes('modelador') || p.rol === 'operador').forEach(p => {

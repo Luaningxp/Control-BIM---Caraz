@@ -1,8 +1,9 @@
 import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
-    getIniciales, colorAvatar, confirmDelete, nombreResponsable
-} from './utils.js';
+    getIniciales, colorAvatar, confirmDelete, nombreResponsable, hoyLima, isoLocal,
+    esAdminManpower, semanaCerrada, cerradaVisibleHoy, limiteVisibleCerrada, lunesDeSemana,
+    validarRegistroManpower, bloqueoRegistroExistente } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -31,14 +32,15 @@ function isUserInvolved(t) {
 // MI TRABAJO
 // ============================================================
 export function renderMiTrabajo(container) {
-    const hoyStr = today().toISOString().split('T')[0];
+    const hoyStr = hoyLima();
     const misTareas = state.tasksCache.filter(t => {
         if (t.estado_cde === 'Archived' || !isUserInvolved(t)) return false;
-        if (t.estado === 'Cerrado') return t.fecha_cierre === hoyStr;
+        // Cerrada: visible hasta cierre + 2 días calendario, sin pasar del domingo (hora de Lima)
+        if (t.estado === 'Cerrado') return cerradaVisibleHoy(t, hoyStr);
         return true;
     });
     
-    const hoy = new Date();
+    const hoy = today();
     hoy.setHours(0,0,0,0);
 
     // Último día laborable (según roster) anterior a hoy, buscando hasta 7 días atrás
@@ -46,7 +48,7 @@ export function renderMiTrabajo(container) {
     const cursor = new Date(hoy);
     for (let i = 0; i < 7; i++) {
         cursor.setDate(cursor.getDate() - 1);
-        const f = cursor.toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+        const f = isoLocal(cursor); // YYYY-MM-DD en hora local
         if (esDiaLaborable(state.currentUser.id, f)) { ayerStr = f; break; }
     }
 
@@ -54,7 +56,9 @@ export function renderMiTrabajo(container) {
         ? state.manpowerCache.filter(m => m.usuario_id === state.currentUser.id && m.fecha === ayerStr)
         : [];
     const porcentajeAyer = registrosAyer.reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    const noLlenoAyer = !!ayerStr && porcentajeAyer < 100;
+    // Si "ayer" cae en una semana ya cerrada, solo un admin puede completarlo
+    const noLlenoAyer = !!ayerStr && porcentajeAyer < 100
+        && (!semanaCerrada(ayerStr, hoyStr) || esAdminManpower(state));
 
     container.innerHTML = `
         ${noLlenoAyer ? `
@@ -95,6 +99,7 @@ export function renderMiTrabajo(container) {
                         <div class="flex items-center gap-2 mb-1 flex-wrap">
                             <span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">${t.codigo_contenedor || '–'}</span>
                             <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">${semaforo(t)}</span>
+                            ${t.estado === 'Cerrado' ? `<span class="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold" title="Puedes registrar horas hasta fechas iguales o anteriores al cierre">Cerrada el ${fmtDate(t.fecha_cierre)} · registra hasta el ${fmtDate(limiteVisibleCerrada(t.fecha_cierre))}</span>` : ''}
                             ${totalUsuarioTarea > 0 ? `<span class="text-[10px] bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">Acumulado: ${totalUsuarioTarea.toFixed(1)}% · ${pctAHoras(totalUsuarioTarea).toFixed(2)} h</span>` : ''}
                         </div>
                         <h4 class="font-bold text-slate-800 text-sm">${escapeHtml(t.actividad)}</h4>
@@ -157,7 +162,7 @@ window.openInformeModal = function() {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
     
-    document.getElementById('inf-fecha-inicio').value = new Date().toISOString().split('T')[0];
+    document.getElementById('inf-fecha-inicio').value = hoyLima();
     document.getElementById('modal-informe').classList.remove('hidden');
     document.getElementById('modal-informe').classList.add('flex');
 };
@@ -325,6 +330,53 @@ function puedeGestionarManpower(r) {
     return !!r && (state.isAdmin || state.isCoordinador || r.usuario_id === state.currentUser?.id);
 }
 
+function tareaDe(pendienteId) {
+    if (!pendienteId) return null;
+    return state.tasksCache.find(t => String(t.id) === String(pendienteId)) || null;
+}
+
+/** Motivo de bloqueo de un registro existente (null si está libre). */
+function bloqueoDe(r) {
+    return bloqueoRegistroExistente({ fecha: r.fecha, tarea: tareaDe(r.pendiente_id) });
+}
+
+/** Para usuarios sin rol admin: motivo por el que no pueden tocar el registro (null si pueden). */
+function registroBloqueadoPara(r) {
+    return esAdminManpower(state) ? null : bloqueoDe(r);
+}
+
+/**
+ * Pide una justificación obligatoria (correcciones de admin fuera del corte).
+ * Devuelve el texto o null si se cancela.
+ */
+function pedirJustificacion(mensaje) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4';
+        overlay.style.zIndex = '80';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3 text-xs">
+                <h3 class="font-bold text-sm text-slate-800"><i class="fa-solid fa-scale-balanced text-amber-600 mr-1"></i> Justificación requerida</h3>
+                <p class="text-slate-600">${escapeHtml(mensaje)}</p>
+                <textarea id="jm-texto" rows="3" class="inp" placeholder="Motivo de la corrección"></textarea>
+                <p id="jm-error" class="text-red-600 hidden">Escribe la justificación.</p>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" id="jm-cancelar" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                    <button type="button" id="jm-ok" class="px-4 py-1.5 bg-amber-600 text-white font-semibold rounded hover:bg-amber-700">Continuar</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const cerrar = (v) => { overlay.remove(); resolve(v); };
+        overlay.querySelector('#jm-cancelar').onclick = () => cerrar(null);
+        overlay.querySelector('#jm-ok').onclick = () => {
+            const v = overlay.querySelector('#jm-texto').value.trim();
+            if (!v) { overlay.querySelector('#jm-error').classList.remove('hidden'); return; }
+            cerrar(v);
+        };
+        setTimeout(() => overlay.querySelector('#jm-texto').focus(), 50);
+    });
+}
+
 function ctxManpower() {
     const editId = document.getElementById('mp-id')?.value || '';
     const rec = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
@@ -419,14 +471,14 @@ export function renderManpower(container) {
                             <td class="p-3 font-bold text-sky-600">${horas.toFixed(2)} h</td>
                             <td class="p-3 text-slate-500 italic">${escapeHtml(r.descripcion || '')}</td>
                             <td class="p-3 text-center whitespace-nowrap">
-                                ${puedeGestionarManpower(r) ? `
+                                ${puedeGestionarManpower(r) && !registroBloqueadoPara(r) ? `
                                     <button onclick="window.editManpower(${r.id})" class="text-sky-600 hover:text-sky-800 mr-2" title="Editar registro">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
                                     <button onclick="window.deleteManpower(${r.id})" class="text-red-500 hover:text-red-700" title="Eliminar registro">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
-                                ` : ''}
+                                ` : (puedeGestionarManpower(r) ? `<i class="fa-solid fa-lock text-slate-400" title="${escapeHtml(registroBloqueadoPara(r))} Pide la corrección a un administrador."></i>` : '')}
                             </td>
                         </tr>`;
                     }).join('') || `<tr><td colspan="7" class="text-center py-6 text-slate-400">No hay registros con los filtros actuales.</td></tr>`}
@@ -525,20 +577,25 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
                         <input type="hidden" id="mp-id" value="">
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Actividad</label>
-                            <select id="mp-actividad" class="inp">
+                            <select id="mp-actividad" class="inp" onchange="window.actualizarJustificacionManpower()">
                                 <option value="">— General —</option>
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-1">Fecha</label>
-                                <input type="date" id="mp-fecha" required class="inp" onchange="window.actualizarRestanteManpower()">
+                                <input type="date" id="mp-fecha" required class="inp" onchange="window.actualizarRestanteManpower(); window.actualizarJustificacionManpower()">
                             </div>
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-1">% del Día</label>
                                 <input type="number" step="1" min="1" max="100" id="mp-porcentaje" required class="inp" placeholder="Ej. 25" oninput="window.actualizarHorasManpower()">
                                 <p id="mp-horas-equivalentes" class="text-[10px] text-slate-500 mt-1">= 0.00 h</p>
                             </div>
+                        </div>
+                        <div id="mp-justif-box" class="hidden bg-amber-50 border border-amber-200 rounded p-2">
+                            <label class="block font-semibold text-amber-800 mb-1"><i class="fa-solid fa-scale-balanced mr-1"></i> Justificación (obligatoria)</label>
+                            <p id="mp-justif-motivo" class="text-[10px] text-amber-700 mb-1"></p>
+                            <textarea id="mp-justif" rows="2" class="inp" placeholder="¿Por qué se corrige fuera del corte?"></textarea>
                         </div>
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Nota (opcional)</label>
@@ -555,15 +612,24 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
 
+    const esAdm = esAdminManpower(state);
+    const hoy = hoyLima();
     const tareasDisponibles = state.tasksCache.filter(t => {
-        if (t.estado === 'Cerrado') return false;
-        if (state.isAdmin || state.isCoordinador) return true;
-        return isUserInvolved(t);
+        if (t.estado_cde === 'Archived') return false;
+        if (!esAdm && !isUserInvolved(t)) return false;
+        // Cerradas: el modelador las ve hasta cierre + 2 días (tope domingo).
+        // Un admin las ve siempre, para correcciones justificadas.
+        if (t.estado === 'Cerrado') return esAdm || cerradaVisibleHoy(t, hoy);
+        return true;
     });
+    const opcionTarea = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml(t.actividad.substring(0,50))}...</option>`;
+    const activas = tareasDisponibles.filter(t => t.estado !== 'Cerrado');
+    const cerradas = tareasDisponibles.filter(t => t.estado === 'Cerrado');
 
     const select = document.getElementById('mp-actividad');
-    select.innerHTML = '<option value="">— General —</option>' + 
-        tareasDisponibles.map(t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml(t.actividad.substring(0,50))}...</option>`).join('');
+    select.innerHTML = '<option value="">— General —</option>' +
+        (activas.length ? `<optgroup label="Activas">${activas.map(opcionTarea).join('')}</optgroup>` : '') +
+        (cerradas.length ? `<optgroup label="Cerradas (solo fechas hasta su cierre)">${cerradas.map(opcionTarea).join('')}</optgroup>` : '');
 
     const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
     // Al editar, la actividad del registro debe poder verse aunque ya esté cerrada
@@ -575,9 +641,16 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     document.getElementById('mp-id').value = rEdit ? rEdit.id : '';
     document.getElementById('mp-titulo').textContent = rEdit ? 'Editar registro' : 'Registrar % del Día';
     select.value = rEdit ? (rEdit.pendiente_id || '') : (pendienteId || '');
-    document.getElementById('mp-fecha').value = rEdit ? rEdit.fecha : (fechaPredefinida || today().toISOString().slice(0,10));
+    document.getElementById('mp-fecha').value = rEdit ? rEdit.fecha : (fechaPredefinida || hoyLima());
     document.getElementById('mp-porcentaje').value = rEdit ? parseFloat(rEdit.porcentaje_dia || 0) : '';
     document.getElementById('mp-desc').value = rEdit ? (rEdit.descripcion || '') : '';
+    document.getElementById('mp-justif').value = '';
+
+    // Fechas permitidas: nunca futuras; sin rol admin, solo la semana en curso
+    const inputFecha = document.getElementById('mp-fecha');
+    inputFecha.max = hoy;
+    inputFecha.min = esAdm ? '' : lunesDeSemana(hoy);
+    window.actualizarJustificacionManpower();
     
     window.actualizarRestanteManpower();
     window.actualizarHorasManpower();
@@ -604,6 +677,33 @@ window.actualizarRestanteManpower = function() {
     }
 };
 
+/**
+ * Evalúa el formulario abierto. Devuelve { error, justificar }:
+ * - error: motivo por el que no se puede guardar (usuarios sin rol admin, o fecha futura).
+ * - justificar: motivo por el que un admin debe justificar el cambio.
+ */
+function evaluarFormularioManpower() {
+    const fecha = document.getElementById('mp-fecha')?.value;
+    const tarea = tareaDe(document.getElementById('mp-actividad')?.value);
+    const { editId } = ctxManpower();
+    const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
+    const hoy = hoyLima();
+
+    if (fecha && fecha > hoy) return { error: 'No puedes registrar horas en una fecha futura.', justificar: null };
+    const motivo = validarRegistroManpower({ fecha, tarea, hoy })
+        || (rEdit ? bloqueoDe(rEdit) : null);
+    if (!motivo) return { error: null, justificar: null };
+    return esAdminManpower(state) ? { error: null, justificar: motivo } : { error: motivo, justificar: null };
+}
+
+window.actualizarJustificacionManpower = function() {
+    const box = document.getElementById('mp-justif-box');
+    if (!box) return;
+    const { justificar } = evaluarFormularioManpower();
+    box.classList.toggle('hidden', !justificar);
+    document.getElementById('mp-justif-motivo').textContent = justificar || '';
+};
+
 window.actualizarHorasManpower = function() {
     const pct = parseFloat(document.getElementById('mp-porcentaje')?.value || 0);
     const horas = pctAHoras(pct);
@@ -627,6 +727,17 @@ export async function saveManpower(e) {
     const porcentaje = parseFloat(document.getElementById('mp-porcentaje').value);
 
     const { editId, uid } = ctxManpower();
+
+    // Reglas de corte semanal y actividades cerradas (también se validan en Supabase)
+    const evaluacion = evaluarFormularioManpower();
+    if (evaluacion.error) { toast(evaluacion.error); return; }
+    const justificacion = (document.getElementById('mp-justif')?.value || '').trim();
+    if (evaluacion.justificar && !justificacion) {
+        toast('Escribe la justificación de la corrección.');
+        document.getElementById('mp-justif')?.focus();
+        return;
+    }
+
     if (!esDiaLaborable(uid, fecha)) {
         const tipo = tipoDia(uid, fecha);
         const etiquetas = { DO: 'domingo no laborable', DE: 'descanso', FE: 'feriado' };
@@ -650,6 +761,8 @@ export async function saveManpower(e) {
         porcentaje_dia: porcentaje,
         descripcion: document.getElementById('mp-desc').value
     };
+    // Solo se envía cuando corresponde: Supabase la guarda en la auditoría y limpia el campo
+    if (evaluacion.justificar) payload.justificacion_correccion = justificacion;
 
     // Bloquear botón mientras se guarda
     guardandoManpower = true;
@@ -688,6 +801,8 @@ export async function saveManpower(e) {
 window.editManpower = function(id) {
     const r = state.manpowerCache.find(x => x.id === id);
     if (!puedeGestionarManpower(r)) { toast('Solo puedes editar tus propios registros.'); return; }
+    const bloqueo = registroBloqueadoPara(r);
+    if (bloqueo) { toast(bloqueo + ' Pide la corrección a un administrador.'); return; }
     openManpowerModal(r.pendiente_id, r.fecha, id);
 };
 
@@ -695,6 +810,8 @@ window.deleteManpower = async function(id) {
     const r = state.manpowerCache.find(x => x.id === id);
     if (!r) return;
     if (!puedeGestionarManpower(r)) { toast('Solo puedes eliminar tus propios registros.'); return; }
+    const bloqueoEl = registroBloqueadoPara(r);
+    if (bloqueoEl) { toast(bloqueoEl + ' Pide la corrección a un administrador.'); return; }
     
     const p = state.perfilesCache.find(x => x.id === r.usuario_id);
     const t = state.tasksCache.find(x => x.id === r.pendiente_id);
@@ -709,8 +826,24 @@ window.deleteManpower = async function(id) {
     });
     
     if (!confirmado) return;
-    
-        const { data, error } = await supabaseClient
+
+    // Admin eliminando fuera del corte: justificación obligatoria y borrado auditado
+    const motivoBloqueo = bloqueoDe(r);
+    if (motivoBloqueo) {
+        const justificacion = await pedirJustificacion(motivoBloqueo + ' Indica por qué se elimina.');
+        if (!justificacion) return;
+        const { data: ok, error: rpcError } = await supabaseClient.rpc('eliminar_manpower_justificado', {
+            p_id: id, p_justificacion: justificacion
+        });
+        if (rpcError) { toast('Error: ' + rpcError.message); return; }
+        if (!ok) { toast('No se eliminó: la base de datos no te permite borrar este registro.'); return; }
+        toast('Registro eliminado (corrección auditada)');
+        await fetchAll();
+        window.renderView();
+        return;
+    }
+
+    const { data, error } = await supabaseClient
         .from('manpower_registros')
         .delete()
         .eq('id', id)
