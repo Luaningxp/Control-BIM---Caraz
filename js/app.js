@@ -2,7 +2,7 @@ import { aplicarTemaCharts } from './tema.js';
 import { supabaseClient, state, fetchCore, fetchVista, fetchAll } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
-import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
+import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, restaurarTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
 import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop } from './kanban.js';
 import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa, openSubcontrataModal, closeSubcontrataModal, saveSubcontrata, deleteSubcontrata } from './config.js';
@@ -118,7 +118,7 @@ window.renderView = function() {
     else if (state.currentTab === 'recursos') renderRecursos(container);
     else if (state.currentTab === 'config') renderConfig(container);
 }
-window.openModal = openModal; window.closeModal = closeModal; window.saveTask = saveTask; window.editTask = editTask; window.deleteTask = deleteTask;
+window.openModal = openModal; window.closeModal = closeModal; window.saveTask = saveTask; window.editTask = editTask; window.deleteTask = deleteTask; window.restaurarTask = restaurarTask;
 window.openModalCDE = openModalCDE; window.closeModalCDE = closeModalCDE; window.confirmarTransicion = confirmarTransicion;
 window.onDragStart = onDragStart; window.onDragEnd = onDragEnd; window.onDragOver = onDragOver; window.onDragLeave = onDragLeave; window.onDrop = onDrop;
 window.openGrupoModal = openGrupoModal; window.closeGrupoModal = closeGrupoModal; window.saveGrupo = saveGrupo; window.deleteGrupo = deleteGrupo;

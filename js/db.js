@@ -11,7 +11,8 @@ export const state = {
     isCoordinador: false,
     isSupervisor: false,
     isModelador: false,
-    tasksCache: [],
+    tasksCache: [],          // Solo actividades vigentes (sin archivar): lo que ven todas las vistas
+    tasksTodasCache: [],     // Incluye archivadas: para nombres en HH históricas y la vista "Archivadas"
     gruposCache: [],
     perfilesCache: [],
     propDefsCache: [],
@@ -53,6 +54,17 @@ export const state = {
     }
 };
 
+// Eliminar = archivar (borrado lógico). Las archivadas salen de todas las vistas vivas.
+function setTareas(rows) {
+    state.tasksTodasCache = rows || [];
+    state.tasksCache = state.tasksTodasCache.filter(t => !t.archivada_en);
+}
+
+/** Busca una actividad por id incluyendo las archivadas (para HH históricas). */
+export function tareaPorId(id) {
+    return (state.tasksTodasCache || []).find(t => String(t.id) === String(id)) || null;
+}
+
 // ------------------------------------------------------------------
 // Núcleo: lo que TODAS las vistas necesitan. Se carga una vez al login.
 // ------------------------------------------------------------------
@@ -72,7 +84,7 @@ export async function fetchCore() {
         if (t.error) console.error('fetchCore tareas:', t.error);
         if (p.error) console.error('fetchCore perfiles:', p.error);
 
-        state.tasksCache = t.data || [];
+        setTareas(t.data);
         state.gruposCache = g.data || [];
         state.perfilesCache = p.data || [];
         state.propDefsCache = pd.data || [];
@@ -320,7 +332,7 @@ export async function fetchAll() {
         if (fe.error) console.error('Error feriados:', fe.error);
         if (te.error) console.error('Error trabajos_extra:', te.error);
 
-        state.tasksCache = t.data || [];
+        setTareas(t.data);
         state.gruposCache = g.data || [];
         state.perfilesCache = p.data || [];
         state.propDefsCache = pd.data || [];
