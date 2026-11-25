@@ -67,11 +67,105 @@ function seccionReprogramaciones() {
 `;
 }
 
-export function renderDashboard(container) {
-    if (window.guardarSnapshotSemanal) {
-        window.guardarSnapshotSemanal().catch(() => {});
-    }
+// ------------------------------------------------------------------
+// COMPARACIÓN ENTRE SEMANAS (datos de Supabase: dashboard_semanas)
+// La semana en curso se calcula en vivo; las cerradas salen de la foto
+// congelada el domingo 23:59 (hora de Lima). Ver sql/dashboard_ppc_especialidades.sql
+// ------------------------------------------------------------------
+function semanaActualDashboard() {
+    return (state.semanasDashboard || [])[0] || null;
+}
 
+// sentido: +1 si subir es bueno (PPC, horas, planos); -1 si subir es malo (abiertas, vencidas)
+function deltaSemana(val, prevVal, sentido) {
+    if (val === null || val === undefined || prevVal === null || prevVal === undefined) return '';
+    const d = Math.round((Number(val) - Number(prevVal)) * 10) / 10;
+    if (d === 0) return '<span class="text-slate-400">=</span>';
+    const bueno = (d > 0) === (sentido > 0);
+    const color = bueno ? 'text-emerald-600' : 'text-red-600';
+    return `<span class="${color}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
+}
+
+function seccionComparacionSemanas() {
+    const semanas = state.semanasDashboard || [];
+    const dash = '<span class="text-slate-300">—</span>';
+    const v = (x) => (x === null || x === undefined) ? dash : x;
+    const num = (x) => (x === null || x === undefined) ? null : Number(x);
+
+    const filas = semanas.map((s, i) => {
+        const prev = semanas[i + 1];
+        const comp = num(s.comprometidas) || 0;
+        const np = num(s.no_planificadas) || 0;
+        const pctNp = comp > 0 ? Math.round(np * 100 / comp) : null;
+        const ad = num(s.adelantadas) || 0;
+        const esp = s.no_planificadas_por_especialidad || {};
+        const espTxt = Object.entries(esp).sort((a, b) => b[1].n - a[1].n)
+            .map(([k, x]) => `${k}: ${x.n} (${Number(x.horas).toFixed(1)} h)`).join(' · ');
+        const ppc = num(s.ppc);
+        return `<tr class="hover:bg-slate-50">
+            <td class="p-3 font-mono font-bold ${i === 0 ? 'text-sky-700' : 'text-slate-600'}">${fmtDate(s.semana)} ${i === 0 ? '(Actual)' : ''}</td>
+            <td class="p-3">${comp}</td>
+            <td class="p-3">${v(num(s.cumplidas))}${ad ? ` <span class="text-emerald-700 text-[10px]" title="Adelantadas de semanas futuras">+${ad}</span>` : ''}</td>
+            <td class="p-3 font-bold">${ppc === null ? (ad ? `— <span class="text-emerald-700 text-[10px]">+${ad} adelantadas</span>` : dash) : ppc + '%'} ${deltaSemana(ppc, num(prev?.ppc), +1)}</td>
+            <td class="p-3" title="${escapeHtml(espTxt)}">${np}${pctNp !== null ? ` <span class="text-slate-400 text-[10px]">(${pctNp}%)</span>` : ''}</td>
+            <td class="p-3">${Number(s.horas_no_planificadas || 0).toFixed(1)} h</td>
+            <td class="p-3">${Number(s.horas_semana || 0).toFixed(1)} h ${deltaSemana(num(s.horas_semana), num(prev?.horas_semana), +1)}</td>
+            <td class="p-3">${v(num(s.abiertas))} ${deltaSemana(num(s.abiertas), num(prev?.abiertas), -1)}</td>
+            <td class="p-3 font-bold ${num(s.vencidas) > 0 ? 'text-red-700' : ''}">${v(num(s.vencidas))} ${deltaSemana(num(s.vencidas), num(prev?.vencidas), -1)}</td>
+            <td class="p-3">${v(num(s.por_vencer))} ${deltaSemana(num(s.por_vencer), num(prev?.por_vencer), -1)}</td>
+            <td class="p-3">${v(num(s.planos_contractuales))} ${deltaSemana(num(s.planos_contractuales), num(prev?.planos_contractuales), +1)}</td>
+            <td class="p-3">${v(num(s.planos_detalle))} ${deltaSemana(num(s.planos_detalle), num(prev?.planos_detalle), +1)}</td>
+        </tr>`;
+    }).join('');
+
+    // No planificadas por especialidad, acumulado de las semanas mostradas
+    const acum = {};
+    semanas.forEach(s => Object.entries(s.no_planificadas_por_especialidad || {}).forEach(([k, x]) => {
+        acum[k] = acum[k] || { n: 0, horas: 0 };
+        acum[k].n += Number(x.n || 0);
+        acum[k].horas += Number(x.horas || 0);
+    }));
+    const acumOrd = Object.entries(acum).sort((a, b) => b[1].horas - a[1].horas);
+
+    return `
+        <div class="card overflow-x-auto mt-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
+                <p class="text-[11px] text-slate-500">PPC = (cumplidas + adelantadas) ÷ comprometidas. Compromiso fijado el lunes 00:00, más las no planificadas surgidas en la semana. La semana en curso se calcula en vivo; las anteriores quedan congeladas el domingo 23:59 (hora de Lima).</p>
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Semana</th>
+                        <th class="p-3" title="Comprometidas el lunes + no planificadas">Compr.</th>
+                        <th class="p-3">Cumplidas</th>
+                        <th class="p-3">PPC</th>
+                        <th class="p-3" title="Surgidas durante la semana (pasa el cursor para ver por especialidad)">No planif.</th>
+                        <th class="p-3">Horas no planif.</th>
+                        <th class="p-3">Horas</th>
+                        <th class="p-3">Abiertas</th>
+                        <th class="p-3">Vencidas</th>
+                        <th class="p-3">Por vencer</th>
+                        <th class="p-3" title="Planos distintos con horas registradas en la semana">Planos contract.</th>
+                        <th class="p-3" title="Planos distintos con horas registradas en la semana">Det. constr.</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${filas || '<tr><td colspan="12" class="text-center py-4 text-slate-400">Aún no hay datos. Verifica que se haya ejecutado sql/dashboard_ppc_especialidades.sql en Supabase.</td></tr>'}
+                </tbody>
+            </table>
+            ${acumOrd.length ? `
+                <div class="p-4 pt-3 border-t border-slate-100">
+                    <h5 class="font-semibold text-xs text-slate-700 mb-2">No planificadas por especialidad (últimas ${semanas.length} semanas)</h5>
+                    <div class="flex flex-wrap gap-2">
+                        ${acumOrd.map(([k, x]) => `<span class="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1 rounded"><b>${escapeHtml(k)}</b>: ${x.n} act. · ${x.horas.toFixed(1)} h</span>`).join('')}
+                    </div>
+                </div>` : ''}
+        </div>
+    `;
+}
+
+export function renderDashboard(container) {
     const k = calcularKPIs();
     
     const hoy = today();
@@ -113,7 +207,17 @@ export function renderDashboard(container) {
     })();
 
     const KPI = [
-        { label: 'PPC Semanal', value: k.ppc !== null ? k.ppc + '%' : '—', sub: `${k.ppcEnPlazo}/${k.ppcTotal} cerradas a tiempo`, color: 'teal', icon: 'fa-chart-line' },
+        (() => {
+            const sa = semanaActualDashboard();
+            if (!sa) return { label: 'PPC Semanal', value: '—', sub: 'sin datos', color: 'teal', icon: 'fa-chart-line' };
+            const ad = Number(sa.adelantadas || 0);
+            return {
+                label: 'PPC Semanal',
+                value: sa.ppc !== null && sa.ppc !== undefined ? sa.ppc + '%' : '—',
+                sub: `${sa.cumplidas}/${sa.comprometidas} cumplidas${ad ? ` · +${ad} adelantadas` : ''}`,
+                color: 'teal', icon: 'fa-chart-line'
+            };
+        })(),
         { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
         { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
         { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
@@ -208,150 +312,7 @@ export function renderDashboard(container) {
             </table>
         </div>
 
-        <div class="card overflow-x-auto mt-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
-                <p class="text-[11px] text-slate-500">La semana en curso se calcula en vivo. Las anteriores se leen del historial congelado.</p>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Semana</th>
-                        <th class="p-3">Total</th>
-                        <th class="p-3">Abiertas</th>
-                        <th class="p-3">Vencidas</th>
-                        <th class="p-3">Por vencer</th>
-                        <th class="p-3">PPC</th>
-                        <th class="p-3">Horas</th>
-                        <th class="p-3">Planos WIP</th>
-                        <th class="p-3">Planos Shared</th>
-                    </tr>
-                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                    ${(() => {
-                        const hoy = today();
-                        hoy.setHours(0, 0, 0, 0);
-                        const dia = hoy.getDay();
-                        const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
-                        const lunesActual = new Date(hoy); lunesActual.setDate(diff);
-                        lunesActual.setHours(0, 0, 0, 0);
-
-                        const listaSemanas = [];
-
-                        // Vamos a calcular las últimas 8 semanas
-                        for (let i = 0; i < 8; i++) {
-                            const lunes = new Date(lunesActual);
-                            lunes.setDate(lunesActual.getDate() - (i * 7));
-                            const semanaStr = isoLocal(lunes);
-                            
-                            const finSem = new Date(lunes); finSem.setDate(lunes.getDate() + 6); finSem.setHours(23,59,59,999);
-
-                            // 1. PPC en vivo (siempre exacto)
-                            const tareasSemana = state.tasksCache.filter(t => {
-                                if (!t.fecha_fin) return false;
-                                if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
-                                const f = new Date(t.fecha_fin + 'T00:00:00');
-                                if (f < lunes || f > finSem) return false;
-                                if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
-                                return true;
-                            });
-
-                            const cumplidas = tareasSemana.filter(t => t.fecha_cierre && t.fecha_cierre <= t.fecha_fin);
-                            const ppcSemana = tareasSemana.length > 0 ? Math.round((cumplidas.length / tareasSemana.length) * 100) : null;
-
-                            // 2. Datos históricos
-                            const esSemanaActual = (i === 0);
-                            const snapDB = state.snapshotsCache?.find(s => s.semana === semanaStr);
-                            
-                            let total, abiertas, vencidas, porVencer, horasSem, planosWip, planosShared;
-
-                            if (esSemanaActual) {
-                                // Semana actual: en vivo
-                                total = k.total;
-                                abiertas = k.abiertas;
-                                vencidas = k.vencidas;
-                                porVencer = k.porVencer;
-                                horasSem = state.manpowerCache.filter(m => {
-                                    if(!m.fecha) return false;
-                                    const f = new Date(m.fecha + 'T00:00:00');
-                                    return f >= lunes && f <= finSem;
-                                }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
-                                planosWip = 0;
-                                planosShared = 0;
-                            } else if (snapDB) {
-                                // Si existe el snapshot en BD, usarlo (esto aplica para el futuro)
-                                total = snapDB.total_tareas;
-                                abiertas = snapDB.abiertas;
-                                vencidas = snapDB.vencidas;
-                                porVencer = snapDB.por_vencer;
-                                horasSem = snapDB.horas_semana;
-                                planosWip = snapDB.planos_wip;
-                                planosShared = snapDB.planos_shared;
-                            } else {
-                                // RECONSTRUCCIÓN: Si no hay snapshot, usamos created_at
-                                const tareasCreadas = state.tasksCache.filter(t => t.created_at && new Date(t.created_at) <= finSem);
-                                total = tareasCreadas.length;
-                                
-                                const cerradasHastaFinSem = tareasCreadas.filter(t => t.fecha_cierre && new Date(t.fecha_cierre) <= finSem).length;
-                                abiertas = total - cerradasHastaFinSem;
-                                
-                                vencidas = tareasCreadas.filter(t => {
-                                    if (t.fecha_cierre && new Date(t.fecha_cierre) <= finSem) return false;
-                                    return t.fecha_fin && new Date(t.fecha_fin + 'T00:00:00') < finSem;
-                                }).length;
-                                
-                                porVencer = 0;
-                                horasSem = state.manpowerCache.filter(m => {
-                                    if(!m.fecha) return false;
-                                    const f = new Date(m.fecha + 'T00:00:00');
-                                    return f >= lunes && f <= finSem;
-                                }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
-                                planosWip = 0;
-                                planosShared = 0;
-                            }
-
-                            listaSemanas.push({
-                                semana: semanaStr,
-                                total_tareas: total,
-                                abiertas: abiertas,
-                                vencidas: vencidas,
-                                por_vencer: porVencer,
-                                ppc: ppcSemana,
-                                horas_semana: horasSem,
-                                planos_wip: planosWip,
-                                planos_shared: planosShared
-                            });
-                        }
-
-                        // Renderizar las filas
-                        return listaSemanas.filter(s => s.ppc !== null).map((s, i, arr) => {
-                            const prev = arr[i + 1];
-                            const delta = (val, prevVal) => {
-                                if (val === null || prevVal === undefined || prevVal === null) return '';
-                                const d = val - prevVal;
-                                if (d === 0) return '<span class="text-slate-400">=</span>';
-                                return d > 0 ? `<span class="text-red-600">▲${d}</span>` : `<span class="text-emerald-600">▼${Math.abs(d)}</span>`;
-                            };
-                            const valOrDash = (val) => val === null || val === undefined ? '<span class="text-slate-300">—</span>' : val;
-
-                            return `<tr class="hover:bg-slate-50">
-                                <td class="p-3 font-mono font-bold ${i === 0 ? 'text-sky-700' : 'text-slate-600'}">
-                                    ${fmtDate(s.semana)} ${i === 0 ? '(Actual)' : ''}
-                                </td>
-                                <td class="p-3">${valOrDash(s.total_tareas)}</td>
-                                <td class="p-3">${valOrDash(s.abiertas)} ${delta(s.abiertas, prev?.abiertas)}</td>
-                                <td class="p-3 font-bold ${s.vencidas > 0 ? 'text-red-700' : ''}">${valOrDash(s.vencidas)} ${delta(s.vencidas, prev?.vencidas)}</td>
-                                <td class="p-3">${valOrDash(s.por_vencer)} ${delta(s.por_vencer, prev?.por_vencer)}</td>
-                                <td class="p-3 font-bold">${s.ppc}% ${prev?.ppc !== null && prev?.ppc !== undefined && s.ppc !== null ? delta(s.ppc, prev.ppc) : ''}</td>
-                                <td class="p-3">${s.horas_semana !== null ? s.horas_semana.toFixed(1) + ' h' : '<span class="text-slate-300">—</span>'}</td>
-                                <td class="p-3">${valOrDash(s.planos_wip)}</td>
-                                <td class="p-3">${valOrDash(s.planos_shared)}</td>
-                            </tr>`;
-                        }).join('');
-                    })() || '<tr><td colspan="9" class="text-center py-4 text-slate-400">Aún no hay datos.</td></tr>'}
-                </tbody>
-            </table>
-        </div>
+        ${seccionComparacionSemanas()}
     `;
 
     renderCharts(inicioSemana, finSemana);
@@ -414,34 +375,10 @@ function renderCharts(inicioSemana, finSemana) {
     if (state.charts.carga) state.charts.carga.destroy();
     if (state.charts.vencidas) state.charts.vencidas.destroy();
 
-    const labelsPPC = [];
-    const dataPPC = [];
-    for (let i = 7; i >= 0; i--) {
-        const inicio = new Date(inicioSemana);
-        inicio.setDate(inicio.getDate() - i * 7);
-        inicio.setHours(0, 0, 0, 0);
-        const fin = new Date(inicio);
-        fin.setDate(inicio.getDate() + 6);
-        fin.setHours(23, 59, 59, 999);
-
-        const tareasSemana = state.tasksCache.filter(t => {
-            if (!t.fecha_fin) return false;
-            if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
-            const f = new Date(t.fecha_fin + 'T00:00:00');
-            if (f < inicio || f > fin) return false;
-            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
-            return true;
-        });
-
-        const cumplidas = tareasSemana.filter(t =>
-            t.fecha_cierre && t.fecha_cierre <= t.fecha_fin
-        );
-
-        labelsPPC.push(`Sem ${inicio.getDate()}/${inicio.getMonth() + 1}`);
-        dataPPC.push(tareasSemana.length > 0
-            ? Math.round((cumplidas.length / tareasSemana.length) * 100)
-            : null);
-    }
+    // PPC de las últimas 8 semanas: mismo cálculo que la tabla (Supabase: dashboard_semanas)
+    const semanasAsc = (state.semanasDashboard || []).slice().reverse();
+    const labelsPPC = semanasAsc.map(w => `Sem ${fmtDate(w.semana).slice(0, 5)}`);
+    const dataPPC = semanasAsc.map(w => (w.ppc === null || w.ppc === undefined) ? null : Number(w.ppc));
 
     state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
         type: 'line',
@@ -643,7 +580,6 @@ function renderPerfTable(inicioSemana, finSemana) {
             if (t.estado === 'Cancelado' || t.estado === 'Anulado') return;
             const f = new Date(t.fecha_fin + 'T00:00:00');
             if (f < inicioSemana || f > finSemana) return;
-            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return;
 
             map[key].semanaTareas++;
             if (t.fecha_cierre && t.fecha_cierre <= t.fecha_fin) {

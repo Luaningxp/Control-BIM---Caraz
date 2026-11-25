@@ -1,4 +1,4 @@
-import { supabaseClient, state, fetchCore, fetchVista, fetchAll, guardarSnapshotSemanal } from './db.js';
+import { supabaseClient, state, fetchCore, fetchVista, fetchAll } from './db.js';
 import { checkUser } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderTabla, openModal, closeModal, saveTask, editTask, deleteTask, duplicateTask, openModalCDE, closeModalCDE, confirmarTransicion } from './tabla.js';
@@ -128,7 +128,6 @@ window.openManpowerModal = openManpowerModal; window.closeManpowerModal = closeM
 window.fetchAll = fetchAll;
 window.duplicateTask = duplicateTask;
 window.openSubcontrataModal = openSubcontrataModal; window.closeSubcontrataModal = closeSubcontrataModal; window.saveSubcontrata = saveSubcontrata; window.deleteSubcontrata = deleteSubcontrata;
-window.guardarSnapshotSemanal = guardarSnapshotSemanal;
 
 window.addEventListener('DOMContentLoaded', async () => {
     const user = await checkUser();

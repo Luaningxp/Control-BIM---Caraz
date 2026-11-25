@@ -1,4 +1,3 @@
-import { today, isoLocal } from './utils.js';
 export const supabaseClient = window.supabase.createClient(
     'https://zsrczkdpluafuoczfokw.supabase.co',
     'sb_publishable_asRWjkS5NLVJ4-FrVA05sw_uW2kFP2A'
@@ -26,6 +25,9 @@ export const state = {
     causasTodasCache: [],
     reprogramacionesCache: [],
     snapshotsCache: [],
+    semanasDashboard: [],
+    especialidadesCache: [],
+    especialidadesTodasCache: [],
     descansosCache: [],
     feriadosCache: [],
     subcontratasCache: [],
@@ -55,13 +57,14 @@ export const state = {
 // ------------------------------------------------------------------
 export async function fetchCore() {
     try {
-        const [t, g, p, pd, ar, sub] = await Promise.all([
+        const [t, g, p, pd, ar, sub, esp] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
             supabaseClient.from('propiedades_def').select('*').eq('activo', true).order('orden'),
             supabaseClient.from('actividad_recursos').select('*'),
-            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre')
+            supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
+            supabaseClient.from('especialidades').select('*').order('orden').order('nombre')
         ]);
 
         if (t.error) console.error('fetchCore tareas:', t.error);
@@ -73,6 +76,7 @@ export async function fetchCore() {
         state.propDefsCache = pd.data || [];
         state.actividadRecursosCache = ar.data || [];
         state.subcontratasCache = sub.data || [];
+        setEspecialidades(esp);
         state._loaded.core = true;
         return true;
     } catch (err) {
@@ -183,6 +187,24 @@ export async function fetchSnapshots() {
     return true;
 }
 
+// Semanas del Dashboard (PPC Last Planner). Siempre se piden de nuevo: la actual es en vivo.
+export async function fetchSemanasDashboard(n = 8) {
+    const { data, error } = await supabaseClient.rpc('dashboard_semanas', { p_semanas: n });
+    if (error) { console.error('fetchSemanasDashboard:', error); state.semanasDashboard = []; return false; }
+    state.semanasDashboard = data || [];
+    return true;
+}
+
+function setEspecialidades(res) {
+    if (res?.error) console.error('especialidades:', res.error);
+    state.especialidadesTodasCache = res?.data || [];
+    state.especialidadesCache = state.especialidadesTodasCache.filter(e => e.activo !== false);
+}
+
+export async function fetchEspecialidades() {
+    setEspecialidades(await supabaseClient.from('especialidades').select('*').order('orden').order('nombre'));
+}
+
 export async function fetchRoster() {
     if (state._loaded.roster) return true;
     const [de, fe, te, dm] = await Promise.all([
@@ -216,7 +238,7 @@ export async function fetchVista(tab) {
             await fetchPlanosLigeros(); // Para mostrar los chips de planos en modales
             break;
         case 'dashboard':
-            await Promise.all([fetchSnapshots(), fetchPlanosLigeros(), fetchCausas(), fetchManpower(), fetchReprogramaciones()]);
+            await Promise.all([fetchSemanasDashboard(), fetchPlanosLigeros(), fetchCausas(), fetchManpower(), fetchReprogramaciones()]);
             break;
         case 'tabla':
             await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);
@@ -254,7 +276,7 @@ export async function fetchVista(tab) {
 // ------------------------------------------------------------------
 export async function fetchAll() {
     try {
-            const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm, rp] = await Promise.all([
+            const [t, g, p, pd, pv, m, ar, pl, ap, ca, tc, sn, de, fe, te, sub, dm, rp, esp] = await Promise.all([
             supabaseClient.from('pendientes_bim').select('*').order('id', { ascending: false }),
             supabaseClient.from('grupos_bim').select('*').order('nombre'),
             supabaseClient.from('perfiles').select('id,email,rol,cargo,avatar_url').order('email'),
@@ -272,7 +294,9 @@ export async function fetchAll() {
             supabaseClient.from('trabajos_extra').select('*'),
             supabaseClient.from('subcontratas').select('*').eq('activo', true).order('nombre'),
             supabaseClient.from('descansos_medicos').select('*'),
-            supabaseClient.from('reprogramaciones_bim').select('*').order('created_at', { ascending: false })
+            supabaseClient.from('reprogramaciones_bim').select('*').order('created_at', { ascending: false }),
+            supabaseClient.from('especialidades').select('*').order('orden').order('nombre'),
+            fetchSemanasDashboard()
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);
@@ -304,6 +328,7 @@ export async function fetchAll() {
         state.descansosMedicosCache = dm.data || [];
         state.subcontratasCache = sub.data || [];
         state.trabajosExtraCache = te.data || [];
+        setEspecialidades(esp);
 
         // Marcar todo como cargado
         Object.keys(state._loaded).forEach(k => state._loaded[k] = true);
@@ -322,101 +347,5 @@ export function invalidarCache(keys) {
     });
 }
 
-// ------------------------------------------------------------------
-// Snapshot semanal: sin cambios en lógica (ya está bien).
-// ------------------------------------------------------------------
-export async function guardarSnapshotSemanal() {
-    try {
-        const hoy = today();
-        hoy.setHours(0, 0, 0, 0);
-        const dia = hoy.getDay();
-        const diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
-        const lunes = new Date(hoy); lunes.setDate(diff);
-        lunes.setHours(0, 0, 0, 0);
-        const semana = isoLocal(lunes);
-
-        const { data: existente, error: errExiste } = await supabaseClient
-            .from('snapshots_semanales')
-            .select('id')
-            .eq('semana', semana)
-            .maybeSingle();
-
-        if (errExiste) { console.error('Snapshot check error:', errExiste); return false; }
-        if (existente) return true;
-
-        const { semaforo, isCerrado } = await import('./utils.js');
-        const { esDiaLaborable } = await import('./roster.js');
-
-        const tareas = state.tasksCache || [];
-        const abiertas = tareas.filter(t => !isCerrado(t));
-        const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida').length;
-        const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer').length;
-        const sinFecha = abiertas.filter(t => !t.fecha_fin).length;
-
-        const finSemana = new Date(lunes);
-        finSemana.setDate(lunes.getDate() + 6);
-        finSemana.setHours(23, 59, 59, 999);
-
-        const tareasSemana = tareas.filter(t => {
-            if (!t.fecha_fin) return false;
-            const f = new Date(t.fecha_fin + 'T00:00:00');
-            if (f < lunes || f > finSemana) return false;
-            if (t.responsable_id && !esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
-            return true;
-        });
-        const cumplidas = tareasSemana.filter(t =>
-            t.fecha_cierre && t.fecha_cierre <= t.fecha_fin
-        );
-        const ppc = tareasSemana.length > 0
-            ? Math.round((cumplidas.length / tareasSemana.length) * 100)
-            : null;
-
-        const horasSemana = (state.manpowerCache || []).filter(m => {
-            if (!m.fecha) return false;
-            const f = new Date(m.fecha + 'T00:00:00');
-            return f >= lunes && f <= finSemana;
-        }).reduce((s, m) => s + (parseFloat(m.porcentaje_dia || 0) * 9.3333) / 100, 0);
-
-        const conteo = { WIP: 0, Shared: 0, Published: 0, Archived: 0 };
-        (state.actividadPlanosCache || []).forEach(ap => {
-            const p = (state.planosCache || []).find(x => x.id === ap.plano_id);
-            if (p && p.estado && conteo[p.estado] !== undefined) conteo[p.estado]++;
-        });
-
-        const causasTop = {};
-        (state.tareaCausasCache || []).forEach(tc => {
-            const c = (state.causasTodasCache || state.causasCache || []).find(x => x.id === tc.causa_id);
-            if (c) causasTop[c.nombre] = (causasTop[c.nombre] || 0) + 1;
-        });
-
-        const payload = {
-            semana,
-            total_tareas: tareas.length,
-            abiertas: abiertas.length,
-            cerradas: tareas.length - abiertas.length,
-            vencidas,
-            por_vencer: porVencer,
-            sin_fecha: sinFecha,
-            ppc,
-            horas_semana: +horasSemana.toFixed(2),
-            planos_wip: conteo.WIP,
-            planos_shared: conteo.Shared,
-            planos_published: conteo.Published,
-            planos_archived: conteo.Archived,
-            causas_top: causasTop
-        };
-
-        const { error } = await supabaseClient
-            .from('snapshots_semanales')
-            .insert([payload]);
-
-        if (error && !String(error.message).toLowerCase().includes('duplicate')) {
-            console.error('Snapshot insert error:', error);
-            return false;
-        }
-        return true;
-    } catch (e) {
-        console.error('guardarSnapshotSemanal', e);
-        return false;
-    }
-}
+// Las fotos semanales ahora las congela Supabase (pg_cron, domingo 23:59 Lima).
+// Ver sql/dashboard_ppc_especialidades.sql
