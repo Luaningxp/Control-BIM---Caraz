@@ -265,10 +265,8 @@ begin
             if t.estado_cde = 'Archived' then
                 return 'actividad archivada';
             end if;
-            if t.estado = 'Cerrado' and t.fecha_cierre is not null
-               and v_hoy > public.manpower_limite_cerrada(t.fecha_cierre) then
-                return 'vencido el plazo de la actividad cerrada';
-            end if;
+            -- El plazo de la actividad cerrada ya no bloquea las correcciones
+            -- (ver sql/manpower_justificar_retraso.sql)
         end if;
     end if;
     return null;
