@@ -119,6 +119,37 @@ export function renderConfig(container) {
                 </div>
             </div>
 
+            <!-- 4b. ESPECIALIDADES -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-800">Especialidades</h3>
+                        <p class="text-[10px] text-slate-500">Obligatoria en cada actividad. GENERAL es la de respaldo.</p>
+                    </div>
+                    <button onclick="window.openEspecialidadModal()" class="px-2 py-1 bg-sky-600 text-white text-xs rounded hover:bg-sky-700">+ Añadir</button>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                    <table class="w-full text-left text-xs">
+                        <tbody class="divide-y divide-slate-100">
+                            ${(state.especialidadesTodasCache || []).map(e => `
+                                <tr class="hover:bg-slate-50 ${e.activo === false ? 'opacity-60' : ''}">
+                                    <td class="py-2">
+                                        ${escapeHtml(e.nombre)}
+                                        ${e.activo === false ? '<span class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-bold uppercase">Inactiva</span>' : ''}
+                                    </td>
+                                    <td class="py-2 text-right whitespace-nowrap">
+                                        <button onclick="window.openEspecialidadModal(${e.id})" class="text-sky-600 mr-2 hover:text-sky-800" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                                        ${e.nombre === 'GENERAL' ? '' : e.activo === false
+                                            ? `<button onclick="window.reactivarEspecialidad(${e.id})" class="text-emerald-600 hover:text-emerald-800" title="Reactivar"><i class="fa-solid fa-rotate-left"></i></button>`
+                                            : `<button onclick="window.deleteEspecialidad(${e.id})" class="text-red-500 hover:text-red-700" title="Desactivar o eliminar"><i class="fa-solid fa-trash"></i></button>`}
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin especialidades (ejecuta sql/dashboard_ppc_especialidades.sql)</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- 5. SUBCONTRATAS -->
             <div class="card p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -380,6 +411,20 @@ function renderModales() {
             </div>
         </div>
 
+        <div id="modal-especialidad" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800" id="esp-modal-title">Nueva especialidad</h3>
+                <form onsubmit="window.saveEspecialidad(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="esp-id">
+                    <div><label class="block font-semibold text-slate-600 mb-1">Nombre (sigla) *</label><input type="text" id="esp-nombre" required class="inp" placeholder="Ej. IIEE"></div>
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" onclick="window.closeEspecialidadModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
+                        <button type="submit" class="px-4 py-1.5 bg-sky-600 text-white font-semibold rounded hover:bg-sky-700">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div id="modal-causa" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
             <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
                 <h3 class="font-bold text-sm text-slate-800" id="causa-modal-title">Nueva causa</h3>
@@ -570,6 +615,64 @@ window.closeCausaModal = closeCausaModal;
 window.saveCausa = saveCausa;
 window.deleteCausa = deleteCausa;
 window.reactivarCausa = reactivarCausa;
+
+// --- ESPECIALIDADES (catálogo) ---
+function buscarEspecialidad(id) {
+    return (state.especialidadesTodasCache || []).find(x => String(x.id) === String(id)) || null;
+}
+window.openEspecialidadModal = function(id) {
+    const e = id ? buscarEspecialidad(id) : null;
+    document.getElementById('esp-modal-title').innerText = e ? 'Editar especialidad' : 'Nueva especialidad';
+    document.getElementById('esp-id').value = e?.id || '';
+    document.getElementById('esp-nombre').value = e?.nombre || '';
+    document.getElementById('esp-nombre').disabled = e?.nombre === 'GENERAL';
+    document.getElementById('modal-especialidad').classList.remove('hidden');
+    document.getElementById('modal-especialidad').classList.add('flex');
+};
+window.closeEspecialidadModal = function() {
+    document.getElementById('modal-especialidad').classList.add('hidden');
+    document.getElementById('modal-especialidad').classList.remove('flex');
+};
+window.saveEspecialidad = async function(ev) {
+    ev.preventDefault();
+    const id = document.getElementById('esp-id').value;
+    const nombre = document.getElementById('esp-nombre').value.trim().toUpperCase();
+    if (!nombre) return;
+    if (buscarEspecialidad(id)?.nombre === 'GENERAL') { window.closeEspecialidadModal(); return; }
+    const dup = (state.especialidadesTodasCache || []).some(x => x.nombre.toUpperCase() === nombre && String(x.id) !== String(id));
+    if (dup) { toast('Ya existe esa especialidad.'); return; }
+    const orden = Math.max(0, ...(state.especialidadesTodasCache || []).map(x => x.orden || 0)) + 1;
+    const { error } = id
+        ? await supabaseClient.from('especialidades').update({ nombre }).eq('id', id)
+        : await supabaseClient.from('especialidades').insert([{ nombre, activo: true, orden }]);
+    if (error) { toast('Error: ' + error.message); return; }
+    window.closeEspecialidadModal(); await fetchAll(); window.renderView(); toast('Especialidad guardada');
+};
+window.deleteEspecialidad = async function(id) {
+    const e = buscarEspecialidad(id);
+    if (!e || e.nombre === 'GENERAL') return;
+    const usos = (state.tasksCache || []).filter(t => String(t.especialidad_id) === String(id)).length;
+    if (usos > 0) {
+        const { data, error } = await supabaseClient.from('especialidades').update({ activo: false }).eq('id', id).select('id');
+        if (error) { toast('Error: ' + error.message); return; }
+        if (!data || data.length === 0) { toast('No se pudo desactivar: la base de datos no te lo permite.'); return; }
+        await fetchAll(); window.renderView();
+        toast(`Especialidad desactivada (la usan ${usos} actividad${usos === 1 ? '' : 'es'}). Se conserva en el historial.`);
+        return;
+    }
+    const confirmado = await confirmDelete({ title: 'Eliminar especialidad', message: `Vas a eliminar "${e.nombre}". Ninguna actividad la usa.` });
+    if (!confirmado) return;
+    const { data, error } = await supabaseClient.from('especialidades').delete().eq('id', id).select('id');
+    if (error) { toast('Error: ' + error.message); return; }
+    if (!data || data.length === 0) { toast('No se pudo eliminar: la base de datos no te lo permite.'); return; }
+    await fetchAll(); window.renderView(); toast('Especialidad eliminada');
+};
+window.reactivarEspecialidad = async function(id) {
+    const { data, error } = await supabaseClient.from('especialidades').update({ activo: true }).eq('id', id).select('id');
+    if (error) { toast('Error: ' + error.message); return; }
+    if (!data || data.length === 0) { toast('No se pudo reactivar: la base de datos no te lo permite.'); return; }
+    await fetchAll(); window.renderView(); toast('Especialidad reactivada');
+};
 
 // --- CAMBIO DE CONTRASEÑA (solo admin) ---
 window.openPasswordModal = function(userId) {

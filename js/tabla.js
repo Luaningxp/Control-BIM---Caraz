@@ -366,14 +366,23 @@ function textoCargaCorto(info) {
     return `${info.tareas} tarea${info.tareas === 1 ? '' : 's'} · ${info.semanas.toFixed(1)} sem`;
 }
 
-const DEFAULT_COL_ORDER = ['codigo', 'actividad', 'grupo', 'responsable', 'recursos', 'planos', 'importancia', 'urgencia', 'criticidad', 'estado', 'inicio', 'fin', 'cierre', 'cde'];
+const DEFAULT_COL_ORDER = ['codigo', 'actividad', 'grupo', 'especialidad', 'responsable', 'recursos', 'planos', 'importancia', 'urgencia', 'criticidad', 'estado', 'inicio', 'fin', 'cierre', 'cde'];
 
 // --- ESTADO LOCAL DE LA TABLA ---
 let tableState = {
     sortBy: 'id', sortDir: 'desc', showColMenu: false,
-    colOrder: JSON.parse(localStorage.getItem('bim_colOrder')) || [...DEFAULT_COL_ORDER],
+    colOrder: (() => {
+        // Orden guardado + columnas nuevas que no existían cuando se guardó
+        let guardado = null;
+        try { guardado = JSON.parse(localStorage.getItem('bim_colOrder')); } catch (e) { guardado = null; }
+        if (!Array.isArray(guardado)) return [...DEFAULT_COL_ORDER];
+        DEFAULT_COL_ORDER.forEach((c, i) => {
+            if (!guardado.includes(c)) guardado.splice(Math.min(i, guardado.length), 0, c);
+        });
+        return guardado;
+    })(),
     visibleCols: { 
-        codigo: true, actividad: true, grupo: true, responsable: true, recursos: true, planos: true,
+        codigo: true, actividad: true, grupo: true, especialidad: true, responsable: true, recursos: true, planos: true,
         importancia: true, urgencia: true, criticidad: true, 
         estado: true, inicio: true, fin: true, cierre: true, cde: true 
     },
@@ -387,7 +396,7 @@ let tableState = {
         soloAsignadosAMi: true
     },
     colWidths: {
-        codigo: 100, actividad: 280, grupo: 120, responsable: 140, recursos: 130, planos: 130,
+        codigo: 100, actividad: 280, grupo: 120, especialidad: 100, responsable: 140, recursos: 130, planos: 130,
         importancia: 90, urgencia: 90, criticidad: 90, estado: 100, 
         inicio: 90, fin: 90, cierre: 90, cde: 100,
         acciones: 100
@@ -592,7 +601,7 @@ export function renderTabla(container) {
                                             ondrop="window.handleDrop(event, '${col}')"
                                             style="${colStyle(col)} ${stickyStyle}" 
                                             class="${thClass} ${stickyClass} cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 select-none" 
-                                            onclick="window.toggleSort('${col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')">
+                                            onclick="window.toggleSort('${col === 'especialidad' ? 'especialidad_id' : col === 'cde' ? 'estado_cde' : col === 'inicio' ? 'fecha_inicio_programado' : col === 'fin' ? 'fecha_fin' : col === 'cierre' ? 'fecha_cierre' : col === 'responsable' ? 'responsable_id' : col === 'codigo' ? 'codigo_contenedor' : col}')">
                                             <div class="pr-2 capitalize">${title} ${getSortIcon(col)}</div>${resizer(col)}
                                         </th>`;
                             }).join('')}
@@ -629,6 +638,7 @@ export function renderTabla(container) {
                                     switch(col) {
                                         case 'codigo': contenido = `<td data-col="codigo" class="p-3 font-mono text-[10px] text-slate-400 truncate ${stickyClass}" style="${colStyle('codigo')} ${stickyStyle}">${t.codigo_contenedor || '–'}</td>`; break;
                                         case 'actividad': contenido = `<td data-col="actividad" class="p-3 truncate ${stickyClass}" style="${colStyle('actividad')} ${stickyStyle}" title="${escapeHtml(t.actividad)}"><div class="font-medium text-slate-900 dark:text-slate-100 text-[12px] flex items-center gap-1.5"><span class="truncate">${escapeHtml(t.actividad)}</span>${badgeReprogramada(t.id)}</div>${t.nota ? `<div class="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">${escapeHtml(t.nota)}</div>` : ''}</td>`; break;
+                                        case 'especialidad': contenido = `<td data-col="especialidad" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('especialidad')}">${escapeHtml(nombreEspecialidad(t.especialidad_id))}</td>`; break;
                                         case 'grupo': contenido = `<td data-col="grupo" class="p-3 text-slate-500 dark:text-slate-400 text-[11px] truncate" style="${colStyle('grupo')}">${escapeHtml(t.grupo || '-')}</td>`; break;
                                         case 'responsable': contenido = `<td data-col="responsable" class="p-3 text-slate-600 dark:text-slate-300 text-[11px] truncate" style="${colStyle('responsable')}">${escapeHtml(nombreResponsable(t, state.perfilesCache))}</td>`; break;
                                         case 'recursos': contenido = `<td data-col="recursos" class="p-3 truncate" style="${colStyle('recursos')}"><div class="flex -space-x-2">${getRecursosDeTarea(t.id).map(p => `<div class="w-6 h-6 rounded-full ${colorAvatar(p.id)} text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-slate-800" title="${escapeHtml(nombreFormateado(p))}">${getIniciales(nombreFormateado(p)).toUpperCase()}</div>`).join('') || '<span class="text-slate-300 text-[10px] italic">-</span>'}</div></td>`; break;
@@ -849,6 +859,7 @@ export function openModal() {
     
     const grSel = document.getElementById('task-grupo'); 
     if (grSel) grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
+    llenarEspecialidades(null);
     
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) {
@@ -913,6 +924,7 @@ export function editTask(id) {
         grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g=>g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join(''); 
         grSel.value = t.grupo || ''; 
     }
+    llenarEspecialidades(t.especialidad_id);
     
     const rsSel = document.getElementById('task-responsable'); 
     if (rsSel) {
@@ -989,6 +1001,7 @@ export function duplicateTask(id) {
         grSel.innerHTML = '<option value="">— Sin grupo —</option>' + state.gruposCache.filter(g => g.activo).map(g => `<option value="${escapeHtml(g.nombre)}">${escapeHtml(g.nombre)}</option>`).join('');
         grSel.value = t.grupo || '';
     }
+    llenarEspecialidades(t.especialidad_id);
 
     const rsSel = document.getElementById('task-responsable');
     if (rsSel) {
@@ -1037,11 +1050,29 @@ export function duplicateTask(id) {
     document.getElementById('modal-task').classList.add('flex');
 }
 
+function nombreEspecialidad(id) {
+    if (!id) return '-';
+    const e = (state.especialidadesTodasCache || []).find(x => String(x.id) === String(id));
+    return e ? e.nombre : '-';
+}
+
+/** Llena el selector de especialidad (obligatoria). Incluye la actual aunque esté desactivada. */
+function llenarEspecialidades(valor) {
+    const sel = document.getElementById('task-especialidad');
+    if (!sel) return;
+    const activas = state.especialidadesCache || [];
+    const actual = valor ? (state.especialidadesTodasCache || []).find(e => String(e.id) === String(valor)) : null;
+    const lista = actual && !activas.some(e => e.id === actual.id) ? [...activas, actual] : activas;
+    sel.innerHTML = '<option value="">— Elige especialidad —</option>' +
+        lista.map(e => `<option value="${e.id}">${escapeHtml(e.nombre)}${e.activo === false ? ' (inactiva)' : ''}</option>`).join('');
+    sel.value = valor ? String(valor) : '';
+}
+
 function aplicarBloqueoModelador() {
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
     const camposBloqueados = [
-        'task-actividad', 'task-grupo', 'task-responsable',
+        'task-actividad', 'task-grupo', 'task-especialidad', 'task-responsable',
         'task-importancia', 'task-urgencia',
         'task-fecha-inicio', 'task-fecha-fin'
     ];
@@ -1182,6 +1213,14 @@ export async function saveTask(e) {
 
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
+    const especialidadId = document.getElementById('task-especialidad')?.value || '';
+    if (!(soloModelador && id) && !especialidadId) {
+        toast('Elige la especialidad de la actividad.');
+        document.getElementById('task-especialidad')?.focus();
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+        return;
+    }
+
     if (soloModelador && estado === 'Cerrado') {
         toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
         if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
@@ -1200,6 +1239,7 @@ export async function saveTask(e) {
         payload = {
             actividad: document.getElementById('task-actividad').value,
             grupo: document.getElementById('task-grupo').value || null,
+            especialidad_id: especialidadId ? parseInt(especialidadId) : null,
             responsable: respPerfil ? (respPerfil.cargo || respPerfil.email) : null,
             responsable_id: respId,
             importancia: document.getElementById('task-importancia').value,
