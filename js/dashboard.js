@@ -317,7 +317,7 @@ function renderParetos() {
 // ------------------------------------------------------------------
 // COMPARACIÓN ENTRE SEMANAS (datos de Supabase: dashboard_semanas)
 // La semana en curso se calcula en vivo; las cerradas salen de la foto
-// congelada el domingo 23:59 (hora de Lima). Ver sql/dashboard_ppc_especialidades.sql
+// congelada el domingo 23:59 (hora de Lima). Ver sql/002_dashboard_ppc_especialidades.sql
 // ------------------------------------------------------------------
 function semanaActualDashboard() {
     return (state.semanasDashboard || [])[0] || null;
@@ -398,7 +398,7 @@ function seccionComparacionSemanas() {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    ${filas || '<tr><td colspan="12" class="text-center py-4 text-slate-400">Aún no hay datos. Verifica que se haya ejecutado sql/dashboard_ppc_especialidades.sql en Supabase.</td></tr>'}
+                    ${filas || '<tr><td colspan="12" class="text-center py-4 text-slate-400">Aún no hay datos. Verifica que se haya ejecutado sql/002_dashboard_ppc_especialidades.sql en Supabase.</td></tr>'}
                 </tbody>
             </table>
             ${acumOrd.length ? `
@@ -428,7 +428,7 @@ function clasePPC(ppc) {
 }
 
 // ------------------------------------------------------------------
-// BLOQUEOS "EN ESPERA" (sql/espera_bloqueos_ppc_responsable.sql)
+// BLOQUEOS "EN ESPERA" (sql/009_espera_bloqueos_ppc_responsable.sql)
 // Días en espera = días laborables del responsable (roster) transcurridos
 // desde el inicio del bloqueo. Sin responsable: lunes a sábado.
 // ------------------------------------------------------------------
@@ -506,7 +506,7 @@ function seccionBloqueos() {
         <div class="mb-4">
             <h4 class="font-semibold text-sm text-slate-800">Restricciones · actividades "En espera"</h4>
             <p class="text-[11px] text-slate-500 mb-2">Bloqueos con su motivo (catálogo de causas de incumplimiento). Días laborables según el roster del responsable. Usa los mismos filtros del Pareto de causas.</p>
-            ${d.sinTabla ? '<p class="text-[11px] text-amber-700 mb-2">Aún no hay historial de bloqueos: ejecuta sql/espera_bloqueos_ppc_responsable.sql en Supabase.</p>' : ''}
+            ${d.sinTabla ? '<p class="text-[11px] text-amber-700 mb-2">Aún no hay historial de bloqueos: ejecuta sql/009_espera_bloqueos_ppc_responsable.sql en Supabase.</p>' : ''}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 ${tarjetas.map(x => `
                     <div class="card p-3 border-l-4 border-${x.color}-500">
@@ -801,7 +801,7 @@ function seccionDesempeno() {
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Desempeño por responsable</h4>
                 <p class="text-[11px] text-slate-500">PPC por responsable con la misma regla Last Planner del PPC semanal (compromiso del lunes, no planificadas y adelantadas). Semanas cerradas = foto congelada. Meta ${metaPPC()}%.</p>
-                ${hayPorResp ? '' : '<p class="text-[11px] text-amber-700 mt-1">Aún no hay PPC por responsable: ejecuta sql/espera_bloqueos_ppc_responsable.sql en Supabase.</p>'}
+                ${hayPorResp ? '' : '<p class="text-[11px] text-amber-700 mt-1">Aún no hay PPC por responsable: ejecuta sql/009_espera_bloqueos_ppc_responsable.sql en Supabase.</p>'}
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">

@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 007 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- REAGRUPAR ACTIVIDADES: nuevo catálogo de grupos BIM (14 grupos)
 --
 -- Cómo aplicarlo: Supabase > SQL Editor > pegar todo este archivo > Run.
@@ -25,6 +28,22 @@
 -- Se puede volver a ejecutar, PERO borra cualquier grupo que no sea de esta
 -- lista: no lo ejecutes otra vez después de crear grupos nuevos desde la app.
 -- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- PROTECCIÓN: este script se ejecuta UNA sola vez (borra los grupos que no
+-- están en la lista). Si ya está registrado, se detiene sin cambiar nada.
+-- ---------------------------------------------------------------------
+do $proteccion$
+declare v_ya boolean := false;
+begin
+    if to_regclass('public.migraciones_aplicadas') is not null then
+        execute 'select exists (select 1 from public.migraciones_aplicadas where numero = 7)' into v_ya;
+    end if;
+    if v_ya then
+        raise exception 'Este script (007_reagrupar_grupos_bim) ya se ejecutó. No se vuelve a ejecutar porque borraría los grupos creados después desde la app.';
+    end if;
+end
+$proteccion$;
 
 -- ---------------------------------------------------------------------
 -- A) Funciones (no bloquean tablas)
@@ -85,6 +104,7 @@ $$;
 -- ---------------------------------------------------------------------
 do $migracion$
 declare
+    v_ya_ejecutado boolean := false;
     -- Catálogo nuevo
     v_nuevos text[] := array[
         'DISEÑO - RFCS Y REDISEÑOS - PLANOS',
@@ -133,6 +153,14 @@ declare
     ];
     v_r record;
 begin
+    -- Protección (control de versiones): si ya se ejecutó, no cambia ningún dato
+    if to_regclass('public.migraciones_aplicadas') is not null then
+        execute 'select exists (select 1 from public.migraciones_aplicadas where numero = 7)' into v_ya_ejecutado;
+        if v_ya_ejecutado then
+            raise exception '007_reagrupar_grupos_bim ya se ejecutó: no se cambió ningún grupo.';
+        end if;
+    end if;
+
     -- 0) Bloquear ambas tablas a la vez (evita el deadlock con la app)
     perform set_config('lock_timeout', '30s', true);
     lock table public.grupos_bim, public.pendientes_bim in access exclusive mode;
@@ -189,6 +217,18 @@ begin
         with check (public.manpower_es_admin());
 end
 $migracion$;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(7, '007_reagrupar_grupos_bim');
+    end if;
+end
+$registro$;
 
 -- Resultado
 select nombre, activo from public.grupos_bim order by nombre;

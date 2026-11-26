@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 001 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- MANPOWER: corte semanal, actividades cerradas y auditoría de correcciones
 -- Zona horaria del proyecto: America/Lima
 --
@@ -238,3 +241,15 @@ end;
 $$;
 
 grant execute on function public.eliminar_manpower_justificado(bigint, text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(1, '001_manpower_corte_semanal');
+    end if;
+end
+$registro$;

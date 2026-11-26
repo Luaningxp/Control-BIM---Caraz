@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 006 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- MANPOWER: registro por fecha, semanas cerradas con justificación para todos (2026-11-25)
 -- Zona horaria del proyecto: America/Lima
 --
@@ -183,3 +186,15 @@ begin
 end;
 $$;
 -- El trigger trg_manpower_validar_corte ya existe y usa esta función: no hace falta recrearlo.
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(6, '006_manpower_registro_por_fecha');
+    end if;
+end
+$registro$;

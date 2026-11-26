@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------
-// BLOQUEOS "EN ESPERA" (deben coincidir con sql/espera_bloqueos_ppc_responsable.sql)
+// BLOQUEOS "EN ESPERA" (deben coincidir con sql/009_espera_bloqueos_ppc_responsable.sql)
 //  * Pasar a "En espera" exige un motivo del catálogo de causas de incumplimiento.
 //  * Un bloqueo = un periodo en espera; si se cambia el motivo, vale el último.
 //  * Modeladores: solo en actividades donde son responsables o recursos.

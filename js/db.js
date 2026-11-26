@@ -27,7 +27,7 @@ export const state = {
     reprogramacionesCache: [],
     snapshotsCache: [],
     semanasDashboard: [],
-    bloqueosCache: [],       // Periodos "En espera" (sql/espera_bloqueos_ppc_responsable.sql)
+    bloqueosCache: [],       // Periodos "En espera" (sql/009_espera_bloqueos_ppc_responsable.sql)
     especialidadesCache: [],
     especialidadesTodasCache: [],
     parametrosApp: {},
@@ -214,7 +214,7 @@ export async function fetchSemanasDashboard(n = 8) {
 // Si la tabla aún no existe (SQL sin ejecutar), queda vacío y las vistas siguen funcionando.
 export async function fetchBloqueos() {
     const { data, error } = await supabaseClient.from('bloqueos_espera').select('*').order('inicio', { ascending: false });
-    if (error) { console.warn('bloqueos_espera no disponible (¿ejecutaste sql/espera_bloqueos_ppc_responsable.sql?):', error.message); state.bloqueosCache = []; return false; }
+    if (error) { console.warn('bloqueos_espera no disponible (¿ejecutaste sql/009_espera_bloqueos_ppc_responsable.sql?):', error.message); state.bloqueosCache = []; return false; }
     state.bloqueosCache = data || [];
     return true;
 }
@@ -382,4 +382,4 @@ export function invalidarCache(keys) {
 }
 
 // Las fotos semanales ahora las congela Supabase (pg_cron, domingo 23:59 Lima).
-// Ver sql/dashboard_ppc_especialidades.sql
+// Ver sql/002_dashboard_ppc_especialidades.sql

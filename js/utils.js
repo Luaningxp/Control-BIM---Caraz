@@ -70,9 +70,9 @@ export const latenciaPromedio = (tareas, semanas = 8) => {
 };
 
 // ------------------------------------------------------------------
-// REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql,
-// sql/archivar_actividades_cierre.sql, sql/manpower_justificar_retraso.sql y
-// sql/manpower_registro_por_fecha.sql, que es la versión vigente)
+// REGLAS DE MANPOWER (deben coincidir con sql/001_manpower_corte_semanal.sql,
+// sql/004_archivar_actividades_cierre.sql, sql/005_manpower_justificar_retraso.sql y
+// sql/006_manpower_registro_por_fecha.sql, que es la versión vigente)
 // ------------------------------------------------------------------
 export const DIAS_GRACIA_CIERRE = 2;
 
@@ -152,7 +152,7 @@ export const bloqueoRegistroExistente = ({ fecha, tarea, hoy = hoyLima() }) => {
 };
 
 // ------------------------------------------------------------------
-// REGLAS DE CIERRE Y ARCHIVO (deben coincidir con sql/archivar_actividades_cierre.sql)
+// REGLAS DE CIERRE Y ARCHIVO (deben coincidir con sql/004_archivar_actividades_cierre.sql)
 // ------------------------------------------------------------------
 /** Estado al que vuelve una actividad si se le borra la fecha de cierre y no hay registro previo. */
 export const ESTADO_REAPERTURA_DEFAULT = 'En proceso';

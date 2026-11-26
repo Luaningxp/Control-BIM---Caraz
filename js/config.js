@@ -1,5 +1,6 @@
 import { escapeHtml, toast, confirmDelete, hoyLima } from './utils.js';
 import { supabaseClient, state, fetchAll, fetchParametros } from './db.js';
+import { renderTarjetaBaseDatos, cargarEstadoBaseDatos } from './basedatos.js';
 
 export function renderConfig(container) {
     container.innerHTML = `
@@ -144,7 +145,7 @@ export function renderConfig(container) {
                                             : `<button onclick="window.deleteEspecialidad(${e.id})" class="text-red-500 hover:text-red-700" title="Desactivar o eliminar"><i class="fa-solid fa-trash"></i></button>`}
                                     </td>
                                 </tr>
-                            `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin especialidades (ejecuta sql/dashboard_ppc_especialidades.sql)</td></tr>'}
+                            `).join('') || '<tr><td class="text-center text-slate-400 py-4">Sin especialidades (ejecuta sql/002_dashboard_ppc_especialidades.sql)</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -212,8 +213,11 @@ export function renderConfig(container) {
             </div>
         </div>
 
+        ${renderTarjetaBaseDatos()}
+
         ${renderModales()}
     `;
+    if (state.isAdmin) cargarEstadoBaseDatos();
 }
 
 // --- LÓGICA DE EXPORTAR ---
@@ -817,7 +821,7 @@ window.guardarLimitesWIP = async () => {
         { clave: 'wip_modelador', valor: mod },
         { clave: 'wip_supervisor', valor: sup }
     ], { onConflict: 'clave' });
-    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
+    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/003_parametros_app.sql?)'); return; }
     await fetchParametros();
     toast('Límites WIP guardados.');
 };
@@ -829,7 +833,7 @@ window.guardarMetaPPC = async () => {
     const { error } = await supabaseClient.from('parametros_app').upsert([
         { clave: 'meta_ppc', valor: meta, descripcion: 'Meta de PPC semanal en % (Dashboard). Referencia Last Planner: 80%' }
     ], { onConflict: 'clave' });
-    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
+    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/003_parametros_app.sql?)'); return; }
     await fetchParametros();
     toast('Meta de PPC guardada.');
 };

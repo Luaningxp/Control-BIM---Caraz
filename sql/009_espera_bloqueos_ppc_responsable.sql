@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 009 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- BLOQUEOS "EN ESPERA" + PPC POR RESPONSABLE + META PPC
 -- Ejecutar completo en el SQL Editor de Supabase (es idempotente).
 -- Requiere haber ejecutado antes, en este orden:
@@ -389,3 +392,15 @@ on conflict (clave) do nothing;
 -- Verificación rápida (opcional):
 -- select * from public.bloqueos_espera order by inicio desc limit 20;
 -- select semana, ppc, ppc_por_responsable from public.snapshots_semanales order by semana desc limit 4;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(9, '009_espera_bloqueos_ppc_responsable');
+    end if;
+end
+$registro$;
