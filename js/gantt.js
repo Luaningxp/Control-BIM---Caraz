@@ -20,9 +20,16 @@ let ganttState = {
     currentGantt: null
 };
 
+// Ocupación por modelador: rango fijo (4 semanas atrás → 12 adelante, desde lunes)
+// con ancho fijo por día y scroll horizontal propio.
+const OCUP_SEMANAS_ATRAS = 4;
+const OCUP_SEMANAS_ADELANTE = 12;
+const OCUP_ANCHO_DIA = 34; // px, igual que el Roster
+const OCUP_ANCHO_NOMBRE = 200; // px, columna Modelador
+
 let ocupacionState = {
-    semanaOffset: 0,
-    diasVisibles: 42
+    scrollLeft: null,
+    scrollTop: null
 };
 
 const COLORES_ESTADO = {
@@ -364,8 +371,13 @@ function inicializarGantt(tareas) {
         // Forzar el scroll a la fecha de hoy
         setTimeout(() => {
             const todayBar = document.querySelector('.gantt-container .bar-wrapper[data-id="today-line"]');
-            if (todayBar) {
-                todayBar.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            const scrollerGantt = document.querySelector('#gantt-container .gantt-container');
+            if (todayBar && scrollerGantt) {
+                // Solo horizontal: la fila de HOY está al final y no debe bajar el scroll vertical
+                const rBar = todayBar.getBoundingClientRect();
+                const rSc = scrollerGantt.getBoundingClientRect();
+                const objetivo = scrollerGantt.scrollLeft + (rBar.left - rSc.left) - rSc.width / 2;
+                scrollerGantt.scrollTo({ left: Math.max(0, objetivo), behavior: 'smooth' });
             } else {
                 const scroller = document.querySelector('.gantt-container .gantt');
                 if (scroller) {
@@ -436,7 +448,43 @@ function pintarBarrasPorEstado(tareas) {
         setTimeout(() => { aplicar(); setTimeout(aplicar, 300); }, 200);
     }
 
-    setTimeout(() => dibujarLineaHoyNativa(), 900);
+    setTimeout(() => { dibujarLineaHoyNativa(); fijarCabeceraGantt(); }, 900);
+}
+
+// Cabecera de fechas fija al hacer scroll vertical dentro del Gantt.
+// frappe-gantt dibuja todo en un solo SVG, así que no sirve 'position: sticky':
+// se lleva el fondo de cabecera y las fechas a un grupo al final del SVG
+// (queda encima de las barras) y se desplaza con el scroll vertical.
+function fijarCabeceraGantt() {
+    const scroller = document.querySelector('#gantt-container .gantt-container');
+    const svg = scroller?.querySelector('svg.gantt');
+    if (!svg || svg.querySelector('g.cabecera-fija')) return;
+    const fondo = svg.querySelector('.grid-header');
+    const fechas = svg.querySelector('g.date');
+    if (!fondo || !fechas) return;
+
+    const grupo = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    grupo.setAttribute('class', 'cabecera-fija');
+    grupo.appendChild(fondo);
+    grupo.appendChild(fechas);
+    svg.appendChild(grupo);
+
+    const altoCabecera = parseFloat(fondo.getAttribute('height')) || 60;
+    const altoSvg = parseFloat(svg.getAttribute('height')) || svg.getBoundingClientRect().height;
+
+    const actualizar = () => {
+        const y = scroller.scrollTop;
+        grupo.setAttribute('transform', `translate(0, ${y})`);
+        // La línea roja de HOY empieza justo debajo de la cabecera visible
+        const linea = scroller.querySelector('#today-red-line');
+        if (linea) {
+            linea.style.bottom = 'auto';
+            linea.style.top = `${y + altoCabecera}px`;
+            linea.style.height = `${Math.max(0, altoSvg - altoCabecera - y)}px`;
+        }
+    };
+    actualizar();
+    scroller.addEventListener('scroll', actualizar);
 }
 
 function dibujarLineaHoyNativa() {
@@ -559,9 +607,10 @@ function rangoOcupacion() {
     const hoy = today();
     hoy.setHours(0, 0, 0, 0);
     const inicio = new Date(hoy);
-    inicio.setDate(hoy.getDate() + ocupacionState.semanaOffset * 7 - 3);
+    const desdeLunes = (hoy.getDay() + 6) % 7;
+    inicio.setDate(hoy.getDate() - desdeLunes - OCUP_SEMANAS_ATRAS * 7);
     const fin = new Date(inicio);
-    fin.setDate(inicio.getDate() + ocupacionState.diasVisibles - 1);
+    fin.setDate(inicio.getDate() + (OCUP_SEMANAS_ATRAS + OCUP_SEMANAS_ADELANTE) * 7 - 1);
     return { inicio, fin };
 }
 
@@ -610,7 +659,7 @@ function renderOcupacion(container, tareasFiltradas) {
         const esHoy = i === hoyIdx;
         const etiquetaMes = (esPrimero || i === 0) ? `<div class="text-[8px] font-bold text-slate-500 dark:text-slate-400 leading-none">${MESES_CORTO[d.getMonth()]}</div>` : '';
         const claseFondo = esHoy
-            ? 'bg-sky-200 dark:bg-sky-900/60 ring-1 ring-inset ring-sky-500'
+            ? 'bg-sky-200 dark:bg-sky-900 ring-1 ring-inset ring-sky-500'
             : esDomingo
                 ? 'bg-slate-200 dark:bg-slate-700'
                 : '';
@@ -773,10 +822,10 @@ function renderOcupacion(container, tareasFiltradas) {
             ${prevBtn}${todayBtn}${nextBtn}
         </div>
     </div>
-    <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-            <div style="min-width:900px;">
-                <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+    <div class="isolate bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div id="ocupacion-scroll" class="overflow-auto">
+            <div style="width:${OCUP_ANCHO_NOMBRE + totalDias * OCUP_ANCHO_DIA}px;">
+                <div class="sticky top-0 z-20 flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                     <div class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" style="width:200px;min-width:200px;">Modelador</div>
                     <div class="flex flex-1">${cabeceraDias}</div>
                 </div>
@@ -812,11 +861,37 @@ function renderOcupacion(container, tareasFiltradas) {
         </div>
     </div>
 `;
+
+    // Scroll: se ubica en hoy al abrir; tras re-render (edición) conserva la posición.
+    const sc = document.getElementById('ocupacion-scroll');
+    if (sc) {
+        if (ocupacionState.scrollLeft != null) {
+            sc.scrollLeft = ocupacionState.scrollLeft;
+            sc.scrollTop = ocupacionState.scrollTop || 0;
+        } else {
+            sc.scrollLeft = Math.max(0, (hoyIdx - 3) * OCUP_ANCHO_DIA);
+        }
+        ocupacionState.scrollLeft = sc.scrollLeft;
+        ocupacionState.scrollTop = sc.scrollTop;
+        sc.addEventListener('scroll', () => {
+            ocupacionState.scrollLeft = sc.scrollLeft;
+            ocupacionState.scrollTop = sc.scrollTop;
+        });
+    }
 }
+// ‹ Hoy ›: mueven el scroll una semana o vuelven a hoy (sin recargar)
 window.ocupacionMove = function(dir) {
-    if (dir === 0) ocupacionState.semanaOffset = 0;
-    else ocupacionState.semanaOffset += dir;
-    window.renderView();
+    const sc = document.getElementById('ocupacion-scroll');
+    if (!sc) return;
+    if (dir === 0) {
+        const { inicio } = rangoOcupacion();
+        const hoy = today();
+        hoy.setHours(0, 0, 0, 0);
+        const hoyIdx = Math.round((hoy - inicio) / 86400000);
+        sc.scrollTo({ left: Math.max(0, (hoyIdx - 3) * OCUP_ANCHO_DIA), behavior: 'smooth' });
+    } else {
+        sc.scrollBy({ left: dir * 7 * OCUP_ANCHO_DIA, behavior: 'smooth' });
+    }
 };
 
 // ============================================
@@ -990,6 +1065,11 @@ async function generarPDFGantt() {
         ganttWrapper.style.overflow = 'visible';
         ganttWrapper.style.width = 'max-content';
         ganttWrapper.style.height = 'max-content';
+        const scrollInterno = ganttWrapper.querySelector('.gantt-container');
+        if (scrollInterno) {
+            scrollInterno.style.maxHeight = 'none';
+            scrollInterno.style.overflow = 'visible';
+        }
 
         await new Promise(resolve => setTimeout(resolve, 400));
 
