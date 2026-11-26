@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 004 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- ARCHIVAR ACTIVIDADES (borrado lógico) + CIERRE AUTOMÁTICO POR FECHA
 -- Ejecutar completo en el SQL Editor de Supabase (es idempotente).
 -- Requiere haber ejecutado antes: sql/dashboard_ppc_especialidades.sql
@@ -387,3 +390,15 @@ $$;
 
 -- Verificación rápida (opcional):
 -- select id, actividad, estado, fecha_cierre, estado_antes_cierre, archivada_en from public.pendientes_bim order by id desc limit 20;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(4, '004_archivar_actividades_cierre');
+    end if;
+end
+$registro$;

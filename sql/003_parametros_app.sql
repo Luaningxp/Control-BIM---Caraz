@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 003 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- Parámetros de la aplicación (clave/valor editables por admin)
 -- Uso inicial: límites de WIP (actividades en paralelo) para Recursos.
 --   wip_modelador  = 3  actividades en paralelo por modelador
@@ -49,3 +52,15 @@ create policy "parametros_app_admin_write" on public.parametros_app
     for all to authenticated
     using (public.manpower_es_admin())
     with check (public.manpower_es_admin());
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(3, '003_parametros_app');
+    end if;
+end
+$registro$;

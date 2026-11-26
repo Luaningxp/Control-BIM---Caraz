@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 002 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- DASHBOARD: PPC semanal (Last Planner), fotos semanales congeladas
 -- y catálogo de especialidades.
 -- Zona horaria del proyecto: America/Lima
@@ -427,3 +430,15 @@ begin
         raise notice 'pg_cron no está activado: la congelación semanal no quedó programada.';
     end if;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(2, '002_dashboard_ppc_especialidades');
+    end if;
+end
+$registro$;

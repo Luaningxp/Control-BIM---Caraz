@@ -1,4 +1,7 @@
 -- =====================================================================
+-- [Control de versiones] Script 008 de sql/. Si lo vuelves a ejecutar, revisa
+-- después Configuración > Base de datos: te dirá si hay que re-ejecutar alguno
+-- posterior que redefine las mismas funciones.
 -- CAMBIO MASIVO DE GRUPO (Tabla > casillas > "Cambiar grupo a")
 --
 -- Cómo aplicarlo: Supabase > SQL Editor > pegar todo este archivo > Run.
@@ -50,3 +53,15 @@ $$;
 
 revoke all on function public.cambiar_grupo_masivo(bigint[], text) from public;
 grant execute on function public.cambiar_grupo_masivo(bigint[], text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Control de versiones: deja la marca de que este script se ejecutó
+-- (ver sql/010_control_versiones.sql y Configuración > Base de datos)
+-- ---------------------------------------------------------------------
+do $registro$
+begin
+    if to_regprocedure('public.registrar_migracion(integer,text,text)') is not null then
+        perform public.registrar_migracion(8, '008_cambio_masivo_grupo');
+    end if;
+end
+$registro$;
