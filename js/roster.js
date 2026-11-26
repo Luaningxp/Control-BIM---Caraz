@@ -123,7 +123,7 @@ export function renderRoster(container) {
             ${Object.entries(ESTILO_DIA).map(([k, v]) => `<span class="inline-flex items-center gap-1"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${v.clase}">${v.letra}</span>${v.label}</span>`).join('')}
         </div>
 
-        <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-4">
+        <div class="isolate bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-4">
             <div id="roster-scroll" class="overflow-x-auto">
                 <table class="text-left text-xs" style="table-layout: fixed;">
                     <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold">
