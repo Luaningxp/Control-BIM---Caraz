@@ -88,6 +88,8 @@ declare
     v_y      bigint;
     v_causa  bigint;
     v_grupo  text;
+    v_plano  bigint;
+    v_prop   bigint;
     v_err    text;
     v_otro   uuid;
     v_vars   jsonb;
@@ -150,6 +152,8 @@ begin
         order by p.id limit 1;
         select c.id into v_causa from public.causas_incumplimiento c order by c.id limit 1;
         select g.nombre into v_grupo from public.grupos_bim g order by g.nombre limit 1;
+        select pl.id into v_plano from public.planos pl order by pl.id limit 1;
+        select pd.id into v_prop from public.propiedades_def pd order by pd.id limit 1;
         insert into public.parametros_app (clave, valor, descripcion)
         values ('meta_ppc', 80, 'Meta de PPC semanal en % (Dashboard). Referencia Last Planner: 80%')
         on conflict (clave) do nothing;
@@ -224,7 +228,44 @@ begin
                 (19, 'Modificar una foto congelada del PPC', null,
                  $q$update public.snapshots_semanales set ppc = -1
                     where semana = (select max(semana) from public.snapshots_semanales)$q$,
-                 $q$select exists (select 1 from public.snapshots_semanales where ppc = -1)$q$, 'NNNN')
+                 $q$select exists (select 1 from public.snapshots_semanales where ppc = -1)$q$, 'NNNN'),
+                (20, 'Crear un feriado (Roster)', null,
+                 $q$insert into public.feriados (fecha, nombre) values ({HOY}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.feriados where nombre = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (21, 'Registrar descanso de otro usuario (Roster)', null,
+                 $q$insert into public.descansos (usuario_id, fecha_inicio, fecha_fin, motivo) values ({OTRO}, {HOY}, {HOY}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.descansos where motivo = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (22, 'Registrar descanso médico (Roster)', null,
+                 $q$insert into public.descansos_medicos (usuario_id, fecha_inicio, fecha_fin, motivo) values ({OTRO}, {HOY}, {HOY}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.descansos_medicos where motivo = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (23, 'Registrar trabajo extra (Roster)', null,
+                 $q$insert into public.trabajos_extra (usuario_id, fecha, motivo) values ({OTRO}, {HOY}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.trabajos_extra where motivo = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (24, 'Crear una subcontrata (Configuración)', null,
+                 $q$insert into public.subcontratas (nombre) values ('ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.subcontratas where nombre = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (25, 'Crear un parámetro personalizado (Configuración)', null,
+                 $q$insert into public.propiedades_def (nombre, tipo) values ('ZZ PRUEBA DE ROL', 'texto')$q$,
+                 $q$select exists (select 1 from public.propiedades_def where nombre = 'ZZ PRUEBA DE ROL')$q$, 'SSNN'),
+                (26, 'Crear un plano (Log de planos)', null,
+                 $q$insert into public.planos (codigo, revision, titulo) values ('ZZ-PRUEBA-ROL', '0', 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.planos where codigo = 'ZZ-PRUEBA-ROL')$q$, 'SSNN'),
+                (27, 'Asignar causa a una actividad donde participa',
+                 $q$delete from public.tarea_causas where pendiente_id = {X}$q$,
+                 $q$insert into public.tarea_causas (pendiente_id, causa_id) values ({X}, {CAUSA})$q$,
+                 $q$select exists (select 1 from public.tarea_causas where pendiente_id = {X})$q$, 'SSSS'),
+                (28, 'Asignar causa a una actividad donde NO participa',
+                 $q$delete from public.tarea_causas where pendiente_id = {Y}$q$,
+                 $q$insert into public.tarea_causas (pendiente_id, causa_id) values ({Y}, {CAUSA})$q$,
+                 $q$select exists (select 1 from public.tarea_causas where pendiente_id = {Y})$q$, 'SSSN'),
+                (29, 'Vincular un plano a una actividad donde NO participa',
+                 $q$delete from public.actividad_planos where pendiente_id = {Y}$q$,
+                 $q$insert into public.actividad_planos (pendiente_id, plano_id) values ({Y}, {PLANO})$q$,
+                 $q$select exists (select 1 from public.actividad_planos where pendiente_id = {Y})$q$, 'SSSN'),
+                (30, 'Guardar parámetro personalizado en actividad donde NO participa',
+                 $q$delete from public.propiedades_valores where pendiente_id = {Y}$q$,
+                 $q$insert into public.propiedades_valores (pendiente_id, propiedad_id, valor_texto) values ({Y}, {PROP}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.propiedades_valores where pendiente_id = {Y})$q$, 'SSSN')
             ) as v(num, nombre, pre, accion, chequeo, esperados)
         loop
             for i in 1..4 loop
@@ -239,6 +280,10 @@ begin
                     v_obt := 'no probado: no hay causas de incumplimiento';
                 elsif coalesce(t.pre, '') like '%{GRUPO}%' and v_grupo is null then
                     v_obt := 'no probado: no hay grupos BIM';
+                elsif t.accion like '%{PLANO}%' and v_plano is null then
+                    v_obt := 'no probado: no hay planos';
+                elsif t.accion like '%{PROP}%' and v_prop is null then
+                    v_obt := 'no probado: no hay parámetros personalizados';
                 end if;
 
                 if v_obt is null then
@@ -252,7 +297,9 @@ begin
                         'YO', quote_literal(v_uid[i]::text) || '::uuid',
                         'OTRO', coalesce(quote_literal(v_otro::text) || '::uuid', 'null'),
                         'HOY', quote_literal(v_hoy::text) || '::date',
-                        'FUTURO', quote_literal((v_hoy + 3)::text) || '::date');
+                        'FUTURO', quote_literal((v_hoy + 3)::text) || '::date',
+                        'PLANO', v_plano::text,
+                        'PROP', v_prop::text);
                     v_obt := public.prueba_como(v_uid[i],
                         public.prueba_sustituir(t.pre, v_vars),
                         public.prueba_sustituir(t.accion, v_vars),
