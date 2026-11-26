@@ -28,6 +28,7 @@ detecta cuáles de los scripts 001-009 ya estaban aplicados y los deja registrad
 | 011 | `011_causas_solo_admin.sql` | catálogo de causas: solo admin lo edita |
 | 012 | `012_fotos_ppc_solo_lectura.sql` | fotos semanales del PPC: nadie las edita desde la app |
 | 013 | `013_permisos_tablas_abiertas.sql` | Roster, subcontratas, parámetros y planos: solo admin; planos/causas/parámetros de una actividad: quien puede editarla |
+| 014 | `014_recursos_actividad.sql` | recursos de actividades: solo admin, coordinador y supervisor |
 
 **Ojo:** algunos scripts redefinen funciones de otros anteriores (Manpower: 001, 004, 005, 006;
 PPC: 002, 004, 009). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
@@ -35,8 +36,8 @@ Configuración > Base de datos te avisa si alguna función quedó en una versió
 
 ## Script nuevo (para quien programa)
 
-1. Nombre: siguiente número, por ejemplo `014_lo_que_hace.sql`. Idempotente (`if not exists`, `create or replace`).
-2. Última línea: `select public.registrar_migracion(14, '014_lo_que_hace');`
+1. Nombre: siguiente número, por ejemplo `015_lo_que_hace.sql`. Idempotente (`if not exists`, `create or replace`).
+2. Última línea: `select public.registrar_migracion(15, '015_lo_que_hace');`
 3. Agregarlo a `MIGRACIONES` en `js/basedatos.js`.
 4. Si redefine una función de la tabla de huellas (`bd_huellas` en el 010), actualizar la huella
    y la versión esperada en un script nuevo.
@@ -44,7 +45,7 @@ Configuración > Base de datos te avisa si alguna función quedó en una versió
 ## Pruebas de permisos por rol
 
 `pruebas/pruebas_roles.sql`: pégalo en el SQL Editor y ejecútalo. Crea 4 usuarios ficticios
-(admin, coordinador, supervisor, modelador), intenta 30 acciones con cada uno y **deshace todo al final**:
+(admin, coordinador, supervisor, modelador), intenta 32 acciones con cada uno y **deshace todo al final**:
 no cambia ningún dato. Muestra una tabla con ✅ / ❌. Para repetirlas: `select * from public.pruebas_roles();`
 
 ## Foto de la estructura
