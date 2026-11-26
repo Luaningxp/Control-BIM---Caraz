@@ -426,6 +426,82 @@ function esMia(t) {
     return (state.actividadRecursosCache || []).some(r => r.pendiente_id === t.id && r.usuario_id === uid);
 }
 
+// --- CAMBIO MASIVO DE GRUPO (solo admin) ---
+const SIN_GRUPO = '__sin_grupo__';
+const seleccionMasiva = new Set();
+let destinoMasivo = '';
+let modoMasivo = false;
+function puedeCambioMasivo() { return state.isAdmin || state.isCoordinador; }
+
+function opcionesGrupoCatalogo(seleccionado) {
+    return state.gruposCache.filter(g => g.activo)
+        .map(g => `<option value="${escapeHtml(g.nombre)}" ${seleccionado === g.nombre ? 'selected' : ''}>${escapeHtml(g.nombre)}</option>`).join('');
+}
+
+function renderBarraMasiva(tasks) {
+    const n = seleccionMasiva.size;
+    if (!n) return `<div class="bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 p-2 rounded-lg mb-3 text-xs text-sky-800 dark:text-sky-200"><i class="fa-solid fa-circle-info mr-1"></i>Marca las actividades con las casillas (o todas las filtradas con la casilla del encabezado) y luego elige el grupo.</div>`;
+    const fuera = [...seleccionMasiva].filter(id => !tasks.some(t => t.id === id)).length;
+    return `
+        <div class="flex flex-wrap items-center gap-2 bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 p-2 rounded-lg mb-3 text-xs">
+            <span class="font-semibold text-sky-800 dark:text-sky-200"><i class="fa-solid fa-square-check mr-1"></i>${n} seleccionada${n === 1 ? '' : 's'}</span>
+            ${fuera ? `<span class="text-[10px] text-slate-500">(${fuera} fuera de los filtros actuales)</span>` : ''}
+            <span class="text-slate-600 dark:text-slate-300 ml-2">Cambiar grupo a</span>
+            <select id="masivo-grupo" class="inp" style="width:auto; max-width: 320px;" onchange="window.elegirDestinoMasivo(this.value)">
+                <option value="">— Elegir grupo —</option>
+                <option value="${SIN_GRUPO}" ${destinoMasivo === SIN_GRUPO ? 'selected' : ''}>— SIN GRUPO —</option>
+                ${opcionesGrupoCatalogo(destinoMasivo)}
+            </select>
+            <button onclick="window.aplicarCambioMasivoGrupo()" class="px-3 py-1.5 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700">Aplicar</button>
+            <button onclick="window.limpiarSeleccionMasiva()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300">Limpiar selección</button>
+        </div>`;
+}
+
+window.toggleModoMasivo = function() {
+    modoMasivo = !modoMasivo;
+    if (!modoMasivo) { seleccionMasiva.clear(); destinoMasivo = ''; }
+    window.renderView();
+};
+
+window.toggleSeleccionMasiva = function(id, checked) {
+    if (checked) seleccionMasiva.add(id); else seleccionMasiva.delete(id);
+    window.renderView();
+};
+
+window.toggleSeleccionTodas = function(checked) {
+    getProcessedTasks().forEach(t => { if (checked) seleccionMasiva.add(t.id); else seleccionMasiva.delete(t.id); });
+    window.renderView();
+};
+
+window.elegirDestinoMasivo = function(v) { destinoMasivo = v; };
+
+window.limpiarSeleccionMasiva = function() { seleccionMasiva.clear(); window.renderView(); };
+
+window.aplicarCambioMasivoGrupo = async function() {
+    if (!puedeCambioMasivo()) { toast('Solo los administradores pueden cambiar grupos en lote.'); return; }
+    const valor = document.getElementById('masivo-grupo')?.value || '';
+    if (!valor) { toast('Elige el grupo de destino.'); return; }
+    const destino = valor === SIN_GRUPO ? null : valor;
+    const ids = [...seleccionMasiva];
+    const tareas = state.tasksCache.filter(t => ids.includes(t.id));
+    const cambian = tareas.filter(t => (t.grupo || null) !== destino);
+    if (!cambian.length) { toast('Las actividades elegidas ya están en ese grupo.'); return; }
+
+    const origen = new Map();
+    cambian.forEach(t => { const k = t.grupo || 'SIN GRUPO'; origen.set(k, (origen.get(k) || 0) + 1); });
+    const resumen = [...origen.entries()].sort((a, b) => b[1] - a[1]).map(([g, c]) => `  • ${c} de ${g}`).join('\n');
+    const yaEstan = tareas.length - cambian.length;
+    if (!confirm(`Vas a pasar ${cambian.length} actividad${cambian.length === 1 ? '' : 'es'} a "${destino || 'SIN GRUPO'}":\n\n${resumen}${yaEstan ? `\n\n(${yaEstan} ya estaban en ese grupo y no cambian.)` : ''}\n\n¿Continuar?`)) return;
+
+    const { data, error } = await supabaseClient.rpc('cambiar_grupo_masivo', { p_ids: cambian.map(t => t.id), p_grupo: destino });
+    if (error) { toast('Error: ' + error.message); return; }
+    seleccionMasiva.clear();
+    destinoMasivo = '';
+    await fetchAll();
+    window.renderView();
+    toast(`${data ?? cambian.length} actividad${(data ?? cambian.length) === 1 ? '' : 'es'} movida${(data ?? cambian.length) === 1 ? '' : 's'} a ${destino || 'SIN GRUPO'}`);
+};
+
 function getProcessedTasks() {
     let result = [...state.tasksCache];
         if (tableState.filters.search) {
@@ -450,7 +526,8 @@ function getProcessedTasks() {
                    nombresRecursos.includes(q);
         });
     }
-    if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
+    if (tableState.filters.grupo === SIN_GRUPO) result = result.filter(t => !t.grupo);
+    else if (tableState.filters.grupo) result = result.filter(t => t.grupo === tableState.filters.grupo);
     if (tableState.filters.responsable) result = result.filter(t => t.responsable_id === tableState.filters.responsable);
     if (tableState.filters.recursos) {
         result = result.filter(t => 
@@ -597,6 +674,14 @@ export function renderTabla(container) {
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-800 dark:text-slate-300";
+    if (!puedeCambioMasivo()) modoMasivo = false;
+    const masivo = modoMasivo;
+    if (masivo) {
+        // Quita de la selección lo que ya no existe (eliminadas, recargas)
+        [...seleccionMasiva].forEach(id => { if (!state.tasksCache.some(t => t.id === id)) seleccionMasiva.delete(id); });
+    } else seleccionMasiva.clear();
+    const offSel = masivo ? 32 : 0;
+    const todasSel = tasks.length > 0 && tasks.every(t => seleccionMasiva.has(t.id));
     const filtrosActivos = Object.values(tableState.filters).filter(v => v !== '' && v !== false && (Array.isArray(v) ? v.length > 0 : true)).length;
 
     container.innerHTML = `
@@ -622,16 +707,20 @@ export function renderTabla(container) {
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 dark:border-slate-700 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
                     </div>
                 </div>
+                ${puedeCambioMasivo() ? `<button onclick="window.toggleModoMasivo()" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${modoMasivo ? 'bg-sky-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}" title="Solo administradores"><i class="fa-solid fa-layer-group"></i> ${modoMasivo ? 'Terminar edición de grupos' : 'Editar grupos masivamente'}</button>` : ''}
                 ${canRestore() ? `<button onclick="window.toggleVerArchivadas()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5" title="Actividades eliminadas (solo administradores)"><i class="fa-solid fa-box-archive"></i> Archivadas (${(state.tasksTodasCache || []).filter(t => t.archivada_en).length})</button>` : ''}
                 <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Refrescar</button>
             </div>
         </div>
+
+        ${masivo ? renderBarraMasiva(tasks) : ''}
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
                <table class="text-left text-xs" style="table-layout: fixed;">
                    <thead class="sticky top-0 z-30 shadow-sm">
                         <tr class="bg-slate-50 dark:bg-slate-800">
+                            ${masivo ? `<th style="width:32px;min-width:32px;max-width:32px;left:0px;" class="p-2 text-center sticky z-20 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700"><input type="checkbox" title="Seleccionar todas las filtradas" ${todasSel ? 'checked' : ''} onclick="event.stopPropagation()" onchange="window.toggleSeleccionTodas(this.checked)" class="w-3.5 h-3.5 rounded text-sky-600 cursor-pointer"></th>` : ''}
                             ${tableState.colOrder.map((col, idx) => {
                                 if (!tableState.visibleCols[col]) return '';
                                 let title = col.replace('_', ' ');
@@ -642,10 +731,10 @@ export function renderTabla(container) {
                                 let stickyStyle = '';
                                 if (col === 'codigo') {
                                     stickyClass = 'sticky left-0 z-20 bg-slate-50 dark:bg-slate-800';
-                                    stickyStyle = 'left: 0px;';
+                                    stickyStyle = `left: ${offSel}px;`;
                                 } else if (col === 'actividad') {
                                     stickyClass = 'sticky z-20 bg-slate-50 dark:bg-slate-800';
-                                    stickyStyle = 'left: 100px;';
+                                    stickyStyle = `left: ${offSel + 100}px;`;
                                 }
 
                                 return `<th data-col="${col}" draggable="true" 
@@ -672,7 +761,8 @@ export function renderTabla(container) {
                         ${tasks.map(t => {
                             const crit = getCriticidad(t); 
                             return `
-                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition group cursor-pointer" ondblclick="window.editTask(${t.id})">
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition group cursor-pointer ${seleccionMasiva.has(t.id) ? 'bg-sky-50/60 dark:bg-sky-900/20' : ''}" ondblclick="window.editTask(${t.id})">
+                                ${masivo ? `<td style="width:32px;min-width:32px;max-width:32px;left:0px;" class="p-2 text-center sticky z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 border-r border-slate-100 dark:border-slate-700" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" ${seleccionMasiva.has(t.id) ? 'checked' : ''} onchange="window.toggleSeleccionMasiva(${t.id}, this.checked)" class="w-3.5 h-3.5 rounded text-sky-600 cursor-pointer"></td>` : ''}
                                 ${tableState.colOrder.map(col => {
                                     if (!tableState.visibleCols[col]) return '';
                                     
@@ -681,10 +771,10 @@ export function renderTabla(container) {
                                     let stickyStyle = '';
                                     if (col === 'codigo') {
                                         stickyClass = 'sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50';
-                                        stickyStyle = 'left: 0px;';
+                                        stickyStyle = `left: ${offSel}px;`;
                                     } else if (col === 'actividad') {
                                         stickyClass = 'sticky z-10 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50';
-                                        stickyStyle = 'left: 100px;';
+                                        stickyStyle = `left: ${offSel + 100}px;`;
                                     }
                                     
                                     let contenido = '';
@@ -778,7 +868,8 @@ window.toggleFilterDrawer = function() {
                         <label class="block font-semibold text-slate-600 dark:text-slate-300 mb-1">Grupo</label>
                         <select class="inp" onchange="window.applyTableFilter('grupo', this.value)">
                             <option value="">Todos</option>
-                            ${gruposOpts.map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+                            <option value="${SIN_GRUPO}" ${tableState.filters.grupo === SIN_GRUPO ? 'selected' : ''}>— SIN GRUPO —</option>
+                            ${[...new Set([...state.gruposCache.map(g => g.nombre), ...gruposOpts])].sort().map(g => `<option value="${escapeHtml(g)}" ${tableState.filters.grupo === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
                         </select>
                     </div>
                     <div>
