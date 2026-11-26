@@ -2,8 +2,9 @@ import { supabaseClient, state, fetchAll, tareaPorId } from './db.js';
 import { 
     escapeHtml, fmtDate, semaforo, today, toast, nombreFormateado, 
     getIniciales, colorAvatar, confirmDelete, nombreResponsable, hoyLima, isoLocal,
-    esAdminManpower, semanaCerrada, cerradaVisibleHoy, limiteVisibleCerrada, lunesDeSemana,
-    validarRegistroManpower, bloqueoRegistroExistente, esMotivoJustificableTodos } from './utils.js';
+    esAdminManpower, semanaCerrada, cerradaVisibleHoy, limiteVisibleCerrada,
+    clasificarRegistroManpower, bloqueoRegistroExistente, esMotivoSoloAdmin,
+    MSG_RETRASO_CERRADA, MSG_SEMANA_CERRADA, MSG_REG_SEMANA_CERRADA } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -341,9 +342,14 @@ function bloqueoDe(r) {
     return bloqueoRegistroExistente({ fecha: r.fecha, tarea: tareaDe(r.pendiente_id) });
 }
 
-/** Para usuarios sin rol admin: motivo por el que no pueden tocar el registro (null si pueden). */
+/**
+ * Motivo por el que el usuario actual no puede tocar el registro (null si puede).
+ * Semana cerrada: cualquiera corrige justificando. Actividad eliminada o archivada: solo admin.
+ */
 function registroBloqueadoPara(r) {
-    return esAdminManpower(state) ? null : bloqueoDe(r);
+    if (esAdminManpower(state)) return null;
+    const motivo = bloqueoDe(r);
+    return esMotivoSoloAdmin(motivo) ? motivo : null;
 }
 
 /**
@@ -567,46 +573,123 @@ export function renderManpower(container) {
     }
 }
 
-// Listas del formulario abierto (se repinta al pulsar "Cargar más actividades cerradas")
-let listaModalManpower = null;
+// ============================================================
+// FORMULARIO DE REGISTRO: primero la fecha, luego las actividades
+// agrupadas (sin justificación / con justificación). Las que no
+// se pueden registrar en esa fecha no se muestran.
+// ============================================================
+// Contexto del formulario abierto
+let ctxModalManpower = null;
 
-/** Cerradas más recientes primero. */
-function ordenarCerradas(lista) {
-    return lista.sort((a, b) => String(b.fecha_cierre || '').localeCompare(String(a.fecha_cierre || '')));
+/** ¿El registro que se edita conserva su actividad? (el plazo de la cerrada no aplica) */
+function esMismaActividad(rEdit, tareaId) {
+    return !!rEdit && String(rEdit.pendiente_id || '') === String(tareaId || '');
 }
 
-function pintarListaActividades(valor) {
-    const select = document.getElementById('mp-actividad');
-    const L = listaModalManpower;
-    if (!select || !L) return;
-    const opcionTarea = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0,50))}...</option>`;
-    const opcionCerrada = t => `<option value="${t.id}">${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0,40))}... (cerró ${fmtDate(t.fecha_cierre)})</option>`;
-    select.innerHTML = '<option value="">— General —</option>' +
-        (L.activas.length ? `<optgroup label="Activas">${L.activas.map(opcionTarea).join('')}</optgroup>` : '') +
-        (L.cerradasVisibles.length ? `<optgroup label="Cerradas (solo fechas hasta su cierre)">${L.cerradasVisibles.map(opcionTarea).join('')}</optgroup>` : '') +
-        (L.mostrarExtra && L.cerradasExtra.length ? `<optgroup label="Cerradas fuera de plazo (requieren justificación)">${L.cerradasExtra.map(opcionCerrada).join('')}</optgroup>` : '') +
-        (L.extraFija ? opcionTarea(L.extraFija) : '');
-    select.value = valor ?? '';
+/** Motivo corto para la etiqueta de una actividad que pide justificación. */
+function motivoCorto(motivo, t) {
+    if (motivo === MSG_RETRASO_CERRADA) return `plazo vencido, cerró ${fmtDate(t.fecha_cierre)}`;
+    if (motivo === MSG_SEMANA_CERRADA) return 'semana cerrada';
+    return 'justificar';
+}
 
-    const btn = document.getElementById('mp-mas-cerradas');
-    if (btn) {
-        const hay = L.cerradasExtra.length > 0;
-        btn.classList.toggle('hidden', !hay);
-        btn.querySelector('span').textContent = L.mostrarExtra
-            ? 'Ocultar actividades cerradas fuera de plazo'
-            : `Cargar más actividades cerradas (${L.cerradasExtra.length})`;
+/** Mensaje si el día no admite registros (no laborable o 100% ya usado); null si se puede. */
+function bloqueoDelDia(uid, fecha, editId) {
+    if (!fecha) return 'Elige la fecha que vas a registrar.';
+    if (fecha > hoyLima()) return 'No puedes registrar horas en una fecha futura.';
+    if (!esDiaLaborable(uid, fecha)) {
+        const etiquetas = { DO: 'domingo no laborable', DE: 'descanso', FE: 'feriado' };
+        const tipo = tipoDia(uid, fecha);
+        return `Ese día no es laborable según el Roster (${etiquetas[tipo] || tipo}). Elige otra fecha.`;
+    }
+    const usado = state.manpowerCache
+        .filter(m => m.usuario_id === uid && m.fecha === fecha && String(m.id) !== String(editId))
+        .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
+    if (usado >= 100) return 'Ya registraste el 100% de ese día. Elige otra fecha.';
+    return null;
+}
+
+/** Arma la lista de actividades para la fecha elegida y la pinta. */
+function pintarListaActividades(valorPreferido) {
+    const select = document.getElementById('mp-actividad');
+    const C = ctxModalManpower;
+    if (!select || !C) return;
+    const fecha = document.getElementById('mp-fecha')?.value || '';
+    const hoy = hoyLima();
+    const aviso = document.getElementById('mp-actividad-aviso');
+    const bloqueoDia = bloqueoDelDia(C.uid, fecha, C.rEdit?.id);
+    const btnGuardar = document.getElementById('btn-save-manpower');
+    const pasos = document.getElementById('mp-paso-2');
+
+    if (bloqueoDia) {
+        select.innerHTML = '<option value="">—</option>';
+        select.disabled = true;
+        pasos?.classList.add('opacity-50', 'pointer-events-none');
+        if (btnGuardar) btnGuardar.disabled = true;
+        if (aviso) { aviso.textContent = bloqueoDia; aviso.classList.remove('hidden'); }
+        return;
+    }
+    select.disabled = false;
+    pasos?.classList.remove('opacity-50', 'pointer-events-none');
+    if (btnGuardar) btnGuardar.disabled = false;
+
+    const libres = [];
+    const conJustif = [];
+    const clasificar = t => clasificarRegistroManpower({ fecha, tarea: t, hoy, omitirPlazo: esMismaActividad(C.rEdit, t?.id) });
+
+    const general = clasificar(null);
+    C.propias.forEach(t => {
+        const c = clasificar(t);
+        if (c.bloqueo) return; // no se puede registrar en esta fecha: no se muestra
+        (c.justificar ? conJustif : libres).push({ t, motivo: c.justificar });
+    });
+    const porCodigo = (a, b) => String(a.t.codigo_contenedor || '').localeCompare(String(b.t.codigo_contenedor || ''));
+    libres.sort(porCodigo);
+    conJustif.sort(porCodigo);
+
+    const texto = t => `${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0, 50))}`;
+    const opcion = ({ t, motivo }) => `<option value="${t.id}">${texto(t)}${motivo ? ` (${escapeHtml(motivoCorto(motivo, t))})` : ''}</option>`;
+    const optGeneral = `<option value="">— General —${general.justificar ? ` (${escapeHtml(motivoCorto(general.justificar))})` : ''}</option>`;
+
+    // Al editar, la actividad del registro siempre se ve, aunque en esta fecha no se pueda usar
+    const ids = new Set([...libres, ...conJustif].map(x => String(x.t.id)));
+    const tEdit = C.rEdit && C.rEdit.pendiente_id ? tareaPorId(C.rEdit.pendiente_id) : null;
+    const extra = tEdit && !ids.has(String(tEdit.id)) ? tEdit : null;
+
+    select.innerHTML =
+        (general.justificar ? '' : optGeneral) +
+        (libres.length ? `<optgroup label="Se registran sin justificación (${libres.length})">${libres.map(opcion).join('')}</optgroup>` : '') +
+        (general.justificar || conJustif.length
+            ? `<optgroup label="Requieren justificación (${conJustif.length + (general.justificar ? 1 : 0)})">${general.justificar ? optGeneral : ''}${conJustif.map(opcion).join('')}</optgroup>`
+            : '') +
+        (extra ? `<optgroup label="Actividad del registro (no admite esta fecha)"><option value="${extra.id}">${texto(extra)}</option></optgroup>` : '');
+
+    const disponibles = new Set(['', ...ids, ...(extra ? [String(extra.id)] : [])]);
+    const deseado = String(valorPreferido ?? '');
+    if (disponibles.has(deseado)) {
+        select.value = deseado;
+        if (aviso) aviso.classList.add('hidden');
+    } else {
+        select.value = '';
+        const t = tareaPorId(deseado);
+        if (aviso) {
+            aviso.textContent = `"${t ? (t.actividad || '').substring(0, 60) : 'La actividad'}" no admite registros el ${fmtDate(fecha)}. Elige otra fecha u otra actividad.`;
+            aviso.classList.remove('hidden');
+        }
     }
 }
 
-window.cargarMasCerradasManpower = function() {
-    if (!listaModalManpower) return;
+/** Al cambiar la fecha: recalcula el % disponible y la lista, conservando la actividad si sigue disponible. */
+window.cambiarFechaManpower = function() {
+    pintarListaActividades(ctxModalManpower?.preferida ?? '');
+    window.actualizarRestanteManpower();
+    window.actualizarJustificacionManpower();
+};
+
+window.cambiarActividadManpower = function() {
     const select = document.getElementById('mp-actividad');
-    const actual = select?.value || '';
-    listaModalManpower.mostrarExtra = !listaModalManpower.mostrarExtra;
-    // Si se ocultan y la elegida era una de ellas, vuelve a "General"
-    const sigue = listaModalManpower.mostrarExtra
-        || !listaModalManpower.cerradasExtra.some(t => String(t.id) === actual);
-    pintarListaActividades(sigue ? actual : '');
+    if (ctxModalManpower && select) ctxModalManpower.preferida = select.value;
+    document.getElementById('mp-actividad-aviso')?.classList.add('hidden');
     window.actualizarJustificacionManpower();
 };
 
@@ -614,35 +697,34 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
             <div id="modal-manpower" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-                <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3">
+                <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
                     <h3 id="mp-titulo" class="font-bold text-sm text-slate-800">Registrar % del Día</h3>
-                    <p id="mp-restante-info" class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded"></p>
                     <form onsubmit="window.saveManpower(event)" class="space-y-3 text-xs">
                         <input type="hidden" id="mp-id" value="">
                         <div>
-                            <label class="block font-semibold text-slate-600 mb-1">Actividad</label>
-                            <select id="mp-actividad" class="inp" onchange="window.actualizarJustificacionManpower()">
-                                <option value="">— General —</option>
-                            </select>
-                            <button type="button" id="mp-mas-cerradas" onclick="window.cargarMasCerradasManpower()" class="hidden mt-1 text-[11px] text-sky-700 hover:underline">
-                                <i class="fa-solid fa-clock-rotate-left mr-1"></i><span></span>
-                            </button>
+                            <label class="block font-semibold text-slate-600 mb-1">1. Fecha a registrar</label>
+                            <input type="date" id="mp-fecha" required class="inp" onchange="window.cambiarFechaManpower()">
+                            <p id="mp-restante-info" class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded mt-1"></p>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
+                        <div id="mp-paso-2" class="space-y-3">
                             <div>
-                                <label class="block font-semibold text-slate-600 mb-1">Fecha</label>
-                                <input type="date" id="mp-fecha" required class="inp" onchange="window.actualizarRestanteManpower(); window.actualizarJustificacionManpower()">
+                                <label class="block font-semibold text-slate-600 mb-1">2. Actividad</label>
+                                <select id="mp-actividad" class="inp" onchange="window.cambiarActividadManpower()">
+                                    <option value="">— General —</option>
+                                </select>
+                                <p class="text-[10px] text-slate-500 mt-1">Solo aparecen las actividades que admiten registro en esa fecha.</p>
                             </div>
                             <div>
-                                <label class="block font-semibold text-slate-600 mb-1">% del Día</label>
+                                <label class="block font-semibold text-slate-600 mb-1">3. % del Día</label>
                                 <input type="number" step="1" min="1" max="100" id="mp-porcentaje" required class="inp" placeholder="Ej. 25" oninput="window.actualizarHorasManpower()">
                                 <p id="mp-horas-equivalentes" class="text-[10px] text-slate-500 mt-1">= 0.00 h</p>
                             </div>
                         </div>
+                        <p id="mp-actividad-aviso" class="hidden text-[11px] text-red-700 bg-red-50 border border-red-200 rounded p-2"></p>
                         <div id="mp-justif-box" class="hidden bg-amber-50 border border-amber-200 rounded p-2">
                             <label class="block font-semibold text-amber-800 mb-1"><i class="fa-solid fa-scale-balanced mr-1"></i> Justificación (obligatoria)</label>
                             <p id="mp-justif-motivo" class="text-[10px] text-amber-700 mb-1"></p>
-                            <textarea id="mp-justif" rows="2" class="inp" placeholder="¿Por qué se corrige fuera del corte?"></textarea>
+                            <textarea id="mp-justif" rows="2" class="inp" placeholder="¿Por qué no registraste a tiempo?"></textarea>
                         </div>
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Nota (opcional)</label>
@@ -659,95 +741,76 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
 
-    const esAdm = esAdminManpower(state);
     const hoy = hoyLima();
     const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
     // La lista muestra las actividades del DUEÑO del registro (responsable o recurso),
     // también para los admins. Si un admin corrige el registro de otra persona, salen las de esa persona.
-    const uidLista = rEdit ? rEdit.usuario_id : state.currentUser.id;
-    const lunes = lunesDeSemana(hoy);
-    const propias = state.tasksCache.filter(t => t.estado_cde !== 'Archived' && isUserInvolved(t, uidLista));
-    const activas = propias.filter(t => t.estado !== 'Cerrado');
-    // Cerradas: visibles hasta cierre + 2 días (tope domingo), igual para todos.
-    const cerradasVisibles = propias.filter(t => t.estado === 'Cerrado' && cerradaVisibleHoy(t, hoy));
-    // "Cargar más": cerradas fuera del plazo. Sin rol admin, solo las que cerraron en la semana en curso
-    // (las de semanas ya cerradas no admiten horas); un admin ve todas.
-    const cerradasExtra = propias.filter(t => t.estado === 'Cerrado' && !cerradaVisibleHoy(t, hoy)
-        && (esAdm || (t.fecha_cierre && t.fecha_cierre >= lunes)));
-    ordenarCerradas(cerradasExtra);
-
-    // Al editar, la actividad del registro debe poder verse aunque ya no esté en la lista
-    const enLista = id => [...activas, ...cerradasVisibles, ...cerradasExtra].some(t => t.id === id);
-    const extraFija = (rEdit && rEdit.pendiente_id && !enLista(rEdit.pendiente_id)) ? tareaPorId(rEdit.pendiente_id) : null;
-
-    const idInicial = rEdit ? (rEdit.pendiente_id || null) : (pendienteId || null);
-    listaModalManpower = {
-        activas, cerradasVisibles, cerradasExtra, extraFija,
-        // Si la actividad elegida es una cerrada fuera de plazo, se muestran directamente
-        mostrarExtra: !!idInicial && cerradasExtra.some(t => String(t.id) === String(idInicial))
-    };
-    pintarListaActividades(idInicial || '');
+    const uid = rEdit ? rEdit.usuario_id : state.currentUser.id;
+    const propias = state.tasksCache.filter(t => t.estado_cde !== 'Archived' && isUserInvolved(t, uid));
+    const preferida = rEdit ? (rEdit.pendiente_id || '') : (pendienteId || '');
+    ctxModalManpower = { rEdit, uid, propias, preferida };
 
     document.getElementById('mp-id').value = rEdit ? rEdit.id : '';
     document.getElementById('mp-titulo').textContent = rEdit ? 'Editar registro' : 'Registrar % del Día';
-    document.getElementById('mp-fecha').value = rEdit ? rEdit.fecha : (fechaPredefinida || hoyLima());
+    const inputFecha = document.getElementById('mp-fecha');
+    inputFecha.value = rEdit ? rEdit.fecha : (fechaPredefinida || hoy);
+    // Nunca fechas futuras. Hacia atrás no hay límite: fuera de la semana en curso se justifica.
+    inputFecha.max = hoy;
+    inputFecha.min = '';
     document.getElementById('mp-porcentaje').value = rEdit ? parseFloat(rEdit.porcentaje_dia || 0) : '';
     document.getElementById('mp-desc').value = rEdit ? (rEdit.descripcion || '') : '';
     document.getElementById('mp-justif').value = '';
 
-    // Fechas permitidas: nunca futuras; sin rol admin, solo la semana en curso
-    const inputFecha = document.getElementById('mp-fecha');
-    inputFecha.max = hoy;
-    inputFecha.min = esAdm ? '' : lunesDeSemana(hoy);
-    window.actualizarJustificacionManpower();
-    
+    pintarListaActividades(preferida);
     window.actualizarRestanteManpower();
+    window.actualizarJustificacionManpower();
     window.actualizarHorasManpower();
-    
+
     document.getElementById('modal-manpower').classList.remove('hidden');
     document.getElementById('modal-manpower').classList.add('flex');
 }
 
 window.actualizarRestanteManpower = function() {
     const fecha = document.getElementById('mp-fecha').value;
-    if (!fecha) return;
-    
+    const info = document.getElementById('mp-restante-info');
+    if (!fecha) { info.textContent = 'Elige la fecha que vas a registrar.'; return; }
+
     const { editId, uid } = ctxManpower();
     const totalDia = state.manpowerCache
         .filter(m => m.usuario_id === uid && m.fecha === fecha && String(m.id) !== String(editId))
         .reduce((s, r) => s + parseFloat(r.porcentaje_dia || 0), 0);
-    
+
     const restante = Math.max(0, 100 - totalDia);
-    const info = document.getElementById('mp-restante-info');
+    const semana = semanaCerrada(fecha) ? ' <span class="text-amber-700 font-semibold">Semana cerrada: todo registro pide justificación.</span>' : '';
     if (restante === 0) {
         info.innerHTML = `<b class="text-red-600">Ya registraste el 100% de este día.</b> No puedes agregar más.`;
     } else {
-        info.innerHTML = `Tienes <b class="text-sky-700">${restante.toFixed(0)}%</b> disponible (${pctAHoras(restante).toFixed(2)} h) — ya usaste ${totalDia.toFixed(0)}% (${pctAHoras(totalDia).toFixed(2)} h).`;
+        info.innerHTML = `Tienes <b class="text-sky-700">${restante.toFixed(0)}%</b> disponible (${pctAHoras(restante).toFixed(2)} h) — ya usaste ${totalDia.toFixed(0)}% (${pctAHoras(totalDia).toFixed(2)} h).${semana}`;
     }
 };
 
 /**
  * Evalúa el formulario abierto. Devuelve { error, justificar }:
- * - error: motivo por el que no se puede guardar (usuarios sin rol admin, o fecha futura).
- * - justificar: motivo por el que hay que justificar el cambio. Un admin justifica cualquier
- *   excepción; cualquier usuario justifica el retraso al cargar en una cerrada fuera de plazo.
+ * - error: motivo por el que no se puede guardar.
+ * - justificar: motivo por el que hay que justificar (cualquier usuario: semana cerrada o
+ *   plazo vencido de una cerrada; solo admin: registros de actividades eliminadas o archivadas).
  */
 function evaluarFormularioManpower() {
     const fecha = document.getElementById('mp-fecha')?.value;
     const tarea = tareaDe(document.getElementById('mp-actividad')?.value);
-    const { editId } = ctxManpower();
+    const { editId, uid } = ctxManpower();
     const rEdit = editId ? state.manpowerCache.find(m => String(m.id) === String(editId)) : null;
     const hoy = hoyLima();
 
-    if (fecha && fecha > hoy) return { error: 'No puedes registrar horas en una fecha futura.', justificar: null };
-    // Corregir un registro sin cambiarle la actividad no pide justificación por el plazo
-    const mismaActividad = !!rEdit && String(rEdit.pendiente_id || '') === String(tarea?.id || '');
-    const motivoExistente = rEdit ? bloqueoDe(rEdit) : null;
-    const motivoNuevo = validarRegistroManpower({ fecha, tarea, hoy, omitirPlazo: mismaActividad });
-    const motivo = motivoExistente || motivoNuevo;
-    if (!motivo) return { error: null, justificar: null };
-    if (esAdminManpower(state) || esMotivoJustificableTodos(motivo)) return { error: null, justificar: motivo };
-    return { error: motivo, justificar: null };
+    const dia = bloqueoDelDia(uid, fecha, editId);
+    if (dia) return { error: dia, justificar: null };
+    const nuevo = clasificarRegistroManpower({ fecha, tarea, hoy, omitirPlazo: esMismaActividad(rEdit, tarea?.id) });
+    if (nuevo.bloqueo) return { error: nuevo.bloqueo, justificar: null };
+    const existente = rEdit ? bloqueoDe(rEdit) : null;
+    if (existente && esMotivoSoloAdmin(existente) && !esAdminManpower(state)) {
+        return { error: existente + ' Pide la corrección a un administrador.', justificar: null };
+    }
+    return { error: null, justificar: existente || nuevo.justificar || null };
 }
 
 window.actualizarJustificacionManpower = function() {
@@ -757,9 +820,9 @@ window.actualizarJustificacionManpower = function() {
     box.classList.toggle('hidden', !justificar);
     document.getElementById('mp-justif-motivo').textContent = justificar || '';
     const txt = document.getElementById('mp-justif');
-    if (txt) txt.placeholder = esMotivoJustificableTodos(justificar)
-        ? '¿Por qué no registraste a tiempo?'
-        : '¿Por qué se corrige fuera del corte?';
+    if (txt) txt.placeholder = esMotivoSoloAdmin(justificar)
+        ? '¿Por qué se corrige fuera de regla?'
+        : (justificar === MSG_REG_SEMANA_CERRADA ? '¿Por qué se corrige fuera de plazo?' : '¿Por qué no registraste a tiempo?');
 };
 
 window.actualizarHorasManpower = function() {
@@ -885,7 +948,7 @@ window.deleteManpower = async function(id) {
     
     if (!confirmado) return;
 
-    // Admin eliminando fuera del corte: justificación obligatoria y borrado auditado
+    // Eliminar fuera de regla (semana cerrada, o admin en actividad eliminada): justificación obligatoria y borrado auditado
     const motivoBloqueo = bloqueoDe(r);
     if (motivoBloqueo) {
         const justificacion = await pedirJustificacion(motivoBloqueo + ' Indica por qué se elimina.');
