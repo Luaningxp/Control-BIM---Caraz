@@ -19,7 +19,8 @@ export const MIGRACIONES = [
     { numero: 7,  nombre: '007_reagrupar_grupos_bim',            titulo: 'Reagrupar grupos BIM (solo una vez)' },
     { numero: 8,  nombre: '008_cambio_masivo_grupo',             titulo: 'Cambio masivo de grupo' },
     { numero: 9,  nombre: '009_espera_bloqueos_ppc_responsable', titulo: 'En espera, bloqueos y PPC por responsable' },
-    { numero: 10, nombre: '010_control_versiones',               titulo: 'Control de versiones de la base' }
+    { numero: 10, nombre: '010_control_versiones',               titulo: 'Control de versiones de la base' },
+    { numero: 11, nombre: '011_causas_solo_admin',               titulo: 'Causas de incumplimiento: solo admin edita' }
 ];
 
 // Scripts que redefinen funciones de scripts anteriores: si re-ejecutas uno

@@ -25,6 +25,7 @@ detecta cuáles de los scripts 001-009 ya estaban aplicados y los deja registrad
 | 008 | `008_cambio_masivo_grupo.sql` | |
 | 009 | `009_espera_bloqueos_ppc_responsable.sql` | versión vigente del PPC |
 | 010 | `010_control_versiones.sql` | registro de scripts, revisión y exportar estructura |
+| 011 | `011_causas_solo_admin.sql` | catálogo de causas: solo admin lo edita |
 
 **Ojo:** algunos scripts redefinen funciones de otros anteriores (Manpower: 001, 004, 005, 006;
 PPC: 002, 004, 009). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
@@ -32,8 +33,8 @@ Configuración > Base de datos te avisa si alguna función quedó en una versió
 
 ## Script nuevo (para quien programa)
 
-1. Nombre: siguiente número, por ejemplo `011_lo_que_hace.sql`. Idempotente (`if not exists`, `create or replace`).
-2. Última línea: `select public.registrar_migracion(11, '011_lo_que_hace');`
+1. Nombre: siguiente número, por ejemplo `012_lo_que_hace.sql`. Idempotente (`if not exists`, `create or replace`).
+2. Última línea: `select public.registrar_migracion(12, '012_lo_que_hace');`
 3. Agregarlo a `MIGRACIONES` en `js/basedatos.js`.
 4. Si redefine una función de la tabla de huellas (`bd_huellas` en el 010), actualizar la huella
    y la versión esperada en un script nuevo.
