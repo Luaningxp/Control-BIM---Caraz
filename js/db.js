@@ -27,6 +27,7 @@ export const state = {
     reprogramacionesCache: [],
     snapshotsCache: [],
     semanasDashboard: [],
+    semanasRecursos: [],     // Semanas PPC/horas para Recursos (todo el proyecto)
     bloqueosCache: [],       // Periodos "En espera" (sql/009_espera_bloqueos_ppc_responsable.sql)
     especialidadesCache: [],
     especialidadesTodasCache: [],
@@ -210,6 +211,22 @@ export async function fetchSemanasDashboard(n = 8) {
     return true;
 }
 
+// Semanas para Recursos: desde la semana del primer registro de Manpower hasta hoy
+// (tope 104 semanas). Las semanas pasadas salen de las fotos congeladas (lectura simple).
+export async function fetchSemanasRecursos() {
+    const fechas = (state.manpowerCache || []).map(r => r.fecha).filter(Boolean).sort();
+    let n = 8;
+    if (fechas.length) {
+        const ini = new Date(fechas[0] + 'T00:00:00Z');
+        const hoy = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }) + 'T00:00:00Z');
+        n = Math.min(104, Math.max(8, Math.ceil((hoy - ini) / (7 * 86400000)) + 2));
+    }
+    const { data, error } = await supabaseClient.rpc('dashboard_semanas', { p_semanas: n });
+    if (error) { console.error('fetchSemanasRecursos:', error); state.semanasRecursos = state.semanasDashboard || []; return false; }
+    state.semanasRecursos = data || [];
+    return true;
+}
+
 // Bloqueos "En espera". Siempre se piden de nuevo (cambian con cada movimiento de estado).
 // Si la tabla aún no existe (SQL sin ejecutar), queda vacío y las vistas siguen funcionando.
 export async function fetchBloqueos() {
@@ -288,7 +305,8 @@ export async function fetchVista(tab) {
             await fetchPlanos();
             break;
         case 'recursos':
-            await Promise.all([fetchManpower(), fetchSemanasDashboard()]);
+            await fetchManpower();
+            await fetchSemanasRecursos();
             break;
         case 'roster':
             break;
@@ -366,6 +384,7 @@ export async function fetchAll() {
 
         // Marcar todo como cargado
         Object.keys(state._loaded).forEach(k => state._loaded[k] = true);
+        if (state.currentTab === 'recursos') await fetchSemanasRecursos();
     } catch (err) {
         console.error('Error general en fetchAll:', err);
     }

@@ -7,7 +7,7 @@ import { renderKanban, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }
 import { renderEisenhower } from './eisenhower.js';
 import { renderConfig, openGrupoModal, closeGrupoModal, saveGrupo, deleteGrupo, openCargoModal, closeCargoModal, saveCargo, openPropModal, closePropModal, saveProp, deleteProp, openCausaModal, closeCausaModal, saveCausa, deleteCausa, openSubcontrataModal, closeSubcontrataModal, saveSubcontrata, deleteSubcontrata } from './config.js';
 import { renderMiTrabajo, renderManpower, openManpowerModal, closeManpowerModal, saveManpower } from './manpower.js';
-import { renderRecursos } from './recursos.js';
+import { renderRecursos, resetPeriodoRecursos } from './recursos.js';
 import { renderGantt } from './gantt.js';
 import { renderLogPlanos } from './planos.js';
 import { renderRoster } from './roster.js';
@@ -96,6 +96,9 @@ window.switchTab = async function(tab) {
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if(btn) btn.classList.toggle('tab-active', t === tab);
     });
+
+    // Recursos siempre arranca en "Todo el proyecto" al entrar a la pestaña.
+    if (tab === 'recursos') resetPeriodoRecursos();
 
     // Cargar sólo lo que esta vista necesita y no esté ya en caché.
     await fetchVista(tab);
