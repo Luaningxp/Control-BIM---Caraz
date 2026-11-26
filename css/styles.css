@@ -575,6 +575,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 .gantt-corte { opacity: 0 !important; pointer-events: none !important; }
 
+/* Gantt y Ocupación por modelador: scroll propio para que la cabecera
+   de fechas quede fija al bajar (la cabecera del Gantt la mueve gantt.js). */
+#gantt-container .gantt-container,
+#ocupacion-scroll { max-height: calc(100vh - 140px); }
+
 
 /* ------------------------------------------------------------------
    Manpower: lista de actividades del formulario (grupos por color)
