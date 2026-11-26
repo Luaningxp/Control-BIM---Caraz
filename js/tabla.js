@@ -1591,10 +1591,14 @@ export async function saveTask(e) {
         else if (val !== null) await supabaseClient.from('propiedades_valores').insert([propPayload]);
     }
 
-    await supabaseClient.from('actividad_recursos').delete().eq('pendiente_id', parseInt(taskId));
-    if (recursosSeleccionados.size > 0) {
-        const recursosData = Array.from(recursosSeleccionados).map(uid => ({ pendiente_id: parseInt(taskId), usuario_id: uid }));
-        await supabaseClient.from('actividad_recursos').insert(recursosData);
+    // Recursos: solo admin, coordinador y supervisor (sql/014_recursos_actividad.sql)
+    if (!soloModelador) {
+        await supabaseClient.from('actividad_recursos').delete().eq('pendiente_id', parseInt(taskId));
+        if (recursosSeleccionados.size > 0) {
+            const recursosData = Array.from(recursosSeleccionados).map(uid => ({ pendiente_id: parseInt(taskId), usuario_id: uid }));
+            const { error: errRecursos } = await supabaseClient.from('actividad_recursos').insert(recursosData);
+            if (errRecursos) toast('No se pudieron guardar los recursos: ' + errRecursos.message);
+        }
     }
 
     await supabaseClient.from('actividad_planos').delete().eq('pendiente_id', parseInt(taskId));

@@ -265,7 +265,13 @@ begin
                 (30, 'Guardar parámetro personalizado en actividad donde NO participa',
                  $q$delete from public.propiedades_valores where pendiente_id = {Y}$q$,
                  $q$insert into public.propiedades_valores (pendiente_id, propiedad_id, valor_texto) values ({Y}, {PROP}, 'ZZ PRUEBA DE ROL')$q$,
-                 $q$select exists (select 1 from public.propiedades_valores where pendiente_id = {Y})$q$, 'SSSN')
+                 $q$select exists (select 1 from public.propiedades_valores where pendiente_id = {Y})$q$, 'SSSN'),
+                (31, 'Asignar un recurso en una actividad donde NO participa', null,
+                 $q$insert into public.actividad_recursos (pendiente_id, usuario_id) values ({Y}, {YO})$q$,
+                 $q$select exists (select 1 from public.actividad_recursos where pendiente_id = {Y} and usuario_id = {YO})$q$, 'SSSN'),
+                (32, 'Quitar recursos de una actividad donde participa', null,
+                 $q$delete from public.actividad_recursos where pendiente_id = {X}$q$,
+                 $q$select not exists (select 1 from public.actividad_recursos where pendiente_id = {X})$q$, 'SSSN')
             ) as v(num, nombre, pre, accion, chequeo, esperados)
         loop
             for i in 1..4 loop
