@@ -291,6 +291,19 @@ window.handleFileUpload = (e) => {
                 return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
             };
 
+            // El grupo debe existir en el catálogo (sin importar mayúsculas ni tildes)
+            const claveGrupo = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .toUpperCase().replace(/\s+/g, ' ').trim();
+            const gruposPorClave = new Map(state.gruposCache.map(g => [claveGrupo(g.nombre), g.nombre]));
+            const gruposDesconocidos = new Set();
+            const resolverGrupo = (val) => {
+                const texto = String(val ?? '').trim();
+                if (!texto) return null;
+                const nombre = gruposPorClave.get(claveGrupo(texto));
+                if (!nombre) gruposDesconocidos.add(texto);
+                return nombre || null;
+            };
+
             const inserts = [];
             for (let i = 1; i < json.length; i++) {
                 const row = json[i];
@@ -316,7 +329,7 @@ window.handleFileUpload = (e) => {
 
                 inserts.push({
                     actividad: actTexto,
-                    grupo: colGrupo !== -1 && row[colGrupo] ? String(row[colGrupo]).trim() : null,
+                    grupo: colGrupo !== -1 ? resolverGrupo(row[colGrupo]) : null,
                     responsable: respEmailReal || null,
                     responsable_id: respId,
                     importancia: colImp !== -1 ? parseNivel(row[colImp]) : 'Medio',
@@ -345,7 +358,13 @@ window.handleFileUpload = (e) => {
 
             await fetchAll();
             window.renderView();
-            toast(`¡Importadas ${inserts.length} actividades con éxito!`);
+            if (gruposDesconocidos.size) {
+                const lista = [...gruposDesconocidos].sort();
+                console.warn('Grupos no encontrados en el catálogo (actividades importadas sin grupo):', lista);
+                alert(`Se importaron ${inserts.length} actividades.\n\nEstos grupos no existen en el catálogo y sus actividades quedaron SIN GRUPO:\n- ${lista.join('\n- ')}`);
+            } else {
+                toast(`¡Importadas ${inserts.length} actividades con éxito!`);
+            }
 
         } catch (err) {
             console.error(err);
@@ -363,7 +382,7 @@ function renderModales() {
                 <h3 class="font-bold text-sm text-slate-800" id="grupo-modal-title">Nuevo grupo</h3>
                 <form onsubmit="window.saveGrupo(event)" class="space-y-3 text-xs">
                     <input type="hidden" id="grupo-id">
-                    <div><label class="block font-semibold text-slate-600 mb-1">Nombre *</label><input type="text" id="grupo-nombre" required class="inp"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">Nombre *</label><input type="text" id="grupo-nombre" required class="inp uppercase" oninput="this.value = this.value.toUpperCase()"></div>
                     <div class="flex items-center gap-2"><input type="checkbox" id="grupo-activo" checked class="w-4 h-4"><label class="text-slate-600 font-semibold">Activo</label></div>
                     <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                         <button type="button" onclick="document.getElementById('modal-grupo').classList.add('hidden')" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600">Cancelar</button>
@@ -491,7 +510,7 @@ export function closeGrupoModal() { document.getElementById('modal-grupo').class
 export async function saveGrupo(e) {
     e.preventDefault();
     const id = document.getElementById('grupo-id').value;
-    const payload = { nombre: document.getElementById('grupo-nombre').value.trim(), activo: document.getElementById('grupo-activo').checked };
+    const payload = { nombre: document.getElementById('grupo-nombre').value.trim().replace(/\s+/g, ' ').toUpperCase(), activo: document.getElementById('grupo-activo').checked };
     if (!payload.nombre) { toast('Nombre requerido'); return; }
     const { error } = id ? await supabaseClient.from('grupos_bim').update(payload).eq('id', id) : await supabaseClient.from('grupos_bim').insert([payload]);
     if (error) { toast('Error: ' + error.message); return; }
