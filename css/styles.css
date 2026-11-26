@@ -565,3 +565,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 .gantt-corte { opacity: 0 !important; pointer-events: none !important; }
 
+
+/* ------------------------------------------------------------------
+   Manpower: lista de actividades del formulario (grupos por color)
+   ------------------------------------------------------------------ */
+.mp-lista { margin-top: 6px; border: 1px solid var(--border-input); border-radius: 8px; max-height: 240px; overflow-y: auto; background: var(--bg-input); }
+.mp-lista-vacia { padding: 10px; color: var(--text-muted); font-size: 11px; text-align: center; }
+.mp-grupo { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; padding: 5px 8px; background: var(--bg-table-head); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.mp-grupo-ok { color: var(--ok); }
+.mp-grupo-warn { color: var(--warn); }
+.mp-grupo-bad { color: var(--bad); }
+.mp-item { display: flex; gap: 6px; align-items: center; width: 100%; text-align: left; padding: 6px 8px; border-top: 1px solid var(--border-card); color: var(--text-body); background: transparent; cursor: pointer; }
+.mp-item:hover { background: var(--row-hover); }
+.mp-item-ok { box-shadow: inset 3px 0 var(--ok); }
+.mp-item-warn { box-shadow: inset 3px 0 var(--warn); }
+.mp-item-bad { box-shadow: inset 3px 0 var(--bad); }
+.mp-item-sel, .mp-item-sel:hover { background: var(--accent-soft); font-weight: 600; }
+.mp-item-cod { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.mp-item-nom { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-elegida { margin-top: 6px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 6px 8px; font-size: 11px; line-height: 1.35; color: var(--text-body); }
+.mp-elegida b { display: block; font-size: 10px; color: var(--link); text-transform: uppercase; margin-bottom: 2px; }
+.mp-tip { position: fixed; z-index: 90; background: var(--struct); color: var(--on-struct); padding: 6px 8px; border-radius: 6px; font-size: 11px; line-height: 1.35; box-shadow: 0 4px 12px rgba(0,0,0,.25); pointer-events: none; }
+.mp-tip span { display: block; color: var(--on-struct-muted); margin-top: 2px; }

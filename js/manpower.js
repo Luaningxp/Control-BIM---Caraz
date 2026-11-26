@@ -4,7 +4,7 @@ import {
     getIniciales, colorAvatar, confirmDelete, nombreResponsable, hoyLima, isoLocal,
     esAdminManpower, semanaCerrada, cerradaVisibleHoy, limiteVisibleCerrada,
     clasificarRegistroManpower, bloqueoRegistroExistente, esMotivoSoloAdmin,
-    MSG_RETRASO_CERRADA, MSG_SEMANA_CERRADA, MSG_REG_SEMANA_CERRADA } from './utils.js';
+    MSG_REG_SEMANA_CERRADA } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 
 const HORAS_POR_100 = 9.3333;
@@ -586,13 +586,6 @@ function esMismaActividad(rEdit, tareaId) {
     return !!rEdit && String(rEdit.pendiente_id || '') === String(tareaId || '');
 }
 
-/** Motivo corto para la etiqueta de una actividad que pide justificación. */
-function motivoCorto(motivo, t) {
-    if (motivo === MSG_RETRASO_CERRADA) return `plazo vencido, cerró ${fmtDate(t.fecha_cierre)}`;
-    if (motivo === MSG_SEMANA_CERRADA) return 'semana cerrada';
-    return 'justificar';
-}
-
 /** Mensaje si el día no admite registros (no laborable o 100% ya usado); null si se puede. */
 function bloqueoDelDia(uid, fecha, editId) {
     if (!fecha) return 'Elige la fecha que vas a registrar.';
@@ -609,11 +602,14 @@ function bloqueoDelDia(uid, fecha, editId) {
     return null;
 }
 
-/** Arma la lista de actividades para la fecha elegida y la pinta. */
+/** Texto de búsqueda / nombre completo de una actividad. */
+const nombreCompleto = t => t ? `${t.codigo_contenedor ? t.codigo_contenedor + ' · ' : ''}${t.actividad || ''}` : 'General';
+
+/** Arma las actividades registrables en la fecha elegida (grupos sin / con justificación) y las pinta. */
 function pintarListaActividades(valorPreferido) {
-    const select = document.getElementById('mp-actividad');
+    const input = document.getElementById('mp-actividad');
     const C = ctxModalManpower;
-    if (!select || !C) return;
+    if (!input || !C) return;
     const fecha = document.getElementById('mp-fecha')?.value || '';
     const hoy = hoyLima();
     const aviso = document.getElementById('mp-actividad-aviso');
@@ -622,61 +618,135 @@ function pintarListaActividades(valorPreferido) {
     const pasos = document.getElementById('mp-paso-2');
 
     if (bloqueoDia) {
-        select.innerHTML = '<option value="">—</option>';
-        select.disabled = true;
+        C.items = [];
+        input.value = '';
+        C.bloqueado = true;
         pasos?.classList.add('opacity-50', 'pointer-events-none');
         if (btnGuardar) btnGuardar.disabled = true;
         if (aviso) { aviso.textContent = bloqueoDia; aviso.classList.remove('hidden'); }
+        renderItemsActividades();
         return;
     }
-    select.disabled = false;
+    C.bloqueado = false;
     pasos?.classList.remove('opacity-50', 'pointer-events-none');
     if (btnGuardar) btnGuardar.disabled = false;
 
+    const clasificar = t => clasificarRegistroManpower({ fecha, tarea: t, hoy, omitirPlazo: esMismaActividad(C.rEdit, t?.id) });
     const libres = [];
     const conJustif = [];
-    const clasificar = t => clasificarRegistroManpower({ fecha, tarea: t, hoy, omitirPlazo: esMismaActividad(C.rEdit, t?.id) });
-
     const general = clasificar(null);
+    (general.justificar ? conJustif : libres).push({ id: '', t: null });
+    const tareas = [];
     C.propias.forEach(t => {
         const c = clasificar(t);
         if (c.bloqueo) return; // no se puede registrar en esta fecha: no se muestra
-        (c.justificar ? conJustif : libres).push({ t, motivo: c.justificar });
+        tareas.push({ id: String(t.id), t, justificar: !!c.justificar });
     });
-    const porCodigo = (a, b) => String(a.t.codigo_contenedor || '').localeCompare(String(b.t.codigo_contenedor || ''));
-    libres.sort(porCodigo);
-    conJustif.sort(porCodigo);
-
-    const texto = t => `${escapeHtml(t.codigo_contenedor || '')} - ${escapeHtml((t.actividad || '').substring(0, 50))}`;
-    const opcion = ({ t, motivo }) => `<option value="${t.id}">${texto(t)}${motivo ? ` (${escapeHtml(motivoCorto(motivo, t))})` : ''}</option>`;
-    const optGeneral = `<option value="">— General —${general.justificar ? ` (${escapeHtml(motivoCorto(general.justificar))})` : ''}</option>`;
+    tareas.sort((a, b) => String(a.t.codigo_contenedor || '').localeCompare(String(b.t.codigo_contenedor || '')));
+    tareas.forEach(x => (x.justificar ? conJustif : libres).push(x));
 
     // Al editar, la actividad del registro siempre se ve, aunque en esta fecha no se pueda usar
-    const ids = new Set([...libres, ...conJustif].map(x => String(x.t.id)));
+    const ids = new Set(tareas.map(x => x.id));
     const tEdit = C.rEdit && C.rEdit.pendiente_id ? tareaPorId(C.rEdit.pendiente_id) : null;
-    const extra = tEdit && !ids.has(String(tEdit.id)) ? tEdit : null;
+    const extra = tEdit && !ids.has(String(tEdit.id)) ? [{ id: String(tEdit.id), t: tEdit }] : [];
 
-    select.innerHTML =
-        (general.justificar ? '' : optGeneral) +
-        (libres.length ? `<optgroup label="Se registran sin justificación (${libres.length})">${libres.map(opcion).join('')}</optgroup>` : '') +
-        (general.justificar || conJustif.length
-            ? `<optgroup label="Requieren justificación (${conJustif.length + (general.justificar ? 1 : 0)})">${general.justificar ? optGeneral : ''}${conJustif.map(opcion).join('')}</optgroup>`
-            : '') +
-        (extra ? `<optgroup label="Actividad del registro (no admite esta fecha)"><option value="${extra.id}">${texto(extra)}</option></optgroup>` : '');
+    C.grupos = [
+        { clave: 'ok', titulo: '🟢 Se registran sin justificación', items: libres },
+        { clave: 'warn', titulo: '🟡 Requieren justificación', items: conJustif },
+        { clave: 'bad', titulo: 'Actividad del registro (no admite esta fecha)', items: extra }
+    ];
 
-    const disponibles = new Set(['', ...ids, ...(extra ? [String(extra.id)] : [])]);
+    const disponibles = new Set(C.grupos.flatMap(g => g.items.map(x => x.id)));
     const deseado = String(valorPreferido ?? '');
     if (disponibles.has(deseado)) {
-        select.value = deseado;
+        input.value = deseado;
         if (aviso) aviso.classList.add('hidden');
     } else {
-        select.value = '';
+        input.value = '';
         const t = tareaPorId(deseado);
         if (aviso) {
             aviso.textContent = `"${t ? (t.actividad || '').substring(0, 60) : 'La actividad'}" no admite registros el ${fmtDate(fecha)}. Elige otra fecha u otra actividad.`;
             aviso.classList.remove('hidden');
         }
     }
+    renderItemsActividades();
+}
+
+/** Pinta la lista (filtrada por el buscador) y el recuadro de la actividad elegida. */
+function renderItemsActividades() {
+    const C = ctxModalManpower;
+    const cont = document.getElementById('mp-lista');
+    const elegida = document.getElementById('mp-elegida');
+    if (!C || !cont) return;
+    ocultarTipActividad();
+    const valor = document.getElementById('mp-actividad')?.value ?? '';
+
+    if (C.bloqueado) {
+        cont.innerHTML = '<p class="mp-lista-vacia">Elige una fecha que admita registros.</p>';
+        if (elegida) elegida.classList.add('hidden');
+        return;
+    }
+
+    const q = (document.getElementById('mp-buscar')?.value || '').toLowerCase().trim();
+    const coincide = x => !q || nombreCompleto(x.t).toLowerCase().includes(q);
+    const html = C.grupos.filter(g => g.items.length).map(g => {
+        const visibles = g.items.filter(coincide);
+        if (!visibles.length) return '';
+        return `<div class="mp-grupo mp-grupo-${g.clave}"><span>${escapeHtml(g.titulo)}</span><span>${g.items.length}</span></div>` +
+            visibles.map(x => `
+                <button type="button" class="mp-item mp-item-${g.clave}${x.id === String(valor) ? ' mp-item-sel' : ''}" data-id="${escapeHtml(x.id)}">
+                    ${x.t ? `<span class="mp-item-cod">${escapeHtml(x.t.codigo_contenedor || '')}</span><span class="mp-item-nom">${escapeHtml(x.t.actividad || '')}</span>`
+                          : '<span class="mp-item-cod">—</span><span class="mp-item-nom">General</span>'}
+                </button>`).join('');
+    }).join('');
+    cont.innerHTML = html || '<p class="mp-lista-vacia">Ninguna actividad coincide con la búsqueda.</p>';
+
+    if (elegida) {
+        const t = valor ? tareaPorId(valor) : null;
+        elegida.innerHTML = `<b>Actividad elegida</b>${escapeHtml(nombreCompleto(t))}`;
+        elegida.classList.remove('hidden');
+    }
+}
+
+// Recuadro flotante con el nombre completo al pasar el mouse
+function ocultarTipActividad() {
+    document.getElementById('mp-tip')?.remove();
+}
+function mostrarTipActividad(btn) {
+    ocultarTipActividad();
+    const id = btn.dataset.id;
+    const t = id ? tareaPorId(id) : null;
+    if (!t) return;
+    const r = btn.getBoundingClientRect();
+    const tip = document.createElement('div');
+    tip.id = 'mp-tip';
+    tip.className = 'mp-tip';
+    const fechas = [t.fecha_inicio_programado && `Inicio ${fmtDate(t.fecha_inicio_programado)}`,
+        t.fecha_fin && `Fin ${fmtDate(t.fecha_fin)}`, t.estado].filter(Boolean).join(' · ');
+    tip.innerHTML = `${escapeHtml(nombreCompleto(t))}${fechas ? `<span>${escapeHtml(fechas)}</span>` : ''}`;
+    document.body.appendChild(tip);
+    const ancho = Math.min(340, window.innerWidth - 16);
+    tip.style.width = ancho + 'px';
+    tip.style.left = Math.max(8, Math.min(r.left + 40, window.innerWidth - ancho - 8)) + 'px';
+    const alto = tip.offsetHeight;
+    tip.style.top = (r.bottom + 4 + alto > window.innerHeight ? r.top - alto - 4 : r.bottom + 4) + 'px';
+}
+
+function conectarListaActividades() {
+    const cont = document.getElementById('mp-lista');
+    if (!cont || cont.dataset.conectada) return;
+    cont.dataset.conectada = '1';
+    cont.addEventListener('click', (e) => {
+        const btn = e.target.closest('.mp-item');
+        if (!btn) return;
+        window.cambiarActividadManpower(btn.dataset.id);
+    });
+    cont.addEventListener('mouseover', (e) => {
+        const btn = e.target.closest('.mp-item');
+        if (btn) mostrarTipActividad(btn);
+    });
+    cont.addEventListener('mouseleave', ocultarTipActividad);
+    cont.addEventListener('scroll', ocultarTipActividad);
 }
 
 /** Al cambiar la fecha: recalcula el % disponible y la lista, conservando la actividad si sigue disponible. */
@@ -686,18 +756,24 @@ window.cambiarFechaManpower = function() {
     window.actualizarJustificacionManpower();
 };
 
-window.cambiarActividadManpower = function() {
-    const select = document.getElementById('mp-actividad');
-    if (ctxModalManpower && select) ctxModalManpower.preferida = select.value;
+window.cambiarActividadManpower = function(id) {
+    const input = document.getElementById('mp-actividad');
+    if (input) input.value = id ?? '';
+    if (ctxModalManpower) ctxModalManpower.preferida = input?.value ?? '';
     document.getElementById('mp-actividad-aviso')?.classList.add('hidden');
+    renderItemsActividades();
     window.actualizarJustificacionManpower();
+};
+
+window.buscarActividadManpower = function() {
+    renderItemsActividades();
 };
 
 export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     if (!document.getElementById('modal-manpower')) {
         const modalHtml = `
             <div id="modal-manpower" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
-                <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3">
+                <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[95vh] overflow-y-auto">
                     <h3 id="mp-titulo" class="font-bold text-sm text-slate-800">Registrar % del Día</h3>
                     <form onsubmit="window.saveManpower(event)" class="space-y-3 text-xs">
                         <input type="hidden" id="mp-id" value="">
@@ -709,9 +785,10 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
                         <div id="mp-paso-2" class="space-y-3">
                             <div>
                                 <label class="block font-semibold text-slate-600 mb-1">2. Actividad</label>
-                                <select id="mp-actividad" class="inp" onchange="window.cambiarActividadManpower()">
-                                    <option value="">— General —</option>
-                                </select>
+                                <input type="hidden" id="mp-actividad" value="">
+                                <input type="search" id="mp-buscar" class="inp" placeholder="Buscar por código o nombre..." oninput="window.buscarActividadManpower()" onkeydown="if (event.key === 'Enter') event.preventDefault()" autocomplete="off">
+                                <div id="mp-lista" class="mp-lista"></div>
+                                <div id="mp-elegida" class="mp-elegida hidden"></div>
                                 <p class="text-[10px] text-slate-500 mt-1">Solo aparecen las actividades que admiten registro en esa fecha.</p>
                             </div>
                             <div>
@@ -761,6 +838,9 @@ export function openManpowerModal(pendienteId, fechaPredefinida, editId) {
     document.getElementById('mp-desc').value = rEdit ? (rEdit.descripcion || '') : '';
     document.getElementById('mp-justif').value = '';
 
+    const buscar = document.getElementById('mp-buscar');
+    if (buscar) buscar.value = '';
+    conectarListaActividades();
     pintarListaActividades(preferida);
     window.actualizarRestanteManpower();
     window.actualizarJustificacionManpower();
@@ -833,6 +913,7 @@ window.actualizarHorasManpower = function() {
 };
 
 export function closeManpowerModal() {
+    ocultarTipActividad();
     document.getElementById('modal-manpower').classList.add('hidden');
     document.getElementById('modal-manpower').classList.remove('flex');
 }
