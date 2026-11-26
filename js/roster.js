@@ -124,13 +124,13 @@ export function renderRoster(container) {
         </div>
 
         <div class="isolate bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-4">
-            <div id="roster-scroll" class="overflow-x-auto">
+            <div id="roster-scroll" class="overflow-auto">
                 <table class="text-left text-xs" style="table-layout: fixed;">
                     <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 uppercase font-semibold">
                         <tr>
                             <th rowspan="2" class="p-2 sticky left-0 bg-slate-100 dark:bg-slate-900 z-20" style="width: 200px; min-width: 200px;">Usuario</th>
                             ${mesesGrid.map(mg => `
-                                <th colspan="${mg.dias}" id="roster-mes-${mg.y}-${mg.m}" class="p-1 text-left text-[10px] font-bold border-l border-slate-300 dark:border-slate-600 bg-slate-200/70 dark:bg-slate-800">
+                                <th colspan="${mg.dias}" id="roster-mes-${mg.y}-${mg.m}" class="p-1 text-left text-[10px] font-bold border-l border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-800">
                                     <span class="sticky inline-block" style="left: 210px;">${mg.label}</span>
                                 </th>`).join('')}
                         </tr>
@@ -140,7 +140,7 @@ export function renderRoster(container) {
                                 const esDom = d.getDay() === 0;
                                 const esHoy = f === hoyStrRoster;
                                 const claseFondo = esHoy
-                                    ? 'bg-sky-200 dark:bg-sky-900/60 ring-1 ring-inset ring-sky-500'
+                                    ? 'bg-sky-200 dark:bg-sky-900 ring-1 ring-inset ring-sky-500'
                                     : esDom
                                         ? 'bg-slate-200 dark:bg-slate-800'
                                         : '';
@@ -238,6 +238,7 @@ export function renderRoster(container) {
         const anchor = `${year}-${month}`;
         if (rosterState.anchor === anchor && rosterState.scrollLeft != null) {
             scroller.scrollLeft = rosterState.scrollLeft; // re-render por edición: no mover
+            if (rosterState.scrollTop != null) scroller.scrollTop = rosterState.scrollTop;
         } else {
             const esMesActual = hoyReal.getFullYear() === year && hoyReal.getMonth() === month;
             const objetivo = (esMesActual && document.getElementById('roster-hoy'))
@@ -248,7 +249,11 @@ export function renderRoster(container) {
         }
         rosterState.anchor = anchor;
         rosterState.scrollLeft = scroller.scrollLeft;
-        scroller.addEventListener('scroll', () => { rosterState.scrollLeft = scroller.scrollLeft; });
+        rosterState.scrollTop = scroller.scrollTop;
+        scroller.addEventListener('scroll', () => {
+            rosterState.scrollLeft = scroller.scrollLeft;
+            rosterState.scrollTop = scroller.scrollTop;
+        });
     }
 
     

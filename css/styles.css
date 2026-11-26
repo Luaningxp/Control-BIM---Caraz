@@ -522,6 +522,16 @@ tr:hover td.sticky { background-color: var(--bg-body) !important; }
 td.sticky.left-0, th.sticky.left-0 { background-color: var(--bg-card) !important; z-index: 20 !important; }
 th.sticky { z-index: 40 !important; }
 
+/* Roster: cabecera de meses y fechas fija al hacer scroll vertical.
+   El scroll vive dentro de #roster-scroll (tarjeta con 'isolate'),
+   así nada se superpone a la cabecera ni a las pestañas de la app. */
+#roster-scroll { max-height: calc(100vh - 140px); }
+#roster-scroll thead th { position: sticky; top: 0; z-index: 30; }
+:where(#roster-scroll) thead th { background-color: var(--bg-table-head); }
+#roster-scroll thead tr:first-child th:not([rowspan]) { height: 24px; }
+#roster-scroll thead tr:nth-child(2) th { top: 24px; }
+#roster-scroll thead th.sticky.left-0 { top: 0; background-color: var(--bg-table-head) !important; z-index: 40 !important; }
+
 /* =========================================
    GANTT · MODO OSCURO
    ========================================= */
