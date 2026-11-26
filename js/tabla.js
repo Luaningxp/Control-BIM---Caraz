@@ -463,19 +463,30 @@ window.toggleModoMasivo = function() {
     window.renderView();
 };
 
+/** Vuelve a pintar la Tabla sin perder la posición del scroll (tabla y página). */
+function renderConservandoScroll() {
+    const caja = document.querySelector('#tabla-scroll');
+    const top = caja ? caja.scrollTop : 0, left = caja ? caja.scrollLeft : 0;
+    const pagina = window.scrollY;
+    window.renderView();
+    const nueva = document.querySelector('#tabla-scroll');
+    if (nueva) { nueva.scrollTop = top; nueva.scrollLeft = left; }
+    window.scrollTo(0, pagina);
+}
+
 window.toggleSeleccionMasiva = function(id, checked) {
     if (checked) seleccionMasiva.add(id); else seleccionMasiva.delete(id);
-    window.renderView();
+    renderConservandoScroll();
 };
 
 window.toggleSeleccionTodas = function(checked) {
     getProcessedTasks().forEach(t => { if (checked) seleccionMasiva.add(t.id); else seleccionMasiva.delete(t.id); });
-    window.renderView();
+    renderConservandoScroll();
 };
 
 window.elegirDestinoMasivo = function(v) { destinoMasivo = v; };
 
-window.limpiarSeleccionMasiva = function() { seleccionMasiva.clear(); window.renderView(); };
+window.limpiarSeleccionMasiva = function() { seleccionMasiva.clear(); renderConservandoScroll(); };
 
 window.aplicarCambioMasivoGrupo = async function() {
     if (!puedeCambioMasivo()) { toast('Solo los administradores pueden cambiar grupos en lote.'); return; }
@@ -716,7 +727,7 @@ export function renderTabla(container) {
         ${masivo ? renderBarraMasiva(tasks) : ''}
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
+            <div id="tabla-scroll" class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
                <table class="text-left text-xs" style="table-layout: fixed;">
                    <thead class="sticky top-0 z-30 shadow-sm">
                         <tr class="bg-slate-50 dark:bg-slate-800">
