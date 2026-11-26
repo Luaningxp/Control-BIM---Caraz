@@ -6,6 +6,7 @@ import {
     clasificarRegistroManpower, bloqueoRegistroExistente, esMotivoSoloAdmin,
     MSG_REG_SEMANA_CERRADA } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
+import { calcularEstancadas, umbralEstancada } from './flujo.js';
 
 const HORAS_POR_100 = 9.3333;
 function pctAHoras(pct) {
@@ -62,7 +63,35 @@ export function renderMiTrabajo(container) {
     const noLlenoAyer = !!ayerStr && porcentajeAyer < 100
         && (!semanaCerrada(ayerStr, hoyStr) || esAdminManpower(state));
 
+    // Actividades estancadas donde participa el usuario (misma regla del Dashboard)
+    const nEst = umbralEstancada(state.parametrosApp);
+    const estancadas = calcularEstancadas({
+        tareas: state.tasksCache.filter(t => isUserInvolved(t)),
+        manpower: state.manpowerCache,
+        recursos: state.actividadRecursosCache,
+        esLaborable: esDiaLaborable,
+        hoy: hoyStr,
+        n: nEst
+    });
+    const estDe = new Map(estancadas.map(e => [String(e.t.id), e]));
+
     container.innerHTML = `
+        ${estancadas.length ? `
+            <div class="bg-orange-50 border-l-4 border-orange-500 p-3 mb-4 rounded-r-lg">
+                <div class="flex items-start gap-3">
+                    <i class="fa-solid fa-hourglass-end text-orange-600 text-lg mt-0.5"></i>
+                    <div>
+                        <p class="font-bold text-orange-900 text-sm">${estancadas.length === 1 ? 'Tienes 1 actividad estancada' : `Tienes ${estancadas.length} actividades estancadas`}</p>
+                        <p class="text-orange-800 text-xs mt-0.5">Nadie del equipo registró horas en ${nEst === 1 ? 'el último día laborable' : `los últimos ${nEst} días laborables`}. Registra tu avance, pásala a <b>En espera</b> con su motivo, reprográmala o ciérrala.</p>
+                        <ul class="text-xs text-orange-900 mt-1 list-disc pl-4">
+                            ${estancadas.slice(0, 5).map(e => `<li>${escapeHtml(e.t.actividad || '')} <span class="text-orange-700">· ${e.tipo.toLowerCase()} · ${e.dias}${e.tope ? '+' : ''} d sin horas</span></li>`).join('')}
+                            ${estancadas.length > 5 ? `<li class="list-none text-orange-700">y ${estancadas.length - 5} más (ver Dashboard › Restricciones).</li>` : ''}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        ` : ''}
+
         ${noLlenoAyer ? `
             <div class="bg-amber-50 border-l-4 border-amber-500 p-3 mb-4 rounded-r-lg">
                 <div class="flex items-start gap-3">
@@ -101,6 +130,7 @@ export function renderMiTrabajo(container) {
                         <div class="flex items-center gap-2 mb-1 flex-wrap">
                             <span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">${t.codigo_contenedor || '–'}</span>
                             <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">${semaforo(t)}</span>
+                            ${estDe.has(String(t.id)) ? `<span class="text-[10px] font-bold bg-orange-100 text-orange-800 px-2 py-0.5 rounded" title="Sin horas del equipo en los últimos días laborables">Estancada · ${estDe.get(String(t.id)).dias}${estDe.get(String(t.id)).tope ? '+' : ''} d</span>` : ''}
                             ${t.estado === 'Cerrado' ? `<span class="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold" title="Puedes registrar horas hasta fechas iguales o anteriores al cierre">Cerrada el ${fmtDate(t.fecha_cierre)} · registra hasta el ${fmtDate(limiteVisibleCerrada(t.fecha_cierre))}</span>` : ''}
                             ${totalUsuarioTarea > 0 ? `<span class="text-[10px] bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">Acumulado: ${totalUsuarioTarea.toFixed(1)}% · ${pctAHoras(totalUsuarioTarea).toFixed(2)} h</span>` : ''}
                         </div>

@@ -189,6 +189,23 @@ export function renderConfig(container) {
                 </div>
             </div>
 
+            <!-- 4e. ESTANCADAS -->
+            <div class="card p-4">
+                <div class="mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Actividades estancadas</h3>
+                    <p class="text-[10px] text-slate-500">Días laborables terminados (Roster) sin horas del responsable ni de los recursos para marcar una actividad como estancada. Hoy no cuenta.</p>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-center justify-between gap-2">
+                        <span>Días sin horas</span>
+                        <input id="dias-estancada" type="number" min="1" max="30" step="1" value="${state.parametrosApp?.dias_estancada ?? 2}" ${state.isAdmin ? '' : 'disabled'} class="w-20 border border-slate-300 rounded px-2 py-1 text-right">
+                    </label>
+                    ${state.isAdmin
+                        ? '<button onclick="window.guardarDiasEstancada()" class="w-full mt-1 px-2 py-1.5 bg-sky-600 text-white rounded hover:bg-sky-700">Guardar umbral</button>'
+                        : '<p class="text-[10px] text-slate-400">Solo el administrador puede modificarlo.</p>'}
+                </div>
+            </div>
+
             <!-- 5. SUBCONTRATAS -->
             <div class="card p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -824,6 +841,18 @@ window.guardarLimitesWIP = async () => {
     if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/003_parametros_app.sql?)'); return; }
     await fetchParametros();
     toast('Límites WIP guardados.');
+};
+
+window.guardarDiasEstancada = async () => {
+    if (!state.isAdmin) { toast('Solo el administrador puede modificar el umbral.'); return; }
+    const dias = parseInt(document.getElementById('dias-estancada')?.value, 10);
+    if (!(dias >= 1 && dias <= 30)) { toast('El umbral debe ser un número entero entre 1 y 30.'); return; }
+    const { error } = await supabaseClient.from('parametros_app').upsert([
+        { clave: 'dias_estancada', valor: dias, descripcion: 'Días laborables terminados sin horas para marcar una actividad como estancada (Dashboard y Mi trabajo)' }
+    ], { onConflict: 'clave' });
+    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
+    await fetchParametros();
+    toast('Umbral de estancadas guardado.');
 };
 
 window.guardarMetaPPC = async () => {
