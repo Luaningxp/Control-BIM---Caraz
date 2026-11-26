@@ -60,7 +60,8 @@ export const latenciaPromedio = (tareas, semanas = 8) => {
 
 // ------------------------------------------------------------------
 // REGLAS DE MANPOWER (deben coincidir con sql/manpower_corte_semanal.sql,
-// sql/archivar_actividades_cierre.sql y sql/manpower_justificar_retraso.sql)
+// sql/archivar_actividades_cierre.sql, sql/manpower_justificar_retraso.sql y
+// sql/manpower_registro_por_fecha.sql, que es la versión vigente)
 // ------------------------------------------------------------------
 export const DIAS_GRACIA_CIERRE = 2;
 
@@ -88,48 +89,54 @@ export const cerradaVisibleHoy = (t, hoy = hoyLima()) => {
 };
 
 export const MSG_RETRASO_CERRADA = 'Pasó el plazo de 2 días desde el cierre de la actividad: justifica el retraso.';
+export const MSG_SEMANA_CERRADA = 'Esa semana ya cerró (corte del domingo 23:59): justifica por qué se registra fuera de plazo.';
+export const MSG_REG_SEMANA_CERRADA = 'Ese registro es de una semana ya cerrada (corte del domingo 23:59): justifica la corrección.';
+export const MSG_REG_ELIMINADA = 'La actividad del registro fue eliminada (archivada).';
+export const MSG_REG_ARCHIVADA = 'La actividad del registro está archivada en el CDE.';
+
+/** Motivos que solo un admin puede justificar (registros existentes de actividades eliminadas o archivadas). */
+export const esMotivoSoloAdmin = (motivo) => motivo === MSG_REG_ELIMINADA || motivo === MSG_REG_ARCHIVADA;
 
 /**
- * ¿El motivo lo puede justificar cualquier usuario (no solo un admin)?
- * Solo el retraso al cargar en una actividad cerrada, siempre dentro de la semana en curso.
+ * Clasifica un registro de manpower (fecha + actividad) igual para todos los roles.
+ * Devuelve { bloqueo, justificar }:
+ * - bloqueo: no se puede registrar (la actividad no se muestra en el formulario).
+ *   Fecha futura, actividad eliminada/archivada, cerrada sin fecha de cierre o
+ *   fecha posterior al cierre de la actividad.
+ * - justificar: se puede registrar escribiendo una justificación (semana cerrada,
+ *   o actividad cerrada con el plazo de 2 días vencido). Cualquier usuario.
+ * - ambos null: se registra libremente. Registrar antes del inicio programado (adelanto) es libre.
+ * omitirPlazo: true al corregir un registro sin cambiarle la actividad (el plazo de la cerrada no aplica).
  */
-export const esMotivoJustificableTodos = (motivo) => motivo === MSG_RETRASO_CERRADA;
-
-/**
- * Valida un registro de manpower (crear o editar) para un usuario sin rol admin.
- * Devuelve null si es válido o el mensaje de error.
- * - fecha: fecha del registro; tarea: actividad vinculada (o null si es General).
- * - omitirPlazo: true al corregir un registro existente sin cambiar su actividad
- *   (corregir lo ya cargado no pide justificación).
- * Si el único problema es el plazo de la cerrada, devuelve MSG_RETRASO_CERRADA:
- * cualquier usuario puede guardar justificando el retraso.
- */
-export const validarRegistroManpower = ({ fecha, tarea, hoy = hoyLima(), omitirPlazo = false }) => {
-    if (!fecha) return 'Indica la fecha del registro.';
-    if (fecha > hoy) return 'No puedes registrar horas en una fecha futura.';
-    if (semanaCerrada(fecha, hoy)) return 'Esa semana ya está cerrada (corte del domingo 23:59). Pide la corrección a un administrador.';
+export const clasificarRegistroManpower = ({ fecha, tarea, hoy = hoyLima(), omitirPlazo = false }) => {
+    if (!fecha) return { bloqueo: 'Indica la fecha del registro.', justificar: null };
+    if (fecha > hoy) return { bloqueo: 'No puedes registrar horas en una fecha futura.', justificar: null };
     if (tarea) {
-        if (tarea.archivada_en) return 'La actividad fue eliminada (archivada).';
-        if (tarea.estado_cde === 'Archived') return 'La actividad está archivada en el CDE.';
+        if (tarea.archivada_en) return { bloqueo: 'La actividad fue eliminada (archivada).', justificar: null };
+        if (tarea.estado_cde === 'Archived') return { bloqueo: 'La actividad está archivada en el CDE.', justificar: null };
         if (tarea.estado === 'Cerrado') {
-            if (!tarea.fecha_cierre) return 'La actividad está cerrada.';
-            if (fecha > tarea.fecha_cierre) return 'No puedes cargar horas después de la fecha de cierre de la actividad.';
-            if (!omitirPlazo && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) return MSG_RETRASO_CERRADA;
+            if (!tarea.fecha_cierre) return { bloqueo: 'La actividad está cerrada sin fecha de cierre.', justificar: null };
+            if (fecha > tarea.fecha_cierre) return { bloqueo: `No se pueden cargar horas después del cierre de la actividad (${fmtDate(tarea.fecha_cierre)}).`, justificar: null };
         }
     }
-    return null;
+    if (semanaCerrada(fecha, hoy)) return { bloqueo: null, justificar: MSG_SEMANA_CERRADA };
+    if (tarea && tarea.estado === 'Cerrado' && !omitirPlazo && hoy > limiteVisibleCerrada(tarea.fecha_cierre)) {
+        return { bloqueo: null, justificar: MSG_RETRASO_CERRADA };
+    }
+    return { bloqueo: null, justificar: null };
 };
 
 /**
- * ¿Un registro que ya existe está bloqueado para editarlo o eliminarlo?
- * Bloqueado si su semana ya cerró o si su actividad está archivada.
+ * Motivo por el que un registro que ya existe pide justificación para editarlo o eliminarlo
+ * (null si se corrige libremente).
+ * - Semana cerrada: cualquier usuario justifica.
+ * - Actividad eliminada o archivada: solo un admin justifica (ver esMotivoSoloAdmin).
  * Dentro de la semana en curso se corrige libremente, aunque la actividad haya cerrado hace más de 2 días.
- * Devuelve null si se puede tocar o el motivo del bloqueo.
  */
 export const bloqueoRegistroExistente = ({ fecha, tarea, hoy = hoyLima() }) => {
-    if (semanaCerrada(fecha, hoy)) return 'Ese registro es de una semana ya cerrada (corte del domingo 23:59).';
-    if (tarea && tarea.archivada_en) return 'La actividad del registro fue eliminada (archivada).';
-    if (tarea && tarea.estado_cde === 'Archived') return 'La actividad del registro está archivada en el CDE.';
+    if (tarea && tarea.archivada_en) return MSG_REG_ELIMINADA;
+    if (tarea && tarea.estado_cde === 'Archived') return MSG_REG_ARCHIVADA;
+    if (semanaCerrada(fecha, hoy)) return MSG_REG_SEMANA_CERRADA;
     return null;
 };
 
