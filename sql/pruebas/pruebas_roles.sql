@@ -220,7 +220,11 @@ begin
                  $q$select rol = 'admin' from public.perfiles where id = {OTRO}$q$, '--NN'),
                 (18, 'Ver el registro de scripts SQL', null,
                  $q$select count(*) > 0 from public.migraciones_aplicadas$q$,
-                 null, 'SSNN')
+                 null, 'SSNN'),
+                (19, 'Modificar una foto congelada del PPC', null,
+                 $q$update public.snapshots_semanales set ppc = -1
+                    where semana = (select max(semana) from public.snapshots_semanales)$q$,
+                 $q$select exists (select 1 from public.snapshots_semanales where ppc = -1)$q$, 'NNNN')
             ) as v(num, nombre, pre, accion, chequeo, esperados)
         loop
             for i in 1..4 loop
