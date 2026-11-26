@@ -4,6 +4,7 @@ import { tipoDia } from './roster.js';
 import { getReprogramaciones } from './reprogramaciones.js';
 
 let ganttState = {
+    search: '',
     filterGrupo: '',
     filterResp: '',
     filterRecursos: '',
@@ -121,7 +122,7 @@ export function renderGantt(container) {
             <div class="flex flex-1 items-center gap-2 flex-wrap">
                 <div class="relative w-full max-w-xs">
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="gantt-search" placeholder="Buscar tarea, responsable..." value="${ganttState.search}" 
+                    <input type="text" id="gantt-search" placeholder="Buscar tarea, responsable..." value="${escapeHtml(ganttState.search || '')}" 
                            class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
                 </div>
                 <button onclick="window.toggleGanttFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
@@ -539,7 +540,7 @@ window.toggleGanttEstadoOculto = function(estado, checked) {
 
 window.clearGanttFilters = function() {
     ganttState = {
-        filterGrupo: '', filterResp: '', filterRecursos: '', estadosOcultos: [],
+        search: '', filterGrupo: '', filterResp: '', filterRecursos: '', estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
         viewMode: ganttState.viewMode, currentGantt: ganttState.currentGantt
