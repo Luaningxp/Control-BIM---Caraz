@@ -433,6 +433,11 @@ let destinoMasivo = '';
 let modoMasivo = false;
 function puedeCambioMasivo() { return state.isAdmin || state.isCoordinador; }
 
+function opcionesGrupoCatalogo(seleccionado) {
+    return state.gruposCache.filter(g => g.activo)
+        .map(g => `<option value="${escapeHtml(g.nombre)}" ${seleccionado === g.nombre ? 'selected' : ''}>${escapeHtml(g.nombre)}</option>`).join('');
+}
+
 function renderBarraMasiva(tasks) {
     const n = seleccionMasiva.size;
     if (!n) return `<div class="bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 p-2 rounded-lg mb-3 text-xs text-sky-800 dark:text-sky-200"><i class="fa-solid fa-circle-info mr-1"></i>Marca las actividades con las casillas (o todas las filtradas con la casilla del encabezado) y luego elige el grupo.</div>`;
