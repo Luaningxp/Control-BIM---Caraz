@@ -1,5 +1,5 @@
 import { state, tareaPorId } from './db.js';
-import { toast, fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, latenciaPromedio } from './utils.js';
+import { toast, fmtDate, escapeHtml, nombreFormateado, getIniciales, colorAvatar, today, hoyLima, isoLocal, sumarDias, lunesDeSemana, domingoDeSemana, latenciaPromedio } from './utils.js';
 import { esDiaLaborable, tipoDia } from './roster.js';
 import { armarReporteModeladores, exportarPDFModeladores } from './reporte-modeladores.js';
 
@@ -52,6 +52,48 @@ function buildSeries(registros, semanas, keyFn) {
     };
 }
 
+// ============================================================
+// FILTRO DE PERIODO
+// desde/hasta = rango de datos (hasta nunca pasa de hoy).
+// fin = último día del periodo (para "días restantes"; puede ser futuro).
+// Siempre arranca en "Todo el proyecto" al entrar a la pestaña.
+// ============================================================
+const PERIODOS = [
+    { clave: 'todo', nombre: 'Todo el proyecto' },
+    { clave: 'semana', nombre: 'Semana en curso' },
+    { clave: 'ultima', nombre: 'Última semana cerrada' },
+    { clave: '4sem', nombre: 'Últimas 4 semanas' },
+    { clave: '8sem', nombre: 'Últimas 8 semanas' },
+    { clave: 'mes', nombre: 'Mes en curso' }
+];
+let periodoRecursos = 'todo';
+export function resetPeriodoRecursos() { periodoRecursos = 'todo'; }
+window.cambiarPeriodoRecursos = (v) => {
+    periodoRecursos = PERIODOS.some(p => p.clave === v) ? v : 'todo';
+    window.renderView();
+};
+
+export function rangoPeriodo(clave, primeraFecha, hoy = hoyLima()) {
+    const lunes = lunesDeSemana(hoy);
+    const domingo = domingoDeSemana(hoy);
+    switch (clave) {
+        case 'semana': return { desde: lunes, hasta: hoy, fin: domingo };
+        case 'ultima': return { desde: sumarDias(lunes, -7), hasta: sumarDias(lunes, -1), fin: sumarDias(lunes, -1) };
+        case '4sem': return { desde: sumarDias(lunes, -21), hasta: hoy, fin: domingo };
+        case '8sem': return { desde: sumarDias(lunes, -49), hasta: hoy, fin: domingo };
+        case 'mes': {
+            const [y, m] = hoy.split('-').map(Number);
+            return { desde: hoy.slice(0, 8) + '01', hasta: hoy, fin: isoLocal(new Date(y, m, 0)) };
+        }
+        default: {
+            const desde = primeraFecha && primeraFecha < hoy ? primeraFecha : hoy;
+            return { desde, hasta: hoy, fin: hoy };
+        }
+    }
+}
+
+const TAG_FIJO = `<span class="ml-1 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 align-middle whitespace-nowrap" title="Mira hacia adelante o es una foto de hoy: el filtro de periodo no la cambia">No depende del periodo</span>`;
+
 export function renderRecursos(container) {
     const registros = state.manpowerCache;
 
@@ -63,15 +105,13 @@ export function renderRecursos(container) {
         return;
     }
 
-    const hoy = today();
-    hoy.setHours(0, 0, 0, 0);
-    const diaSemana = hoy.getDay();
-    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0, 0, 0, 0);
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0); // Último día del mes
+    // Periodo elegido: todo lo que mira hacia atrás se calcula solo con estos registros.
+    const primeraFecha = registros.map(r => r.fecha).filter(Boolean).sort()[0] || null;
+    const P = rangoPeriodo(periodoRecursos, primeraFecha);
+    const nombrePeriodo = (PERIODOS.find(p => p.clave === periodoRecursos) || PERIODOS[0]).nombre;
+    const textoRango = `${fmtDate(P.desde)} → ${fmtDate(P.hasta)}`;
+    const regP = registros.filter(r => r.fecha && r.fecha >= P.desde && r.fecha <= P.hasta);
+    const hoyIso = hoyLima();
 
     const pctPorUsuarioDia = {};
     registros.forEach(r => {
@@ -85,31 +125,20 @@ export function renderRecursos(container) {
 
     const cumplimientoPorModelador = {};
     modeladores.forEach(p => {
-        const diasDelMes = [];
-        const diasRestantes = [];
-        const cursor = new Date(inicioMes);
-
-        while (cursor <= finMes) {
-            const fechaStr = isoLocal(cursor);
-            if (esDiaLaborable(p.id, fechaStr)) {
-                if (cursor <= hoy) {
-                    diasDelMes.push(fechaStr); // Días hábiles hasta hoy
-                } else {
-                    diasRestantes.push(fechaStr); // Días hábiles que faltan
-                }
-            }
-            cursor.setDate(cursor.getDate() + 1);
+        const diasDelMes = [];      // días laborables transcurridos del periodo
+        const diasRestantes = [];   // días laborables del periodo que aún no llegan
+        for (let f = P.desde; f <= P.fin; f = sumarDias(f, 1)) {
+            if (!esDiaLaborable(p.id, f)) continue;
+            if (f <= P.hasta) diasDelMes.push(f);
+            else if (f > hoyIso) diasRestantes.push(f);
         }
 
         const diasCumplidos = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) >= 100).length;
         const diasRegistrados = diasDelMes.filter(d => (pctPorUsuarioDia[`${p.id}|${d}`] || 0) > 0).length;
         
-        // Solo sumar las horas de este mes
-        const horasTotales = registros.filter(r => {
-            if (r.usuario_id !== p.id || !r.fecha) return false;
-            const f = new Date(r.fecha + 'T00:00:00');
-            return f >= inicioMes && f <= hoy;
-        }).reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
+        // Solo las horas del periodo
+        const horasTotales = regP.filter(r => r.usuario_id === p.id)
+            .reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
         
         cumplimientoPorModelador[p.id] = {
             nombre: nombreFormateado(p),
@@ -122,10 +151,8 @@ export function renderRecursos(container) {
         };
     });
 
-    const totalHoras = registros.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
-    const horasSemana = registros
-        .filter(r => r.fecha && new Date(r.fecha + 'T00:00:00') >= inicioSemana)
-        .reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
+    const totalHoras = regP.reduce((s, r) => s + pctAHoras(r.porcentaje_dia), 0);
+    const horasPeriodo = totalHoras;
 
     // Pendientes según el roster de cada modelador (no cuenta a quien descansa)
     const hoyStr = hoyLima();
@@ -143,20 +170,19 @@ export function renderRecursos(container) {
         return f && (pctPorUsuarioDia[`${p.id}|${f}`] || 0) < 100;
     }).length;
 
-    // Capacidad de la semana (lunes a hoy) según roster: 9.33 h por día laborable de cada modelador
-    const lunesStr = lunesDeSemana(hoyStr);
+    // Capacidad del periodo según roster: 9.33 h por día laborable de cada modelador
     let capacidadSemana = 0;
     modeladores.forEach(p => {
-        for (let f = lunesStr; f <= hoyStr; f = sumarDias(f, 1)) if (esDiaLaborable(p.id, f)) capacidadSemana += HORAS_POR_100;
+        for (let f = P.desde; f <= P.hasta; f = sumarDias(f, 1)) if (esDiaLaborable(p.id, f)) capacidadSemana += HORAS_POR_100;
     });
     const idsModeladores = new Set(modeladores.map(p => p.id));
-    const horasSemanaModeladores = registros
-        .filter(r => r.fecha && r.fecha >= lunesStr && r.fecha <= hoyStr && idsModeladores.has(r.usuario_id))
+    const horasSemanaModeladores = regP
+        .filter(r => idsModeladores.has(r.usuario_id))
         .reduce((acc, r) => acc + pctAHoras(r.porcentaje_dia), 0);
     const ocupacionSemana = capacidadSemana > 0 ? Math.round(horasSemanaModeladores * 100 / capacidadSemana) : null;
 
     const porGrupo = {};
-    registros.forEach(r => {
+    regP.forEach(r => {
         const t = tareaPorId(r.pendiente_id);
         const grupo = t ? t.grupo || 'Sin grupo' : 'General';
         porGrupo[grupo] = (porGrupo[grupo] || 0) + pctAHoras(r.porcentaje_dia);
@@ -238,28 +264,28 @@ export function renderRecursos(container) {
     const labelsY = jefesEjeY.sort();
     // === FIN CÁLCULO DISTRIBUCIÓN ===
 
-    const fechas = registros.map(r => r.fecha).filter(Boolean).sort();
-    const primera = fechas[0];
-    const ultima = fechas[fechas.length - 1];
-    const semanas = semanasEntre(semanaKey(primera), semanaKey(ultima));
+    const semanas = semanasEntre(semanaKey(P.desde), semanaKey(P.hasta));
 
-    const serieGrupo = buildSeries(registros, semanas, r => {
+    const serieGrupo = buildSeries(regP, semanas, r => {
         const t = tareaPorId(r.pendiente_id);
         return t ? (t.grupo || 'Sin grupo') : 'General';
     });
    
     const espNombre = (id) => (state.especialidadesTodasCache || []).find(e => String(e.id) === String(id))?.nombre || 'GENERAL';
-    const serieNivel = buildSeries(registros, semanas, r => {
+    const serieNivel = buildSeries(regP, semanas, r => {
         const t = tareaPorId(r.pendiente_id);
         return t ? espNombre(t.especialidad_id) : 'Sin actividad';
     });
 
     // Horas planificadas vs no planificadas: mismo cálculo que el Dashboard (Supabase: dashboard_semanas).
     // No planificada = actividad creada durante la semana con fin en ella (regla del PPC Last Planner).
-    const semanasPlanifSQL = (state.semanasDashboard || []).slice().reverse();
+    const fuenteSemanas = (state.semanasRecursos && state.semanasRecursos.length) ? state.semanasRecursos : (state.semanasDashboard || []);
+    const semanasPlanifSQL = fuenteSemanas.slice().sort((a, b) => String(a.semana).localeCompare(String(b.semana)));
+    const lunesDesde = lunesDeSemana(P.desde);
     const planifPorSemana = {};
     semanasPlanifSQL.forEach(w => {
         const sk = String(w.semana).slice(0, 10);
+        if (sk < lunesDesde || sk > P.hasta) return;
         const total = Number(w.horas_semana || 0);
         const noPlan = Number(w.horas_no_planificadas || 0);
         const general = Number(w.horas_generales || 0);
@@ -267,7 +293,7 @@ export function renderRecursos(container) {
     });
     const semanasPlanif = Object.keys(planifPorSemana);
 
-    const semanasRecientes = semanas.slice(-6);
+    const semanasRecientes = semanas;
     const hoyLocalStr = hoyLima(); // YYYY-MM-DD en hora local
     const cumplimientoSemanal = {};
     modeladores.forEach(p => {
@@ -299,9 +325,11 @@ export function renderRecursos(container) {
     const porGrupoTareas = {};
     Object.keys(porGrupo).forEach(g => {
         const tareasGrupo = state.tasksCache.filter(t => (t.grupo || 'Sin grupo') === g);
+        const cerradaEnPeriodo = t => t.estado === 'Cerrado' &&
+            (periodoRecursos === 'todo' || (t.fecha_cierre && t.fecha_cierre >= P.desde && t.fecha_cierre <= P.hasta));
         porGrupoTareas[g] = {
             horas: porGrupo[g],
-            cerradas: tareasGrupo.filter(t => t.estado === 'Cerrado').length,
+            cerradas: tareasGrupo.filter(cerradaEnPeriodo).length,
             abiertas: tareasGrupo.filter(t => t.estado !== 'Cerrado').length
         };
     });
@@ -315,29 +343,37 @@ export function renderRecursos(container) {
         <div class="flex justify-between items-center mb-4">
             <div>
                 <h3 class="font-bold text-sm text-slate-800">Monitoreo de Horas Hombre</h3>
-                <p class="text-[11px] text-slate-500">Análisis en horas (100% = ${HORAS_POR_100} h).</p>
+                <p class="text-[11px] text-slate-500">Análisis en horas (100% = ${HORAS_POR_100} h). Periodo: <b>${escapeHtml(nombrePeriodo)}</b> (${textoRango}).</p>
             </div>
-            <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
+            <div class="flex items-center gap-3">
+                <label class="flex items-center gap-1 text-xs text-slate-600" title="Recalcula las secciones que miran hacia atrás (horas, ocupación, cumplimiento). Las que miran hacia adelante no cambian.">
+                    <i class="fa-solid fa-filter text-slate-400"></i>
+                    <select id="recursos-periodo" onchange="window.cambiarPeriodoRecursos(this.value)" class="text-xs border rounded px-2 py-1">
+                        ${PERIODOS.map(p => `<option value="${p.clave}" ${p.clave === periodoRecursos ? 'selected' : ''}>${p.nombre}</option>`).join('')}
+                    </select>
+                </label>
+                <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
+            </div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div class="card kpi-card p-3 border-l-4 border-sky-500">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Ocupación registrada</p>
                 <p class="text-2xl font-bold mt-1 text-sky-700">${ocupacionSemana === null ? '—' : ocupacionSemana + '%'}</p>
-                <p class="text-[10px] text-slate-400">${horasSemanaModeladores.toFixed(1)} h de ${capacidadSemana.toFixed(1)} h disponibles (roster, lun–hoy)</p>
+                <p class="text-[10px] text-slate-400">${horasSemanaModeladores.toFixed(1)} h de ${capacidadSemana.toFixed(1)} h disponibles (roster, ${textoRango})</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 border-teal-500">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Horas de la Semana</p>
-                <p class="text-2xl font-bold mt-1 text-teal-700">${horasSemana.toFixed(1)} h</p>
-                <p class="text-[10px] text-slate-400">Lun - Dom</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Horas del periodo</p>
+                <p class="text-2xl font-bold mt-1 text-teal-700">${horasPeriodo.toFixed(1)} h</p>
+                <p class="text-[10px] text-slate-400">Todo el equipo · ${textoRango}</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesHoy > 0 ? 'border-red-500' : 'border-emerald-500'}">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Hoy</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Hoy ${TAG_FIJO}</p>
                 <p class="text-2xl font-bold mt-1 ${modeladoresPendientesHoy > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesHoy}</p>
                 <p class="text-[10px] text-slate-400">De ${laboranHoy.length} que laboran hoy</p>
             </div>
             <div class="card kpi-card p-3 border-l-4 ${modeladoresPendientesAyer > 0 ? 'border-red-500' : 'border-emerald-500'}">
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Ayer</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pendientes Ayer ${TAG_FIJO}</p>
                 <p class="text-2xl font-bold mt-1 ${modeladoresPendientesAyer > 0 ? 'text-red-700' : 'text-emerald-700'}">${modeladoresPendientesAyer}</p>
                 <p class="text-[10px] text-slate-400">Su último día laborable < 100%</p>
             </div>
@@ -358,11 +394,11 @@ export function renderRecursos(container) {
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Horas planificadas vs. no planificadas</h4>
-                <p class="text-[11px] text-slate-500 mb-2">Mismo cálculo que el Dashboard (Last Planner): no planificada = actividad creada durante la semana con fin en esa misma semana. Últimas 8 semanas.</p>
+                <p class="text-[11px] text-slate-500 mb-2">Mismo cálculo que el Dashboard (Last Planner): no planificada = actividad creada durante la semana con fin en esa misma semana. Semanas del periodo.</p>
                 <div class="chart-box" style="height: 240px;"><canvas id="chart-planif"></canvas></div>
             </div>
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Distribución de Modeladores</h4>
+                <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Distribución de Modeladores ${TAG_FIJO}</h4>
                 <p class="text-[11px] text-slate-500 mb-2">Estimada: se asigna a cada modelador el jefe que es responsable de la mayoría de sus actividades abiertas.</p>
                 <div class="chart-box" style="height: 300px;"><canvas id="chart-equipos"></canvas></div>
             </div>
@@ -407,7 +443,7 @@ export function renderRecursos(container) {
         <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Horas vs. Tareas Cerradas por Grupo</h4>
-                <p class="text-[11px] text-slate-500">Detecta grupos que consumen horas sin cerrar tareas.</p>
+                <p class="text-[11px] text-slate-500">Detecta grupos que consumen horas sin cerrar tareas. Horas y cerradas del periodo; abiertas = las que siguen abiertas hoy.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -416,7 +452,7 @@ export function renderRecursos(container) {
                         <th class="p-3">Horas</th>
                         <th class="p-3">% del total</th>
                         <th class="p-3">Cerradas</th>
-                        <th class="p-3">Abiertas</th>
+                        <th class="p-3">Abiertas (hoy)</th>
                         <th class="p-3">h / cerrada</th>
                     </tr>
                 </thead>
@@ -450,8 +486,8 @@ export function renderRecursos(container) {
 
         <div class="card overflow-x-auto">
             <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento y horas por modelador (mes)</h4>
-                <p class="text-[11px] text-slate-500">Días trabajados a la fecha, horas acumuladas y días restantes del mes.</p>
+                <h4 class="font-semibold text-sm text-slate-800">Cumplimiento y horas por modelador (periodo)</h4>
+                <p class="text-[11px] text-slate-500">Días laborables transcurridos del periodo, horas acumuladas y días laborables que aún faltan del periodo.</p>
             </div>
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
@@ -688,7 +724,7 @@ function seccionWIP(w) {
     return `
         <div class="card mb-4">
             <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Sobrecarga · trabajo en paralelo (WIP)</h4>
+                <h4 class="font-semibold text-sm text-slate-800">Sobrecarga · trabajo en paralelo (WIP) ${TAG_FIJO}</h4>
                 <p class="text-[11px] text-slate-500">
                     Próximas 2 semanas (${fmtDate(w.desde)} → ${fmtDate(w.hasta)}), solo días laborables según roster. Cuenta las actividades activas a la vez en las que produce cada modelador; su día (${HORAS_POR_100.toFixed(2)} h) se reparte entre ellas.
                     Límite: <b>${w.lim.modelador}</b> en paralelo por modelador. Vencidas proyectadas ${w.extraVencida} día(s) (latencia promedio${w.lat > 0 ? '' : ': sin datos, 3 d por defecto'}).
@@ -816,7 +852,7 @@ function seccionRiesgo(rg) {
         <div class="card p-4 mb-4">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-3">
                 <div>
-                    <h4 class="font-semibold text-sm text-slate-800">Riesgo por modelador · ¿qué pierdo si se va?</h4>
+                    <h4 class="font-semibold text-sm text-slate-800">Riesgo por modelador · ¿qué pierdo si se va? ${TAG_FIJO}</h4>
                     <p class="text-[11px] text-slate-500">Sin respaldo = actividades abiertas donde es el único modelador (el supervisor no cuenta). Conocimiento = % de las horas en actividades críticas de las últimas 4 semanas.
                     Crítico: ≥ 3 críticas sin respaldo o ≥ 40% del conocimiento · Alto: ≥ 1 crítica sin respaldo o ≥ 25% · Medio: alguna sin respaldo o ≥ 10%.</p>
                 </div>
