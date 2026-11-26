@@ -27,6 +27,7 @@ export const state = {
     reprogramacionesCache: [],
     snapshotsCache: [],
     semanasDashboard: [],
+    bloqueosCache: [],       // Periodos "En espera" (sql/espera_bloqueos_ppc_responsable.sql)
     especialidadesCache: [],
     especialidadesTodasCache: [],
     parametrosApp: {},
@@ -209,6 +210,15 @@ export async function fetchSemanasDashboard(n = 8) {
     return true;
 }
 
+// Bloqueos "En espera". Siempre se piden de nuevo (cambian con cada movimiento de estado).
+// Si la tabla aún no existe (SQL sin ejecutar), queda vacío y las vistas siguen funcionando.
+export async function fetchBloqueos() {
+    const { data, error } = await supabaseClient.from('bloqueos_espera').select('*').order('inicio', { ascending: false });
+    if (error) { console.warn('bloqueos_espera no disponible (¿ejecutaste sql/espera_bloqueos_ppc_responsable.sql?):', error.message); state.bloqueosCache = []; return false; }
+    state.bloqueosCache = data || [];
+    return true;
+}
+
 function setEspecialidades(res) {
     if (res?.error) console.error('especialidades:', res.error);
     state.especialidadesTodasCache = res?.data || [];
@@ -260,13 +270,13 @@ export async function fetchVista(tab) {
             await fetchPlanosLigeros(); // Para mostrar los chips de planos en modales
             break;
         case 'dashboard':
-            await Promise.all([fetchSemanasDashboard(), fetchPlanosLigeros(), fetchCausas(), fetchManpower(), fetchReprogramaciones()]);
+            await Promise.all([fetchSemanasDashboard(), fetchPlanosLigeros(), fetchCausas(), fetchManpower(), fetchReprogramaciones(), fetchBloqueos()]);
             break;
         case 'tabla':
-            await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);
+            await Promise.all([fetchPropVals(), fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones(), fetchBloqueos()]);
             break;
         case 'kanban':
-            await Promise.all([fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones()]);
+            await Promise.all([fetchPlanosLigeros(), fetchCausas(), fetchReprogramaciones(), fetchBloqueos()]);
             break;
         case 'eisenhower':
             break;
@@ -278,7 +288,7 @@ export async function fetchVista(tab) {
             await fetchPlanos();
             break;
         case 'recursos':
-            await fetchManpower();
+            await Promise.all([fetchManpower(), fetchSemanasDashboard()]);
             break;
         case 'roster':
             break;
@@ -319,7 +329,8 @@ export async function fetchAll() {
             supabaseClient.from('reprogramaciones_bim').select('*').order('created_at', { ascending: false }),
             supabaseClient.from('especialidades').select('*').order('orden').order('nombre'),
             fetchSemanasDashboard(),
-            fetchParametros()
+            fetchParametros(),
+            fetchBloqueos()
         ]);
 
         if (t.error) console.error('Error tareas:', t.error);

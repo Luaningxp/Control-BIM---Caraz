@@ -1,7 +1,7 @@
 import { colorTema } from './tema.js';
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio, cerradaTarde } from './utils.js';
 
 
 // ------------------------------------------------------------------
@@ -10,7 +10,7 @@ import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, ge
 // ------------------------------------------------------------------
 const CATEGORIAS_PORTAFOLIO = [
     { key: 'cerradaATiempo', label: 'Cerradas a tiempo', color: '#059669' },
-    { key: 'cerradaTarde',   label: 'Cerradas con atraso', color: '#a7f3d0' },
+    { key: 'cerradaTarde',   label: 'Cerradas con atraso (vs. fin original)', color: '#a7f3d0' },
     { key: 'enPlazo',        label: 'Abiertas en plazo', color: '#0284c7' },
     { key: 'porVencer',      label: 'Abiertas por vencer (≤ 7 d)', color: '#ea580c' },
     { key: 'vencida',        label: 'Abiertas vencidas', color: '#dc2626' },
@@ -18,7 +18,8 @@ const CATEGORIAS_PORTAFOLIO = [
 ];
 
 function categoriaPortafolio(t) {
-    if (isCerrado(t)) return (t.fecha_fin && t.fecha_cierre && t.fecha_cierre > t.fecha_fin) ? 'cerradaTarde' : 'cerradaATiempo';
+    // "A tiempo" se mide contra la fecha fin ORIGINAL: reprogramar no borra el atraso
+    if (isCerrado(t)) return cerradaTarde(t) ? 'cerradaTarde' : 'cerradaATiempo';
     const s = semaforo(t);
     if (s === 'Sin fecha') return 'sinFecha';
     if (s === 'Vencida') return 'vencida';
@@ -47,21 +48,22 @@ function datosPortafolio() {
         avance: n ? Math.round(cerradas * 100 / n) : 0,
         abiertas: n - cerradas,
         vencidas: total.vencida,
+        porVencer: total.porVencer,
+        sinFecha: total.sinFecha,
         reprogramadas: tareas.filter(t => conRep.has(String(t.id))).length
     };
 }
 
 function seccionPortafolio() {
     const d = datosPortafolio();
-    const sa = semanaActualDashboard();
-    const ppc = sa && sa.ppc !== null && sa.ppc !== undefined ? sa.ppc + '%' : '—';
     const tarjetas = [
         { label: 'Total', value: d.n, sub: 'actividades', color: 'sky' },
         { label: 'Avance', value: d.avance + '%', sub: `${d.cerradas} cerradas`, color: 'emerald' },
         { label: 'Abiertas', value: d.abiertas, sub: 'en curso', color: 'slate' },
         { label: 'Vencidas', value: d.vencidas, sub: 'requieren acción', color: 'red' },
-        { label: 'Reprogramadas', value: d.reprogramadas, sub: 'con ≥ 1 reprogramación', color: 'violet' },
-        { label: 'PPC semana', value: ppc, sub: 'Last Planner', color: 'teal' }
+        { label: 'Por vencer', value: d.porVencer, sub: '≤ 7 días', color: 'amber' },
+        { label: 'Sin fecha', value: d.sinFecha, sub: 'abiertas sin fecha fin', color: 'slate' },
+        { label: 'Reprogramadas', value: d.reprogramadas, sub: 'con ≥ 1 reprogramación', color: 'violet' }
     ];
     const filas = 1 + Object.keys(d.porEsp).length;
     return `
@@ -72,7 +74,7 @@ function seccionPortafolio() {
                     <p class="text-[11px] text-slate-500">Situación actual de todas las actividades (sin canceladas ni anuladas) · ${fmtDate(hoyLima())}</p>
                 </div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                 ${tarjetas.map(x => `
                     <div class="rounded-lg bg-${x.color}-50 border border-${x.color}-100 p-3">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-${x.color}-800">${x.label}</p>
@@ -306,9 +308,10 @@ function dibujarPareto(canvasId, pareto, colorVital) {
 }
 
 function renderParetos() {
-    ['chart-pareto-reprog', 'chart-pareto-incump'].forEach(id => { if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; } });
+    ['chart-pareto-reprog', 'chart-pareto-incump', 'chart-pareto-bloqueos'].forEach(id => { if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; } });
     dibujarPareto('chart-pareto-reprog', paretoReprogramaciones(), '#7c3aed');
     dibujarPareto('chart-pareto-incump', paretoIncumplimientos(), '#dc2626');
+    dibujarPareto('chart-pareto-bloqueos', datosBloqueos().pareto, '#ea580c');
 }
 
 // ------------------------------------------------------------------
@@ -372,7 +375,7 @@ function seccionComparacionSemanas() {
     const acumOrd = Object.entries(acum).sort((a, b) => b[1].horas - a[1].horas);
 
     return `
-        <div class="card overflow-x-auto mt-4">
+        <div class="card overflow-x-auto mb-4">
             <div class="p-4 pb-2">
                 <h4 class="font-semibold text-sm text-slate-800">Comparación entre semanas</h4>
                 <p class="text-[11px] text-slate-500">PPC = (cumplidas + adelantadas) ÷ comprometidas. Compromiso fijado el lunes 00:00, más las no planificadas surgidas en la semana. La semana en curso se calcula en vivo; las anteriores quedan congeladas el domingo 23:59 (hora de Lima).</p>
@@ -409,71 +412,206 @@ function seccionComparacionSemanas() {
     `;
 }
 
-export function renderDashboard(container) {
-    const k = calcularKPIs();
-    
-    const hoy = today();
-    hoy.setHours(0,0,0,0);
-    const diaSemana = hoy.getDay();
-    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0,0,0,0);
-    const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6);
-    finSemana.setHours(23,59,59,999);
+// ------------------------------------------------------------------
+// META DE PPC (parametros_app.meta_ppc; referencia Last Planner 80%)
+// ------------------------------------------------------------------
+export function metaPPC() {
+    const v = Number(state.parametrosApp?.meta_ppc);
+    return v > 0 && v <= 100 ? v : 80;
+}
 
-    const cerradasEstaSemana = state.tasksCache.filter(t => {
-        if (!t.fecha_cierre) return false;
-        const c = new Date(t.fecha_cierre + 'T00:00:00');
-        return c >= inicioSemana && c <= finSemana;
+function clasePPC(ppc) {
+    const meta = metaPPC();
+    if (ppc >= meta) return 'bg-teal-100 text-teal-800';
+    if (ppc >= meta - 20) return 'bg-amber-100 text-amber-800';
+    return 'bg-red-100 text-red-700';
+}
+
+// ------------------------------------------------------------------
+// BLOQUEOS "EN ESPERA" (sql/espera_bloqueos_ppc_responsable.sql)
+// Días en espera = días laborables del responsable (roster) transcurridos
+// desde el inicio del bloqueo. Sin responsable: lunes a sábado.
+// ------------------------------------------------------------------
+function diasLaborablesEntre(uid, desde, hasta) {
+    if (!desde || !hasta || hasta <= desde) return 0;
+    let n = 0;
+    for (let f = sumarDias(desde, 1); f <= hasta; f = sumarDias(f, 1)) {
+        const lab = uid ? esDiaLaborable(uid, f) : new Date(f + 'T00:00:00').getDay() !== 0;
+        if (lab) n++;
+    }
+    return n;
+}
+
+function datosBloqueos() {
+    const hoy = hoyLima();
+    const tareas = new Map(state.tasksCache.map(t => [String(t.id), t]));
+    const bloqueos = state.bloqueosCache || [];
+    const abiertoDe = new Map(bloqueos.filter(b => !b.fin).map(b => [String(b.pendiente_id), b]));
+
+    const actuales = state.tasksCache.filter(t => t.estado === 'En espera').map(t => {
+        const b = abiertoDe.get(String(t.id));
+        const desde = b?.inicio ? fmtLimaDia(b.inicio) : null;
+        return {
+            t, desde,
+            dias: desde ? diasLaborablesEntre(t.responsable_id, desde, hoy) : null,
+            motivo: (t.motivo_espera_id ?? b?.causa_id) ? nombreCausa(t.motivo_espera_id ?? b?.causa_id) : 'Sin motivo',
+            esp: (state.especialidadesTodasCache || []).find(e => String(e.id) === String(t.especialidad_id))?.nombre || 'GENERAL'
+        };
+    }).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
+
+    // Pareto y promedios: bloqueos iniciados en el periodo y especialidad del filtro
+    const desdePeriodo = inicioPeriodoPareto();
+    const enPeriodo = bloqueos.filter(b => {
+        const t = tareas.get(String(b.pendiente_id));
+        if (!t) return false;
+        if (desdePeriodo && fmtLimaDia(b.inicio) < desdePeriodo) return false;
+        return tareaPasaFiltro(b.pendiente_id);
     });
-    
+    const conteo = {};
+    const porEsp = {};
+    enPeriodo.forEach(b => {
+        const t = tareas.get(String(b.pendiente_id));
+        const n = b.causa_id ? nombreCausa(b.causa_id) : 'Sin motivo';
+        conteo[n] = (conteo[n] || 0) + 1;
+        const dias = diasLaborablesEntre(t.responsable_id, fmtLimaDia(b.inicio), b.fin ? fmtLimaDia(b.fin) : hoy);
+        const esp = (state.especialidadesTodasCache || []).find(e => String(e.id) === String(t.especialidad_id))?.nombre || 'GENERAL';
+        porEsp[esp] = porEsp[esp] || { n: 0, dias: 0 };
+        porEsp[esp].n++;
+        porEsp[esp].dias += dias;
+    });
+    const cerrados = enPeriodo.filter(b => b.fin);
+    const diasCerrados = cerrados.map(b => diasLaborablesEntre(tareas.get(String(b.pendiente_id))?.responsable_id, fmtLimaDia(b.inicio), fmtLimaDia(b.fin)));
+    const prom = a => a.length ? Math.round(a.reduce((s, v) => s + v, 0) / a.length * 10) / 10 : 0;
+    return {
+        actuales,
+        pareto: calcularPareto(conteo),
+        porEsp: Object.entries(porEsp).map(([k, x]) => ({ esp: k, n: x.n, prom: Math.round(x.dias / x.n * 10) / 10 })).sort((a, b) => b.prom - a.prom),
+        promActual: prom(actuales.filter(a => a.dias !== null).map(a => a.dias)),
+        promCerrados: prom(diasCerrados),
+        cerradosN: cerrados.length,
+        sinTabla: !(state.bloqueosCache || []).length && actuales.length > 0
+    };
+}
+
+function seccionBloqueos() {
+    const d = datosBloqueos();
+    const periodoTxt = paretoState.semanas ? `Últimas ${paretoState.semanas} semanas` : 'Todo el proyecto';
+    const tarjetas = [
+        { label: 'En espera ahora', value: d.actuales.length, sub: 'actividades bloqueadas', color: 'amber' },
+        { label: 'Días en espera', value: d.promActual + ' d', sub: 'promedio de las actuales', color: 'orange' },
+        { label: 'Bloqueos liberados', value: d.cerradosN, sub: periodoTxt.toLowerCase(), color: 'emerald' },
+        { label: 'Duración promedio', value: d.promCerrados + ' d', sub: 'de los liberados', color: 'slate' }
+    ];
+    return `
+        <div class="mb-4">
+            <h4 class="font-semibold text-sm text-slate-800">Restricciones · actividades "En espera"</h4>
+            <p class="text-[11px] text-slate-500 mb-2">Bloqueos con su motivo (catálogo de causas de incumplimiento). Días laborables según el roster del responsable. Usa los mismos filtros del Pareto de causas.</p>
+            ${d.sinTabla ? '<p class="text-[11px] text-amber-700 mb-2">Aún no hay historial de bloqueos: ejecuta sql/espera_bloqueos_ppc_responsable.sql en Supabase.</p>' : ''}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                ${tarjetas.map(x => `
+                    <div class="card p-3 border-l-4 border-${x.color}-500">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
+                        <p class="text-xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
+                        <p class="text-[10px] text-slate-400">${x.sub}</p>
+                    </div>`).join('')}
+            </div>
+            <div class="grid lg:grid-cols-5 gap-3">
+                <div class="lg:col-span-3 card overflow-x-auto">
+                    <div class="p-4 pb-2"><h4 class="font-semibold text-sm text-slate-800">En espera ahora (más antiguas primero)</h4></div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <tr><th class="p-3">Actividad</th><th class="p-3">Responsable</th><th class="p-3">Esp.</th><th class="p-3">Motivo</th><th class="p-3">Desde</th><th class="p-3">Días</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${d.actuales.map(a => `<tr class="hover:bg-slate-50">
+                                <td class="p-3"><span class="font-mono text-[10px] text-slate-400">${escapeHtml(a.t.codigo_contenedor || '')}</span> ${escapeHtml(a.t.actividad || '')}</td>
+                                <td class="p-3">${escapeHtml(nombreResponsableDash(a.t))}</td>
+                                <td class="p-3">${escapeHtml(a.esp)}</td>
+                                <td class="p-3 ${a.motivo === 'Sin motivo' ? 'text-slate-400 italic' : ''}">${escapeHtml(a.motivo)}</td>
+                                <td class="p-3 whitespace-nowrap">${a.desde ? fmtDate(a.desde) : '—'}</td>
+                                <td class="p-3 font-bold ${a.dias >= 5 ? 'text-red-700' : a.dias >= 3 ? 'text-amber-700' : 'text-slate-700'}">${a.dias ?? '—'}</td>
+                            </tr>`).join('') || '<tr><td colspan="6" class="text-center py-4 text-slate-400">No hay actividades en espera.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="lg:col-span-2 space-y-3">
+                    ${bloquePareto('chart-pareto-bloqueos', 'Bloqueos por motivo', `${periodoTxt} · iniciados en el periodo`, d.pareto)}
+                    ${d.porEsp.length ? `<div class="card p-4">
+                        <h5 class="font-semibold text-xs text-slate-700 mb-2">Días promedio bloqueado por especialidad</h5>
+                        <div class="flex flex-wrap gap-2">
+                            ${d.porEsp.map(x => `<span class="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1 rounded"><b>${escapeHtml(x.esp)}</b>: ${x.prom} d · ${x.n} bloqueo${x.n === 1 ? '' : 's'}</span>`).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+            </div>
+        </div>`;
+}
+
+// ------------------------------------------------------------------
+// PERSONAS
+// ------------------------------------------------------------------
+function perfilDe(uid) {
+    return uid ? state.perfilesCache.find(x => x.id === uid) : null;
+}
+
+function nombreResponsableDash(t) {
+    const p = perfilDe(t.responsable_id);
+    return p ? nombreFormateado(p) : (t.responsable || 'Sin asignar');
+}
+
+// ------------------------------------------------------------------
+// VISTA
+// Orden de reporte: 1 Portafolio · 2 Operación de la semana · 3 Causas
+// · 4 Restricciones · 5 Equipo. Cada cifra aparece una sola vez.
+// ------------------------------------------------------------------
+export function renderDashboard(container) {
+    const hoyStr = hoyLima();
+    const lunes = lunesDeSemana(hoyStr);
+    const domingo = sumarDias(lunes, 6);
+
+    const cerradasEstaSemana = state.tasksCache.filter(t => t.fecha_cierre && t.fecha_cierre >= lunes && t.fecha_cierre <= domingo);
+    const cerradasTardeSemana = cerradasEstaSemana.filter(cerradaTarde).length;
+
     const reprogramadasEstaSemana = (state.reprogramacionesCache || []).filter(r => {
-        if (r.es_migrada) return false;
-        const f = new Date(r.created_at);
-        return f >= inicioSemana && f <= finSemana;
+        if (r.es_migrada || !r.created_at) return false;
+        const f = fmtLimaDia(r.created_at);
+        return f >= lunes && f <= domingo;
     }).length;
 
     const latencia = latenciaPromedio(state.tasksCache, 8);
+    const sa = semanaActualDashboard();
+    const meta = metaPPC();
 
     const KPI = [
         (() => {
-            const sa = semanaActualDashboard();
-            if (!sa) return { label: 'PPC Semanal', value: '—', sub: 'sin datos', color: 'teal', icon: 'fa-chart-line' };
+            if (!sa) return { label: 'PPC de la semana', value: '—', sub: 'sin datos', color: 'teal', icon: 'fa-chart-line' };
             const ad = Number(sa.adelantadas || 0);
             return {
-                label: 'PPC Semanal',
+                label: 'PPC de la semana',
                 value: sa.ppc !== null && sa.ppc !== undefined ? sa.ppc + '%' : '—',
-                sub: `${sa.cumplidas}/${sa.comprometidas} cumplidas${ad ? ` · +${ad} adelantadas` : ''}`,
-                color: 'teal', icon: 'fa-chart-line'
+                sub: `${sa.cumplidas}/${sa.comprometidas} cumplidas${ad ? ` · +${ad} adelantadas` : ''} · meta ${meta}%`,
+                color: sa.ppc !== null && sa.ppc !== undefined && Number(sa.ppc) < meta ? 'red' : 'teal', icon: 'fa-chart-line'
             };
         })(),
-        { label: 'Abiertas', value: k.abiertas, sub: 'en curso', color: 'slate', icon: 'fa-list-check' },
-        { label: 'Vencidas', value: k.vencidas, sub: 'fuera de plazo', color: 'red', icon: 'fa-triangle-exclamation' },
-        { label: 'Latencia', value: latencia.toFixed(1) + ' d', sub: 'atraso promedio · 8 semanas', color: 'orange', icon: 'fa-hourglass-half' }
-    ];
-
-    const COMPLEMENTARIAS = [
-        { label: 'Por vencer', value: k.porVencer, sub: '≤ 7 días', color: 'amber', icon: 'fa-clock' },
-        { label: 'Cerradas esta semana', value: cerradasEstaSemana.length, sub: 'todas, a tiempo o tarde', color: 'emerald', icon: 'fa-circle-check' },
-        { label: 'Reprogramadas', value: reprogramadasEstaSemana, sub: 'esta semana', color: 'violet', icon: 'fa-calendar-plus' },
-        { label: 'Sin fecha', value: k.sinFecha, sub: 'no vencen', color: 'slate', icon: 'fa-calendar-xmark' }
+        { label: 'Cerradas esta semana', value: cerradasEstaSemana.length, sub: `${cerradasTardeSemana} con atraso vs. fin original`, color: 'emerald', icon: 'fa-circle-check' },
+        { label: 'Reprogramadas', value: reprogramadasEstaSemana, sub: 'reprogramaciones esta semana', color: 'violet', icon: 'fa-calendar-plus' },
+        { label: 'No planificadas', value: sa ? Number(sa.no_planificadas || 0) : '—', sub: sa ? `${Number(sa.horas_no_planificadas || 0).toFixed(1)} h esta semana` : 'sin datos', color: 'amber', icon: 'fa-bolt' },
+        { label: 'Latencia', value: latencia.toFixed(1) + ' d', sub: 'atraso promedio vs. fin original · 8 sem', color: 'orange', icon: 'fa-hourglass-half' }
     ];
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div>
                 <h3 class="font-bold text-sm text-slate-800">Dashboard de Control BIM</h3>
-                <p class="text-[11px] text-slate-500">Análisis de cumplimiento, latencia y salud del planeamiento.</p>
+                <p class="text-[11px] text-slate-500">Reporte del portafolio: estado, cumplimiento del plan, causas, restricciones y equipo.</p>
             </div>
             <button onclick="window.fetchAll().then(window.renderView)" class="text-xs text-sky-600 hover:underline font-medium"><i class="fa-solid fa-rotate-right mr-1"></i> Actualizar</button>
         </div>
 
         ${seccionPortafolio()}
 
-        <h4 class="font-semibold text-sm text-slate-800 mb-2">Operación de la semana</h4>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <h4 class="font-semibold text-sm text-slate-800 mb-2">Operación de la semana · ${fmtDate(lunes)} al ${fmtDate(domingo)}</h4>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             ${KPI.map(x => `
                 <div class="card kpi-card p-3 border-l-4 border-${x.color}-500">
                     <div class="flex items-center justify-between">
@@ -486,127 +624,46 @@ export function renderDashboard(container) {
             `).join('')}
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            ${COMPLEMENTARIAS.map(x => `
-                <div class="card p-3 border-l-4 border-${x.color}-500">
-                    <div class="flex items-center justify-between">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
-                        <i class="fa-solid ${x.icon} text-${x.color}-500 text-xs"></i>
-                    </div>
-                    <p class="text-xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
-                    <p class="text-[10px] text-slate-400">${x.sub}</p>
-                </div>
-            `).join('')}
-        </div>
-
         <div class="card p-4 mb-4">
             <h4 class="font-semibold text-sm text-slate-800 mb-2">Evolución del PPC (últimas 8 semanas)</h4>
             <div class="chart-box" style="height: 250px;"><canvas id="chart-ppc"></canvas></div>
         </div>
 
+        ${seccionComparacionSemanas()}
+
+        ${seccionParetos()}
+
+        ${seccionBloqueos()}
+
+        <h4 class="font-semibold text-sm text-slate-800 mb-2">Equipo</h4>
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Carga de Trabajo (Tareas Abiertas)</h4>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Carga de trabajo (actividades abiertas por responsable)</h4>
                 <div class="chart-box" style="height: 250px;"><canvas id="chart-carga"></canvas></div>
             </div>
             <div class="card p-4">
-                <h4 class="font-semibold text-sm text-slate-800 mb-2">Vencidas por Criticidad</h4>
+                <h4 class="font-semibold text-sm text-slate-800 mb-2">Vencidas por criticidad</h4>
                 <div class="chart-box" style="height: 250px;"><canvas id="chart-vencidas"></canvas></div>
             </div>
         </div>
 
-        ${seccionParetos()}
-
-        <div class="card overflow-x-auto mb-4">
-            <div class="p-4 pb-2">
-                <h4 class="font-semibold text-sm text-slate-800">Desempeño por Responsable</h4>
-                <p class="text-[11px] text-slate-500">PPC calculado por semana de fecha_fin programada.</p>
-            </div>
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
-                    <tr>
-                        <th class="p-3">Responsable · Cargo</th>
-                        <th class="p-3">Abiertas</th>
-                        <th class="p-3">Vencidas</th>
-                        <th class="p-3">% Venc.</th>
-                        <th class="p-3">Cerradas</th>
-                        <th class="p-3">PPC Semanal</th>
-                        <th class="p-3">Carga Pond.</th>
-                    </tr>
-                </thead>
-                <tbody id="perf-table" class="divide-y divide-slate-100"></tbody>
-            </table>
-        </div>
-
-        ${seccionComparacionSemanas()}
+        ${seccionDesempeno()}
     `;
 
-    renderCharts(inicioSemana, finSemana);
+    renderCharts();
     renderParetos();
     renderPortafolio();
-    renderPerfTable(inicioSemana, finSemana);
 }
 
-function calcularKPIs() {
-    const total = state.tasksCache.length;
-    const abiertas = state.tasksCache.filter(t => !isCerrado(t));
-    const vencidas = abiertas.filter(t => semaforo(t) === 'Vencida');
-    const porVencer = abiertas.filter(t => semaforo(t) === 'Por vencer');
-    const sinFecha = abiertas.filter(t => !t.fecha_fin);
-
-    const hoy = today();
-    hoy.setHours(0, 0, 0, 0);
-    const diaSemana = hoy.getDay();
-    const diffLunes = hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(diffLunes);
-    inicioSemana.setHours(0, 0, 0, 0);
-    const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6);
-    finSemana.setHours(23, 59, 59, 999);
-
-    const tareasSemana = state.tasksCache.filter(t => {
-        if (!t.fecha_fin) return false;
-        if (t.estado === 'Cancelado' || t.estado === 'Anulado') return false;
-        const fin = new Date(t.fecha_fin + 'T00:00:00');
-        if (fin < inicioSemana || fin > finSemana) return false;
-        if (t.responsable_id && typeof esDiaLaborable === 'function') {
-            if (!esDiaLaborable(t.responsable_id, t.fecha_fin)) return false;
-        }
-        return true;
-    });
-
-    const cumplidas = tareasSemana.filter(t => {
-        if (!t.fecha_cierre) return false;
-        return t.fecha_cierre <= t.fecha_fin;
-    });
-
-    const ppc = tareasSemana.length > 0
-        ? Math.round((cumplidas.length / tareasSemana.length) * 100)
-        : null;
-
-    return {
-        total,
-        abiertas: abiertas.length,
-        vencidas: vencidas.length,
-        porVencer: porVencer.length,
-        sinFecha: sinFecha.length,
-        ppc,
-        ppcTotal: tareasSemana.length,
-        ppcEnPlazo: cumplidas.length
-    };
-}
-
-function renderCharts(inicioSemana, finSemana) {
-    if (state.charts.ppc) state.charts.ppc.destroy();
-    if (state.charts.estados) state.charts.estados.destroy();
-    if (state.charts.carga) state.charts.carga.destroy();
-    if (state.charts.vencidas) state.charts.vencidas.destroy();
+function renderCharts() {
+    ['ppc', 'carga', 'vencidas'].forEach(k => { if (state.charts[k]) { state.charts[k].destroy(); state.charts[k] = null; } });
+    const meta = metaPPC();
 
     // PPC de las últimas 8 semanas: mismo cálculo que la tabla (Supabase: dashboard_semanas)
     const semanasAsc = (state.semanasDashboard || []).slice().reverse();
     const labelsPPC = semanasAsc.map(w => `Sem ${fmtDate(w.semana).slice(0, 5)}`);
     const dataPPC = semanasAsc.map(w => (w.ppc === null || w.ppc === undefined) ? null : Number(w.ppc));
+    const maxY = Math.max(110, ...dataPPC.filter(v => v !== null).map(v => Math.ceil(v / 10) * 10 + 10));
 
     state.charts.ppc = new Chart(document.getElementById('chart-ppc'), {
         type: 'line',
@@ -614,31 +671,14 @@ function renderCharts(inicioSemana, finSemana) {
             labels: labelsPPC,
             datasets: [
                 {
-                    label: 'PPC %',
-                    data: dataPPC,
-                    borderColor: '#0d9488',
-                    backgroundColor: 'rgba(13,148,136,.1)',
-                    fill: true,
-                    tension: 0.3,
-                    spanGaps: true,
-                    pointBackgroundColor: '#0d9488',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    order: 1
+                    label: 'PPC %', data: dataPPC,
+                    borderColor: '#0d9488', backgroundColor: 'rgba(13,148,136,.1)', fill: true, tension: 0.3, spanGaps: true,
+                    pointBackgroundColor: dataPPC.map(v => v !== null && v < meta ? '#dc2626' : '#0d9488'),
+                    pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 7, order: 1
                 },
                 {
-                    label: 'Mínimo 80%',
-                    data: labelsPPC.map(() => 80),
-                    borderColor: '#dc2626',
-                    borderDash: [6, 4],
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    fill: false,
-                    tension: 0,
-                    order: 2
+                    label: `Meta ${meta}%`, data: labelsPPC.map(() => meta),
+                    borderColor: '#dc2626', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0, order: 2
                 }
             ]
         },
@@ -647,94 +687,35 @@ function renderCharts(inicioSemana, finSemana) {
             layout: { padding: { top: 10 } },
             plugins: {
                 legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                tooltip: {
-                    callbacks: {
-                        label: c => {
-                            if (c.datasetIndex === 1) return 'Mínimo: 80%';
-                            return c.parsed.y !== null ? `PPC: ${c.parsed.y}%` : 'Sin datos';
-                        }
-                    }
-                }
+                tooltip: { callbacks: { label: c => c.datasetIndex === 1 ? `Meta: ${meta}%` : (c.parsed.y !== null ? `PPC: ${c.parsed.y}%` : 'Sin datos') } }
             },
-            scales: { 
-                y: { 
-                    beginAtZero: true, 
-                    max: 110, 
-                    ticks: { 
-                        stepSize: 10,
-                        callback: v => v > 100 ? '' : v + '%'
-                    },
-                    grid: {
-                        color: (ctx) => {
-                            if (ctx.tick && ctx.tick.value === 80) return 'rgba(220,38,38,0.4)';
-                            if (ctx.tick && ctx.tick.value > 100) return 'rgba(0,0,0,0.02)';
-                            return 'rgba(0,0,0,0.05)';
-                        }
-                    }
-                }, 
-                x: { grid: { display: false } } 
+            scales: {
+                y: { beginAtZero: true, max: maxY, ticks: { stepSize: 10, callback: v => v + '%' } },
+                x: { grid: { display: false } }
             }
         }
     });
 
-    const estados = ['No iniciado', 'En proceso', 'En espera', 'Cerrado'];
-    const counts = estados.map(e => state.tasksCache.filter(t => t.estado === e).length);
-    const colores = ['#94a3b8', '#0284c7', '#f59e0b', '#0d9488'];
-    const totalEstados = counts.reduce((s, v) => s + v, 0);
-
-    if (document.getElementById('chart-estados')) state.charts.estados = new Chart(document.getElementById('chart-estados'), {
-        type: 'doughnut',
-        data: { 
-            labels: estados, 
-            datasets: [{ data: counts, backgroundColor: colores, borderWidth: 2, borderColor: '#fff' }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
-            plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const v = ctx.parsed;
-                            const pct = totalEstados > 0 ? ((v / totalEstados) * 100).toFixed(1) : '0.0';
-                            return `${ctx.label}: ${v} (${pct}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-
+    // Carga de trabajo: abiertas por persona (id del responsable, no el texto del nombre)
     const cargaMap = {};
     state.tasksCache.filter(t => !isCerrado(t)).forEach(t => {
-        const resp = t.responsable || 'Sin asignar';
-        cargaMap[resp] = (cargaMap[resp] || 0) + 1;
+        const k = t.responsable_id || `txt:${t.responsable || 'Sin asignar'}`;
+        cargaMap[k] = cargaMap[k] || { nombre: nombreResponsableDash(t), n: 0 };
+        cargaMap[k].n++;
     });
-    const respLabels = Object.keys(cargaMap).sort();
-    const respValues = respLabels.map(r => cargaMap[r]);
-    const totalCarga = respValues.reduce((s, v) => s + v, 0);
+    const filasCarga = Object.values(cargaMap).sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'));
+    const totalCarga = filasCarga.reduce((s, x) => s + x.n, 0);
 
     state.charts.carga = new Chart(document.getElementById('chart-carga'), {
         type: 'bar',
-        data: { 
-            labels: respLabels, 
-            datasets: [{ label: 'Tareas Abiertas', data: respValues, backgroundColor: '#0284c7', borderRadius: 4 }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
+        data: { labels: filasCarga.map(x => x.nombre), datasets: [{ label: 'Abiertas', data: filasCarga.map(x => x.n), backgroundColor: '#0284c7', borderRadius: 4 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const v = ctx.parsed.y;
-                            const pct = totalCarga > 0 ? ((v / totalCarga) * 100).toFixed(1) : '0.0';
-                            return `${v} tarea${v === 1 ? '' : 's'} (${pct}%)`;
-                        }
-                    }
-                }
-            }, 
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
+                tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y; return `${v} actividad${v === 1 ? '' : 'es'} (${totalCarga ? (v * 100 / totalCarga).toFixed(1) : '0.0'}%)`; } } }
+            },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
         }
     });
 
@@ -745,95 +726,100 @@ function renderCharts(inicioSemana, finSemana) {
 
     state.charts.vencidas = new Chart(document.getElementById('chart-vencidas'), {
         type: 'bar',
-        data: { 
-            labels: critLabels, 
-            datasets: [{ label: 'Vencidas por Criticidad', data: critValues, backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#64748b'], borderRadius: 4 }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
+        data: { labels: critLabels, datasets: [{ label: 'Vencidas por criticidad', data: critValues, backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#64748b'], borderRadius: 4 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const v = ctx.parsed.y;
-                            const pct = totalCrit > 0 ? ((v / totalCrit) * 100).toFixed(1) : '0.0';
-                            return `${v} vencida${v === 1 ? '' : 's'} (${pct}%)`;
-                        }
-                    }
-                }
-            }, 
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } 
+                tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y; return `${v} vencida${v === 1 ? '' : 's'} (${totalCrit ? (v * 100 / totalCrit).toFixed(1) : '0.0'}%)`; } } }
+            },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
         }
     });
 }
 
-function renderPerfTable(inicioSemana, finSemana) {
+// ------------------------------------------------------------------
+// DESEMPEÑO POR RESPONSABLE
+// PPC con la misma regla Last Planner del PPC semanal (Supabase:
+// ppc_calcular_semana -> por_responsable). Semanas cerradas = foto congelada.
+// ------------------------------------------------------------------
+const SEMANAS_DESEMPENO = 4;
+
+function seccionDesempeno() {
+    const semanas = (state.semanasDashboard || []).slice(0, SEMANAS_DESEMPENO).reverse(); // antigua -> actual
+    const hayPorResp = semanas.some(s => s.por_responsable && Object.keys(s.por_responsable).length);
+
+    const esBimManager = (t) => (perfilDe(t.responsable_id)?.cargo || '').toLowerCase().includes('bim manager');
     const map = {};
-
-    const nombreDe = (t) => {
-        if (t.responsable_id) {
-            const p = state.perfilesCache.find(x => x.id === t.responsable_id);
-            if (p) return { nombre: nombreFormateado(p), cargo: p.cargo || '', id: p.id };
-        }
-        return { nombre: t.responsable || 'Sin asignar', cargo: '', id: null };
-    };
-
-    const esBimManager = (t) => {
-        if (!t.responsable_id) return false;
-        const p = state.perfilesCache.find(x => x.id === t.responsable_id);
-        if (!p) return false;
-        const cargo = (p.cargo || '').toLowerCase();
-        return cargo.includes('bim manager');
-    };
-
     state.tasksCache.forEach(t => {
         if (esBimManager(t)) return;
-
-        const info = nombreDe(t);
-        const key = info.id || info.nombre;
-        if (!map[key]) {
-            map[key] = { nombre: info.nombre, cargo: info.cargo, a: 0, v: 0, c: 0, carga: 0, semanaTareas: 0, semanaCumplidas: 0 };
-        }
-
-        if (isCerrado(t)) {
-            map[key].c++;
-        } else {
+        const p = perfilDe(t.responsable_id);
+        const key = p ? p.id : (t.responsable ? `txt:${t.responsable}` : 'sin_asignar');
+        if (!map[key]) map[key] = { key, nombre: p ? nombreFormateado(p) : (t.responsable || 'Sin asignar'), cargo: p?.cargo || '', a: 0, v: 0, c: 0, carga: 0 };
+        if (isCerrado(t)) map[key].c++;
+        else {
             map[key].a++;
             if (semaforo(t) === 'Vencida') map[key].v++;
             map[key].carga += WEIGHT[getCriticidad(t)] || 1;
         }
-
-        if (t.fecha_fin) {
-            if (t.estado === 'Cancelado' || t.estado === 'Anulado') return;
-            const f = new Date(t.fecha_fin + 'T00:00:00');
-            if (f < inicioSemana || f > finSemana) return;
-
-            map[key].semanaTareas++;
-            if (t.fecha_cierre && t.fecha_cierre <= t.fecha_fin) {
-                map[key].semanaCumplidas++;
-            }
-        }
     });
 
-    document.getElementById('perf-table').innerHTML = Object.values(map)
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
-        .map(m => {
-            const pv = m.a ? Math.round((m.v / m.a) * 100) : 0;
-            const ppc = m.semanaTareas > 0
-                ? Math.round((m.semanaCumplidas / m.semanaTareas) * 100)
-                : null;
-            return `<tr class="hover:bg-slate-50">
-                <td class="p-3">
-                    <div class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</div>
-                    <div class="text-[10px] text-slate-500">${escapeHtml(m.cargo || 'Sin cargo')}</div>
-                </td>
-                <td class="p-3">${m.a}</td>
-                <td class="p-3 ${m.v ? 'text-red-600 font-bold' : ''}">${m.v}</td>
-                <td class="p-3 ${pv >= 50 ? 'text-red-600' : pv > 0 ? 'text-amber-600' : ''}">${pv}%</td>
-                <td class="p-3">${m.c}</td>
-                <td class="p-3">${ppc !== null ? `<span class="px-2 py-0.5 rounded font-bold ${ppc >= 80 ? 'bg-teal-100 text-teal-800' : ppc >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}">${ppc}%</span>` : '—'}</td>
-                <td class="p-3 font-bold text-slate-700">${m.carga}</td>
-            </tr>`;
-        }).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">Sin datos</td></tr>';
+    const ppcDe = (s, key) => s.por_responsable?.[key] || null;
+    const celda = (x) => {
+        if (!x || !Number(x.comprometidas)) return x && Number(x.adelantadas) ? `<span class="text-emerald-700 text-[10px]" title="Solo adelantadas">+${x.adelantadas}</span>` : '<span class="text-slate-300">—</span>';
+        const ppc = Number(x.ppc);
+        return `<span class="px-2 py-0.5 rounded font-bold ${clasePPC(ppc)}" title="${Number(x.cumplidas) + Number(x.adelantadas || 0)} de ${x.comprometidas} comprometidas">${ppc}%</span>`;
+    };
+
+    const filas = Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(m => {
+        const pv = m.a ? Math.round((m.v / m.a) * 100) : 0;
+        const xs = semanas.map(s => ppcDe(s, m.key));
+        const comp = xs.reduce((acc, x) => acc + Number(x?.comprometidas || 0), 0);
+        const ok = xs.reduce((acc, x) => acc + Number(x?.cumplidas || 0) + Number(x?.adelantadas || 0), 0);
+        const acum = comp ? Math.round(ok * 100 / comp) : null;
+        // Tendencia: última semana cerrada vs. la anterior
+        const cerradas = semanas.filter(s => s.cerrada).map(s => ppcDe(s, m.key)).filter(x => x && Number(x.comprometidas));
+        const tend = cerradas.length >= 2 ? deltaSemana(Number(cerradas[cerradas.length - 1].ppc), Number(cerradas[cerradas.length - 2].ppc), +1) : '';
+        return `<tr class="hover:bg-slate-50">
+            <td class="p-3">
+                <div class="font-semibold text-slate-800">${escapeHtml(m.nombre)}</div>
+                <div class="text-[10px] text-slate-500">${escapeHtml(m.cargo || 'Sin cargo')}</div>
+            </td>
+            <td class="p-3">${m.a}</td>
+            <td class="p-3 ${m.v ? 'text-red-600 font-bold' : ''}">${m.v}</td>
+            <td class="p-3 ${pv >= 50 ? 'text-red-600' : pv > 0 ? 'text-amber-600' : ''}">${pv}%</td>
+            <td class="p-3">${m.c}</td>
+            ${xs.map(x => `<td class="p-3 text-center">${celda(x)}</td>`).join('')}
+            <td class="p-3 text-center">${acum === null ? '<span class="text-slate-300">—</span>' : `<span class="px-2 py-0.5 rounded font-bold ${clasePPC(acum)}">${acum}%</span>`}</td>
+            <td class="p-3 text-center">${tend}</td>
+            <td class="p-3 font-bold text-slate-700">${m.carga}</td>
+        </tr>`;
+    }).join('');
+
+    return `
+        <div class="card overflow-x-auto mb-4">
+            <div class="p-4 pb-2">
+                <h4 class="font-semibold text-sm text-slate-800">Desempeño por responsable</h4>
+                <p class="text-[11px] text-slate-500">PPC por responsable con la misma regla Last Planner del PPC semanal (compromiso del lunes, no planificadas y adelantadas). Semanas cerradas = foto congelada. Meta ${metaPPC()}%.</p>
+                ${hayPorResp ? '' : '<p class="text-[11px] text-amber-700 mt-1">Aún no hay PPC por responsable: ejecuta sql/espera_bloqueos_ppc_responsable.sql en Supabase.</p>'}
+            </div>
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                    <tr>
+                        <th class="p-3">Responsable · Cargo</th>
+                        <th class="p-3">Abiertas</th>
+                        <th class="p-3">Vencidas</th>
+                        <th class="p-3">% Venc.</th>
+                        <th class="p-3">Cerradas</th>
+                        ${semanas.map(s => `<th class="p-3 text-center whitespace-nowrap">PPC ${fmtDate(s.semana).slice(0, 5)}${s.cerrada ? '' : ' (actual)'}</th>`).join('')}
+                        <th class="p-3 text-center" title="(cumplidas + adelantadas) ÷ comprometidas de las ${semanas.length} semanas">PPC ${semanas.length} sem</th>
+                        <th class="p-3 text-center" title="Última semana cerrada vs. la anterior">Tend.</th>
+                        <th class="p-3" title="Abiertas ponderadas por criticidad">Carga pond.</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${filas || `<tr><td colspan="${8 + semanas.length}" class="text-center py-4 text-slate-400">Sin datos</td></tr>`}
+                </tbody>
+            </table>
+        </div>`;
 }

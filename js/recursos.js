@@ -254,24 +254,18 @@ export function renderRecursos(container) {
         return t ? espNombre(t.especialidad_id) : 'Sin actividad';
     });
 
-    // Horas planificadas vs no planificadas por semana (no planificada = creada en esa semana con fin en ella)
-    const lunesDe = (f) => lunesDeSemana(f);
-    const fechaLima = (ts) => ts ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts)) : null;
+    // Horas planificadas vs no planificadas: mismo cálculo que el Dashboard (Supabase: dashboard_semanas).
+    // No planificada = actividad creada durante la semana con fin en ella (regla del PPC Last Planner).
+    const semanasPlanifSQL = (state.semanasDashboard || []).slice().reverse();
     const planifPorSemana = {};
-    registros.forEach(r => {
-        if (!r.fecha) return;
-        const sk = semanaKey(r.fecha);
-        planifPorSemana[sk] = planifPorSemana[sk] || { plan: 0, noPlan: 0, general: 0 };
-        const t = tareaPorId(r.pendiente_id);
-        const h = pctAHoras(r.porcentaje_dia);
-        if (!t) { planifPorSemana[sk].general += h; return; }
-        const creada = fechaLima(t.created_at);
-        const finRef = t.fecha_fin_original || t.fecha_fin;
-        const lun = lunesDe(r.fecha);
-        const noPlan = creada && creada >= lun && creada <= sumarDias(lun, 6) && finRef && finRef >= lun && finRef <= sumarDias(lun, 6);
-        if (noPlan) planifPorSemana[sk].noPlan += h; else planifPorSemana[sk].plan += h;
+    semanasPlanifSQL.forEach(w => {
+        const sk = String(w.semana).slice(0, 10);
+        const total = Number(w.horas_semana || 0);
+        const noPlan = Number(w.horas_no_planificadas || 0);
+        const general = Number(w.horas_generales || 0);
+        planifPorSemana[sk] = { plan: Math.max(0, total - noPlan - general), noPlan, general };
     });
-    const semanasPlanif = semanas.slice(-8);
+    const semanasPlanif = Object.keys(planifPorSemana);
 
     const semanasRecientes = semanas.slice(-6);
     const hoyLocalStr = hoyLima(); // YYYY-MM-DD en hora local
@@ -364,7 +358,7 @@ export function renderRecursos(container) {
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
             <div class="card p-4">
                 <h4 class="font-semibold text-sm text-slate-800 dark:text-white mb-2">Horas planificadas vs. no planificadas</h4>
-                <p class="text-[11px] text-slate-500 mb-2">No planificada = actividad creada durante la semana con fin en esa misma semana.</p>
+                <p class="text-[11px] text-slate-500 mb-2">Mismo cálculo que el Dashboard (Last Planner): no planificada = actividad creada durante la semana con fin en esa misma semana. Últimas 8 semanas.</p>
                 <div class="chart-box" style="height: 240px;"><canvas id="chart-planif"></canvas></div>
             </div>
             <div class="card p-4">
