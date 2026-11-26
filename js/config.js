@@ -171,6 +171,23 @@ export function renderConfig(container) {
                 </div>
             </div>
 
+            <!-- 4d. META PPC -->
+            <div class="card p-4">
+                <div class="mb-3">
+                    <h3 class="font-bold text-sm text-slate-800">Meta de PPC (Dashboard)</h3>
+                    <p class="text-[10px] text-slate-500">Referencia Last Planner: 80%. Equipos que recién empiezan suelen estar en 50–60%; los maduros sostienen 80–85% o más.</p>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-center justify-between gap-2">
+                        <span>Meta semanal (%)</span>
+                        <input id="meta-ppc" type="number" min="1" max="100" step="1" value="${state.parametrosApp?.meta_ppc ?? 80}" ${state.isAdmin ? '' : 'disabled'} class="w-20 border border-slate-300 rounded px-2 py-1 text-right">
+                    </label>
+                    ${state.isAdmin
+                        ? '<button onclick="window.guardarMetaPPC()" class="w-full mt-1 px-2 py-1.5 bg-sky-600 text-white rounded hover:bg-sky-700">Guardar meta</button>'
+                        : '<p class="text-[10px] text-slate-400">Solo el administrador puede modificarla.</p>'}
+                </div>
+            </div>
+
             <!-- 5. SUBCONTRATAS -->
             <div class="card p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -803,4 +820,16 @@ window.guardarLimitesWIP = async () => {
     if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
     await fetchParametros();
     toast('Límites WIP guardados.');
+};
+
+window.guardarMetaPPC = async () => {
+    if (!state.isAdmin) { toast('Solo el administrador puede modificar la meta.'); return; }
+    const meta = parseInt(document.getElementById('meta-ppc')?.value, 10);
+    if (!(meta >= 1 && meta <= 100)) { toast('La meta debe ser un número entero entre 1 y 100.'); return; }
+    const { error } = await supabaseClient.from('parametros_app').upsert([
+        { clave: 'meta_ppc', valor: meta, descripcion: 'Meta de PPC semanal en % (Dashboard). Referencia Last Planner: 80%' }
+    ], { onConflict: 'clave' });
+    if (error) { toast('No se pudo guardar: ' + error.message + ' (¿ejecutaste sql/parametros_app.sql?)'); return; }
+    await fetchParametros();
+    toast('Meta de PPC guardada.');
 };

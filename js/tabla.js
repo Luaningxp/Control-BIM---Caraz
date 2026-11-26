@@ -3,6 +3,7 @@ import {
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
     confirmDelete, semaforo, hoyLima, resolverCierre, validarFechaCierre, ESTADO_REAPERTURA_DEFAULT } from './utils.js';
+import { ESTADO_ESPERA, puedeCambiarEstado, llenarSelectMotivo, ultimaCausaEspera, nombreCausaPorId } from './espera.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
 
@@ -1044,6 +1045,7 @@ export function openModal() {
     const causasContainer = document.getElementById('causas-container');
     if (causasContainer) causasContainer.classList.add('hidden');
     causasSeleccionadas.clear();
+    llenarSelectMotivo(document.getElementById('task-motivo-espera'), null);
 
     aplicarBloqueoModelador();
 
@@ -1070,6 +1072,8 @@ export function editTask(id) {
         estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option>' + (soloModelador ? '' : '<option>Cerrado</option>');
         estadoSel.value = t.estado || 'No iniciado';
     }
+    llenarSelectMotivo(document.getElementById('task-motivo-espera'), t.estado === ESTADO_ESPERA ? t.motivo_espera_id : null)
+        .then(() => window.actualizarMotivoEsperaUI?.());
     document.getElementById('task-fecha-fin').value = t.fecha_fin || '';
     document.getElementById('task-fecha-cierre').value = t.fecha_cierre || '';
     document.getElementById('task-nota').value = t.nota || '';
@@ -1198,6 +1202,7 @@ export function duplicateTask(id) {
 
     const causasContainer = document.getElementById('causas-container');
     if (causasContainer) causasContainer.classList.add('hidden');
+    llenarSelectMotivo(document.getElementById('task-motivo-espera'), null);
 
     aplicarBloqueoModelador();
 
@@ -1267,10 +1272,18 @@ function aplicarBloqueoModelador() {
         el.classList.toggle('opacity-60', soloModelador);
     });
 
-    ['task-nota', 'task-estado'].forEach(id => {
+    ['task-nota', 'task-estado', 'task-motivo-espera'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = false;
     });
+    // Modeladores: estado y motivo de espera solo en actividades donde están asignados
+    const previaEstado = idActual ? state.tasksCache.find(t => String(t.id) === String(idActual)) : null;
+    if (previaEstado && !puedeCambiarEstado(previaEstado)) {
+        ['task-estado', 'task-motivo-espera'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.disabled = true; el.title = 'Solo puedes cambiar el estado de las actividades en las que estás asignado.'; }
+        });
+    }
     // Poner fecha de cierre cierra la actividad: los modeladores no cierran
     const fcEl = document.getElementById('task-fecha-cierre');
     if (fcEl) {
@@ -1353,8 +1366,22 @@ function configurarCierreModal() {
     const actualizarCausas = () => {
         const tarde = fc.value && fin?.value && fc.value > fin.value;
         document.getElementById('causas-container')?.classList.toggle('hidden', !tarde);
+        // Si estuvo en espera, se propone el motivo de la espera como causa (se puede cambiar)
+        if (tarde && previa && causasSeleccionadas.size === 0) {
+            const sugerida = ultimaCausaEspera(previa.id);
+            if (sugerida) {
+                causasSeleccionadas.add(sugerida);
+                toast(`Se propuso la causa "${nombreCausaPorId(sugerida)}" (motivo de la espera). Puedes cambiarla.`);
+            }
+        }
         if (tarde) actualizarCausasUI();
     };
+    const actualizarMotivoEspera = () => {
+        const enEspera = estadoSel.value === ESTADO_ESPERA;
+        document.getElementById('motivo-espera-container')?.classList.toggle('hidden', !enEspera);
+    };
+    window.actualizarMotivoEsperaUI = actualizarMotivoEspera;
+    actualizarMotivoEspera();
 
     fc.onchange = () => {
         if (fc.value) {
@@ -1369,6 +1396,7 @@ function configurarCierreModal() {
             estadoSel.value = estadoSel.dataset.previo || ESTADO_REAPERTURA_DEFAULT;
         }
         actualizarCausas();
+        actualizarMotivoEspera();
     };
     estadoSel.onchange = () => {
         if (estadoSel.value === 'Cerrado') {
@@ -1378,6 +1406,7 @@ function configurarCierreModal() {
             fc.value = '';
         }
         actualizarCausas();
+        actualizarMotivoEspera();
     };
     if (ini) ini.onchange = () => { fc.min = ini.value || ''; };
     if (fin) fin.onchange = actualizarCausas;
@@ -1440,6 +1469,16 @@ export async function saveTask(e) {
 
     const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
 
+    const motivoEspera = document.getElementById('task-motivo-espera')?.value || '';
+    if (estado === ESTADO_ESPERA && !motivoEspera) {
+        toast('Elige el motivo de espera.');
+        document.getElementById('motivo-espera-container')?.classList.remove('hidden');
+        document.getElementById('task-motivo-espera')?.focus();
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
+        return;
+    }
+    const motivoEsperaId = estado === ESTADO_ESPERA ? parseInt(motivoEspera) : null;
+
     const especialidadId = document.getElementById('task-especialidad')?.value || '';
     if (!(soloModelador && id) && !especialidadId) {
         toast('Elige la especialidad de la actividad.');
@@ -1459,7 +1498,7 @@ export async function saveTask(e) {
         payload = {
             estado: estado,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            
+            motivo_espera_id: motivoEsperaId,
             nota: document.getElementById('task-nota').value
         };
     } else {
@@ -1475,7 +1514,7 @@ export async function saveTask(e) {
             fecha_inicio_programado: document.getElementById('task-fecha-inicio').value || null,
             fecha_fin: fechaFinProgramada || null,
             fecha_cierre: estado === 'Cerrado' ? (fechaCierre || null) : null,
-            
+            motivo_espera_id: motivoEsperaId,
             nota: document.getElementById('task-nota').value,
             subcontrata: document.getElementById('task-subcontrata')?.value || null
         };

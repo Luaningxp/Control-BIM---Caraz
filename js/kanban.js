@@ -1,3 +1,4 @@
+import { ESTADO_ESPERA, pedirMotivoEspera, nombreCausaPorId } from './espera.js';
 import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, cdeBadge, nombreResponsable, critColor, toast, 
@@ -159,7 +160,8 @@ export function renderKanban(container) {
                                 let canDrag = false;
                                 if (state.isAdmin || state.isCoordinador || state.isSupervisor) {
                                     canDrag = true;
-                                } else if (state.isModelador && participa && !esArchivada) {
+                                } else if (state.isModelador && (esResponsable || esRecurso) && !esArchivada) {
+                                    // Modeladores: cambian el estado solo donde están asignados (responsable o recurso)
                                     canDrag = true;
                                 }
 
@@ -184,6 +186,7 @@ export function renderKanban(container) {
                                         ${cdeBadge(t.estado_cde, t.codigo_aptitud)}
                                     </div>
                                     <p class="text-[12px] font-semibold text-slate-800 leading-snug mb-2 line-clamp-2">${escapeHtml(t.actividad)}</p>
+                                    ${t.estado === ESTADO_ESPERA ? `<p class="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mb-2" title="Motivo de espera"><i class="fa-solid fa-pause mr-1"></i>${escapeHtml(nombreCausaPorId(t.motivo_espera_id))}</p>` : ''}
                                     
                                     <div class="flex items-center justify-between text-[10px] text-slate-500 mb-2">
                                         <span class="flex items-center gap-1"><i class="fa-solid fa-user text-[9px]"></i> ${escapeHtml(nombreResponsable(t, state.perfilesCache))}</span>
@@ -439,6 +442,13 @@ export async function onDrop(e, nuevoEstado) {
     }
 
     const updateData = { estado: estadoFinal, fecha_cierre: fechaCierre };
+
+    // Pasar a "En espera" exige el motivo (catálogo de causas de incumplimiento)
+    if (estadoFinal === ESTADO_ESPERA) {
+        const motivo = await pedirMotivoEspera(t);
+        if (!motivo) { toast('Cambio cancelado: falta el motivo de espera.'); return; }
+        updateData.motivo_espera_id = motivo;
+    }
 
     const { error } = await supabaseClient.from('pendientes_bim').update(updateData).eq('id', id);
     if (error) { toast('Error al mover: ' + error.message); return; }

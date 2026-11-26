@@ -47,14 +47,25 @@ export const lunesDeSemana = (fechaStr) => sumarDias(domingoDeSemana(fechaStr), 
 export const today = () => new Date(hoyLima() + 'T00:00:00');
 
 /**
- * Latencia promedio (días de atraso) de los cierres tardíos de las últimas N semanas.
- * Única definición para Dashboard y Recursos. Devuelve 0 si no hay cierres tardíos.
+ * Fecha fin contra la que se mide si una actividad se cerró "a tiempo":
+ * la fecha fin ORIGINAL (reprogramar no borra el atraso). Si no hay original, la vigente.
+ * Única definición para Dashboard y Recursos. El PPC semanal (Last Planner) es otra
+ * medida: evalúa el compromiso de la semana contra la fecha vigente el lunes (ver SQL).
+ */
+export const finReferencia = (t) => t?.fecha_fin_original || t?.fecha_fin || null;
+
+/** Cerrada después de su fecha fin original. */
+export const cerradaTarde = (t) => !!(t?.fecha_cierre && finReferencia(t) && t.fecha_cierre > finReferencia(t));
+
+/**
+ * Latencia promedio (días de atraso contra la fecha fin original) de los cierres
+ * tardíos de las últimas N semanas. Devuelve 0 si no hay cierres tardíos.
  */
 export const latenciaPromedio = (tareas, semanas = 8) => {
     const desde = sumarDias(hoyLima(), -7 * semanas);
-    const tarde = (tareas || []).filter(t => t.fecha_cierre && t.fecha_fin && t.fecha_cierre > t.fecha_fin && t.fecha_cierre >= desde);
+    const tarde = (tareas || []).filter(t => cerradaTarde(t) && t.fecha_cierre >= desde);
     if (!tarde.length) return 0;
-    const dias = t => Math.round((new Date(t.fecha_cierre + 'T00:00:00Z') - new Date(t.fecha_fin + 'T00:00:00Z')) / 86400000);
+    const dias = t => Math.round((new Date(t.fecha_cierre + 'T00:00:00Z') - new Date(finReferencia(t) + 'T00:00:00Z')) / 86400000);
     return tarde.reduce((acc, t) => acc + dias(t), 0) / tarde.length;
 };
 
