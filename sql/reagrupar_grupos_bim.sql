@@ -22,6 +22,13 @@
 -- lista: no lo ejecutes otra vez después de crear grupos nuevos desde la app.
 -- =====================================================================
 
+-- Todo en una sola transacción. Se bloquean las dos tablas al inicio y en el
+-- mismo orden para evitar el "deadlock detected" con la app abierta
+-- (si alguien está usando la app, espera hasta 30 s a que suelte las tablas).
+begin;
+set local lock_timeout = '30s';
+lock table public.grupos_bim, public.pendientes_bim in access exclusive mode;
+
 -- Clave de comparación: mayúsculas, sin tildes, sin espacios repetidos
 create or replace function public.grupo_clave(p text)
 returns text language sql immutable as $$
@@ -213,6 +220,8 @@ create policy "grupos_bim_admin_write" on public.grupos_bim
 
 drop table if exists tmp_mapeo_grupos;
 drop table if exists tmp_grupos_nuevos;
+
+commit;
 
 -- Resultado
 select nombre, activo from public.grupos_bim order by nombre;
