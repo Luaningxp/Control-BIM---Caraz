@@ -430,46 +430,12 @@ function esMia(t) {
 const SIN_GRUPO = '__sin_grupo__';
 const seleccionMasiva = new Set();
 let destinoMasivo = '';
+let modoMasivo = false;
 function puedeCambioMasivo() { return state.isAdmin || state.isCoordinador; }
-
-/** Actividades con todos los filtros salvo el de grupo (para el contador por grupo). */
-function tareasSinFiltroGrupo() {
-    const guardado = tableState.filters.grupo;
-    tableState.filters.grupo = '';
-    try { return getProcessedTasks(); } finally { tableState.filters.grupo = guardado; }
-}
-
-function opcionesGrupoCatalogo(seleccionado) {
-    return state.gruposCache.filter(g => g.activo)
-        .map(g => `<option value="${escapeHtml(g.nombre)}" ${seleccionado === g.nombre ? 'selected' : ''}>${escapeHtml(g.nombre)}</option>`).join('');
-}
-
-function renderContadorGrupos() {
-    const base = tareasSinFiltroGrupo();
-    const conteo = new Map();
-    base.forEach(t => { const k = t.grupo || SIN_GRUPO; conteo.set(k, (conteo.get(k) || 0) + 1); });
-    const nombres = state.gruposCache.map(g => g.nombre);
-    [...conteo.keys()].forEach(k => { if (k !== SIN_GRUPO && !nombres.includes(k)) nombres.push(k); });
-    const actual = tableState.filters.grupo;
-    const chip = (valor, etiqueta, n) => `<button onclick="window.filtrarGrupoChip('${valor === SIN_GRUPO ? SIN_GRUPO : encodeURIComponent(valor)}')"
-        class="px-2 py-1 rounded-full text-[10px] font-semibold border transition whitespace-nowrap ${actual === valor ? 'bg-sky-600 text-white border-sky-600' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'} ${n === 0 ? 'opacity-50' : ''}">
-        ${escapeHtml(etiqueta)} <span class="ml-0.5 font-bold">${n}</span></button>`;
-    return `
-        <div class="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm mb-3">
-            <div class="flex items-center justify-between mb-1.5">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Actividades por grupo <span class="font-normal normal-case">(con los filtros actuales)</span></span>
-                ${actual ? `<button onclick="window.filtrarGrupoChip('')" class="text-[10px] text-sky-600 hover:underline">Ver todos los grupos</button>` : ''}
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-                ${chip(SIN_GRUPO, 'SIN GRUPO', conteo.get(SIN_GRUPO) || 0)}
-                ${nombres.map(n => chip(n, n, conteo.get(n) || 0)).join('')}
-            </div>
-        </div>`;
-}
 
 function renderBarraMasiva(tasks) {
     const n = seleccionMasiva.size;
-    if (!n) return '';
+    if (!n) return `<div class="bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 p-2 rounded-lg mb-3 text-xs text-sky-800 dark:text-sky-200"><i class="fa-solid fa-circle-info mr-1"></i>Marca las actividades con las casillas (o todas las filtradas con la casilla del encabezado) y luego elige el grupo.</div>`;
     const fuera = [...seleccionMasiva].filter(id => !tasks.some(t => t.id === id)).length;
     return `
         <div class="flex flex-wrap items-center gap-2 bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 p-2 rounded-lg mb-3 text-xs">
@@ -486,11 +452,9 @@ function renderBarraMasiva(tasks) {
         </div>`;
 }
 
-window.filtrarGrupoChip = function(valor) {
-    tableState.filters.grupo = valor === SIN_GRUPO || valor === '' ? valor : decodeURIComponent(valor);
-    // El panel de filtros se vuelve a armar con el grupo elegido
-    document.getElementById('table-filter-drawer')?.remove();
-    document.getElementById('table-filter-drawer-overlay')?.remove();
+window.toggleModoMasivo = function() {
+    modoMasivo = !modoMasivo;
+    if (!modoMasivo) { seleccionMasiva.clear(); destinoMasivo = ''; }
     window.renderView();
 };
 
@@ -705,7 +669,8 @@ export function renderTabla(container) {
     const colStyle = (key) => `width: ${tableState.colWidths[key] || 100}px; min-width: ${tableState.colWidths[key] || 100}px; max-width: ${tableState.colWidths[key] || 100}px;`;
     const resizer = (key) => `<div class="absolute right-0 top-0 w-2 h-full cursor-col-resize bg-slate-300 dark:bg-slate-600 opacity-0 hover:opacity-100 transition-opacity z-30" onmousedown="window.initResize(event, '${key}')"></div>`;
     const thClass = "p-3 relative group border-r border-slate-200 dark:border-slate-700 last:border-r-0 text-[10px] font-bold tracking-wider text-slate-500 bg-slate-50 dark:bg-slate-800 dark:text-slate-300";
-    const masivo = puedeCambioMasivo();
+    if (!puedeCambioMasivo()) modoMasivo = false;
+    const masivo = modoMasivo;
     if (masivo) {
         // Quita de la selección lo que ya no existe (eliminadas, recargas)
         [...seleccionMasiva].forEach(id => { if (!state.tasksCache.some(t => t.id === id)) seleccionMasiva.delete(id); });
@@ -737,12 +702,13 @@ export function renderTabla(container) {
                         ${state.propDefsCache.length > 0 ? `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase border-t border-slate-100 dark:border-slate-700 mt-1">Personalizadas</div>${state.propDefsCache.map(pd => `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-xs"><input type="checkbox" onchange="window.toggleProp(${pd.id})" ${tableState.visibleProps[pd.id] !== false ? 'checked' : ''} class="rounded text-sky-600"> ${escapeHtml(pd.nombre)}</label>`).join('')}` : ''}
                     </div>
                 </div>
+                ${puedeCambioMasivo() ? `<button onclick="window.toggleModoMasivo()" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${modoMasivo ? 'bg-sky-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}" title="Solo administradores"><i class="fa-solid fa-layer-group"></i> ${modoMasivo ? 'Terminar edición de grupos' : 'Editar grupos masivamente'}</button>` : ''}
                 ${canRestore() ? `<button onclick="window.toggleVerArchivadas()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5" title="Actividades eliminadas (solo administradores)"><i class="fa-solid fa-box-archive"></i> Archivadas (${(state.tasksTodasCache || []).filter(t => t.archivada_en).length})</button>` : ''}
                 <button onclick="window.fetchAll().then(window.renderView)" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Refrescar</button>
             </div>
         </div>
 
-        ${masivo ? renderContadorGrupos() + renderBarraMasiva(tasks) : ''}
+        ${masivo ? renderBarraMasiva(tasks) : ''}
 
         <div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
             <div class="overflow-x-auto overflow-y-auto max-h-[70vh] custom-scrollbar relative">
