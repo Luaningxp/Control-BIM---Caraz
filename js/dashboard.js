@@ -1,7 +1,8 @@
 import { colorTema } from './tema.js';
 import { state } from './db.js';
 import { esDiaLaborable } from './roster.js';
-import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio, cerradaTarde } from './utils.js';
+import { WEIGHT, DAY, today, daysToDeadline, isCerrado, semaforo, escapeHtml, getCriticidad, fmtDate, nombreFormateado, isoLocal, hoyLima, sumarDias, lunesDeSemana, TZ_PROYECTO, latenciaPromedio, cerradaTarde, esAdminManpower } from './utils.js';
+import { calcularEstancadas, calcularFlujo, umbralEstancada } from './flujo.js';
 
 
 // ------------------------------------------------------------------
@@ -548,6 +549,197 @@ function seccionBloqueos() {
 }
 
 // ------------------------------------------------------------------
+// ACTIVIDADES ESTANCADAS (js/flujo.js)
+// Sin horas de responsable ni recursos en los N últimos días laborables
+// terminados (roster). El admin ve todas; los demás, donde participan.
+// ------------------------------------------------------------------
+function participaEn(t, uid) {
+    return t.responsable_id === uid
+        || (state.actividadRecursosCache || []).some(r => String(r.pendiente_id) === String(t.id) && r.usuario_id === uid);
+}
+
+export function estancadasVisibles() {
+    const todas = calcularEstancadas({
+        tareas: state.tasksCache,
+        manpower: state.manpowerCache,
+        recursos: state.actividadRecursosCache,
+        esLaborable: esDiaLaborable,
+        hoy: hoyLima(),
+        n: umbralEstancada(state.parametrosApp)
+    });
+    if (esAdminManpower(state)) return todas;
+    const uid = state.currentUser?.id;
+    return todas.filter(e => participaEn(e.t, uid));
+}
+
+function seccionEstancadas() {
+    const n = umbralEstancada(state.parametrosApp);
+    const lista = estancadasVisibles();
+    const sinArrancar = lista.filter(e => e.tipo === 'Sin arrancar').length;
+    const alcance = esAdminManpower(state) ? 'todas las actividades' : 'actividades donde participas';
+    const tarjetas = [
+        { label: 'Estancadas', value: lista.length, sub: alcance, color: 'red' },
+        { label: 'Sin arrancar', value: sinArrancar, sub: 'inicio pasado, nunca tuvo horas', color: 'orange' },
+        { label: 'Detenidas', value: lista.length - sinArrancar, sub: 'tuvo horas y se frenó', color: 'amber' },
+        { label: 'Umbral', value: n + ' d', sub: 'laborables terminados sin horas', color: 'slate' }
+    ];
+    return `
+        <div class="mb-4">
+            <h4 class="font-semibold text-sm text-slate-800">Restricciones · actividades estancadas</h4>
+            <p class="text-[11px] text-slate-500 mb-2">En proceso (o no iniciadas con inicio ya pasado) sin horas registradas por su responsable ni sus recursos en los últimos ${n} días laborables según el Roster. Hoy no cuenta hasta que termina el día. Acción: registrar horas, pasarla a En espera con motivo, reprogramarla o cerrarla.</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                ${tarjetas.map(x => `
+                    <div class="card p-3 border-l-4 border-${x.color}-500">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
+                        <p class="text-xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
+                        <p class="text-[10px] text-slate-400">${x.sub}</p>
+                    </div>`).join('')}
+            </div>
+            <div class="card overflow-x-auto" style="max-height: 420px; overflow-y: auto;">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0">
+                        <tr><th class="p-3">Actividad</th><th class="p-3">Responsable</th><th class="p-3">Grupo</th><th class="p-3">Tipo</th><th class="p-3">Última hora</th><th class="p-3" title="Días laborables terminados sin horas">Días sin horas</th><th class="p-3"></th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${lista.map(e => `<tr class="hover:bg-slate-50">
+                            <td class="p-3"><span class="font-mono text-[10px] text-slate-400">${escapeHtml(e.t.codigo_contenedor || '')}</span> ${escapeHtml(e.t.actividad || '')}</td>
+                            <td class="p-3">${escapeHtml(nombreResponsableDash(e.t))}</td>
+                            <td class="p-3">${escapeHtml(e.t.grupo || 'SIN GRUPO')}</td>
+                            <td class="p-3"><span class="text-[10px] font-bold px-2 py-0.5 rounded ${e.tipo === 'Sin arrancar' ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800'}">${e.tipo}</span></td>
+                            <td class="p-3 whitespace-nowrap">${e.ultima ? fmtDate(e.ultima) : '—'}</td>
+                            <td class="p-3 font-bold ${e.dias >= n * 3 ? 'text-red-700' : e.dias >= n * 2 ? 'text-amber-700' : 'text-slate-700'}">${e.dias}${e.tope ? '+' : ''}</td>
+                            <td class="p-3 text-right"><button onclick="window.editTask(${e.t.id})" class="text-sky-600 hover:underline whitespace-nowrap">Abrir</button></td>
+                        </tr>`).join('') || '<tr><td colspan="7" class="text-center py-4 text-slate-400">No hay actividades estancadas. 👍</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
+// ------------------------------------------------------------------
+// FLUJO: throughput (cerradas por semana) y tiempo de ciclo
+// (días laborables de la fecha de inicio programada al cierre, roster
+// del responsable). Mediana y percentil 85. Sin archivadas.
+// ------------------------------------------------------------------
+const SEMANAS_FLUJO = 8;
+let flujoState = { por: 'grupo' };
+
+window.setFlujoPor = function(v) {
+    flujoState.por = v === 'especialidad' ? 'especialidad' : 'grupo';
+    window.renderView();
+};
+
+function claveFlujo(t) {
+    if (flujoState.por === 'especialidad') {
+        return (state.especialidadesTodasCache || []).find(e => String(e.id) === String(t.especialidad_id))?.nombre || 'GENERAL';
+    }
+    return t.grupo || 'SIN GRUPO';
+}
+
+function datosFlujo() {
+    return calcularFlujo({
+        tareas: state.tasksCache,
+        manpower: state.manpowerCache,
+        esLaborable: esDiaLaborable,
+        hoy: hoyLima(),
+        semanas: SEMANAS_FLUJO,
+        claveDe: claveFlujo
+    });
+}
+
+const fmtCiclo = v => v === null || v === undefined ? '—' : `${v} d`;
+
+function seccionFlujo() {
+    const d = datosFlujo();
+    const tot = d.total;
+    const semanasCompletas = tot.porSemana.slice(0, -1);
+    const promSemana = semanasCompletas.length ? Math.round(semanasCompletas.reduce((s, v) => s + v, 0) / semanasCompletas.length * 10) / 10 : 0;
+    const tarjetas = [
+        { label: 'Cerradas · 8 semanas', value: tot.total, sub: `${promSemana} por semana (sin la actual)`, color: 'emerald' },
+        { label: 'Tiempo de ciclo típico', value: fmtCiclo(tot.mediana), sub: 'mediana · días laborables', color: 'sky' },
+        { label: 'Tiempo de ciclo P85', value: fmtCiclo(tot.p85), sub: '85% se cierra en este plazo o menos', color: 'violet' },
+        { label: 'Cerradas sin horas', value: tot.sinHoras, sub: tot.sinInicio ? `revisar registro · ${tot.sinInicio} sin fecha de inicio` : 'revisar registro en Manpower', color: tot.sinHoras ? 'orange' : 'slate' }
+    ];
+    const btn = (v, txt) => `<button onclick="window.setFlujoPor('${v}')" class="px-2 py-1 rounded ${flujoState.por === v ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${txt}</button>`;
+    const cab = d.lunes.map((l, i) => `<th class="p-2 text-center whitespace-nowrap" title="Semana del ${fmtDate(l)} al ${fmtDate(sumarDias(l, 6))}">${fmtDate(l).slice(0, 5)}${i === d.lunes.length - 1 ? '*' : ''}</th>`).join('');
+    const celdas = arr => arr.map(v => `<td class="p-2 text-center ${v ? 'text-slate-700' : 'text-slate-300'}">${v || '·'}</td>`).join('');
+    const fila = (r, nombre, clase = '') => `<tr class="${clase}">
+        <td class="p-2 font-semibold">${escapeHtml(nombre)}</td>
+        ${celdas(r.porSemana)}
+        <td class="p-2 text-center font-bold">${r.total}</td>
+        <td class="p-2 text-center">${fmtCiclo(r.mediana)}</td>
+        <td class="p-2 text-center">${fmtCiclo(r.p85)}</td>
+        <td class="p-2 text-center ${r.sinHoras ? 'text-orange-700 font-semibold' : 'text-slate-300'}">${r.sinHoras || '·'}</td>
+    </tr>`;
+    return `
+        <div class="mb-4">
+            <div class="flex flex-wrap items-end justify-between gap-2 mb-2">
+                <div>
+                    <h4 class="font-semibold text-sm text-slate-800">Flujo · throughput y tiempo de ciclo</h4>
+                    <p class="text-[11px] text-slate-500">Throughput = actividades cerradas por semana (lunes a domingo, según fecha de cierre). Tiempo de ciclo = días laborables del responsable (Roster) desde la fecha de inicio programada hasta el cierre, ambos incluidos.</p>
+                </div>
+                <div class="flex gap-1 text-[11px]">${btn('grupo', 'Por grupo')}${btn('especialidad', 'Por especialidad')}</div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                ${tarjetas.map(x => `
+                    <div class="card p-3 border-l-4 border-${x.color}-500">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${x.label}</p>
+                        <p class="text-xl font-bold mt-1 text-${x.color}-700">${x.value}</p>
+                        <p class="text-[10px] text-slate-400">${x.sub}</p>
+                    </div>`).join('')}
+            </div>
+            <div class="grid lg:grid-cols-5 gap-3">
+                <div class="lg:col-span-2 card p-4">
+                    <h5 class="font-semibold text-xs text-slate-700 mb-2">Cerradas por semana y tiempo de ciclo (mediana)</h5>
+                    <div class="chart-box" style="height: 260px;"><canvas id="chart-flujo"></canvas></div>
+                </div>
+                <div class="lg:col-span-3 card overflow-x-auto">
+                    <table class="w-full text-left text-[11px]">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                            <tr><th class="p-2">${flujoState.por === 'especialidad' ? 'Especialidad' : 'Grupo'}</th>${cab}<th class="p-2 text-center">Total</th><th class="p-2 text-center" title="Mediana del tiempo de ciclo">Típico</th><th class="p-2 text-center" title="Percentil 85 del tiempo de ciclo">P85</th><th class="p-2 text-center" title="Cerradas sin ninguna hora en Manpower">Sin horas</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${d.filas.map(r => fila(r, r.clave)).join('') || `<tr><td colspan="${d.lunes.length + 5}" class="text-center py-4 text-slate-400">Sin actividades cerradas en las últimas ${SEMANAS_FLUJO} semanas.</td></tr>`}
+                            ${d.filas.length > 1 ? fila(tot, 'TOTAL', 'bg-slate-50 font-semibold') : ''}
+                        </tbody>
+                    </table>
+                    <p class="text-[10px] text-slate-400 p-2">* Semana en curso. Sin actividades archivadas.</p>
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderFlujo() {
+    if (state.charts.flujo) { state.charts.flujo.destroy(); state.charts.flujo = null; }
+    const el = document.getElementById('chart-flujo');
+    if (!el) return;
+    const d = datosFlujo();
+    const labels = d.lunes.map((l, i) => fmtDate(l).slice(0, 5) + (i === d.lunes.length - 1 ? '*' : ''));
+    const azafran = colorTema('--accent', '#d97706');
+    state.charts.flujo = new Chart(el, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar', label: 'Cerradas', data: d.total.porSemana, backgroundColor: '#059669', borderRadius: 4, yAxisID: 'y', order: 2 },
+                { type: 'line', label: 'Ciclo típico (d)', data: d.total.medianaSemana, borderColor: azafran, backgroundColor: azafran, tension: 0.3, spanGaps: true, pointRadius: 4, yAxisID: 'y1', order: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: { callbacks: { label: c => c.datasetIndex === 0 ? `${c.parsed.y} cerrada${c.parsed.y === 1 ? '' : 's'}` : (c.parsed.y !== null ? `Ciclo típico: ${c.parsed.y} d laborables` : 'Sin datos') } }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Cerradas', font: { size: 10 } } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Días', font: { size: 10 } } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+// ------------------------------------------------------------------
 // PERSONAS
 // ------------------------------------------------------------------
 function perfilDe(uid) {
@@ -561,8 +753,8 @@ function nombreResponsableDash(t) {
 
 // ------------------------------------------------------------------
 // VISTA
-// Orden de reporte: 1 Portafolio · 2 Operación de la semana · 3 Causas
-// · 4 Restricciones · 5 Equipo. Cada cifra aparece una sola vez.
+// Orden de reporte: 1 Portafolio · 2 Operación de la semana (+ Flujo) · 3 Causas
+// · 4 Restricciones (En espera + Estancadas) · 5 Equipo. Cada cifra aparece una sola vez.
 // ------------------------------------------------------------------
 export function renderDashboard(container) {
     const hoyStr = hoyLima();
@@ -631,9 +823,13 @@ export function renderDashboard(container) {
 
         ${seccionComparacionSemanas()}
 
+        ${seccionFlujo()}
+
         ${seccionParetos()}
 
         ${seccionBloqueos()}
+
+        ${seccionEstancadas()}
 
         <h4 class="font-semibold text-sm text-slate-800 mb-2">Equipo</h4>
         <div class="grid lg:grid-cols-2 gap-3 mb-4">
@@ -653,6 +849,7 @@ export function renderDashboard(container) {
     renderCharts();
     renderParetos();
     renderPortafolio();
+    renderFlujo();
 }
 
 function renderCharts() {
