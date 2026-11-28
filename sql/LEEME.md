@@ -30,6 +30,7 @@ detecta cuáles de los scripts 001-009 ya estaban aplicados y los deja registrad
 | 013 | `013_permisos_tablas_abiertas.sql` | Roster, subcontratas, parámetros y planos: solo admin; planos/causas/parámetros de una actividad: quien puede editarla |
 | 014 | `014_recursos_actividad.sql` | recursos de actividades: solo admin, coordinador y supervisor |
 | 015 | `015_ppc_sin_archivadas.sql` | versión vigente del PPC: las archivadas no cuentan en ninguna semana (recalcula las fotos pasadas una vez) |
+| 016 | `016_unir_diseno_planos_modelado.sql` | une los grupos Diseño Planos y Modelado en DISEÑO - RFCS Y REDISEÑOS |
 
 **Ojo:** algunos scripts redefinen funciones de otros anteriores (Manpower: 001, 004, 005, 006;
 PPC: 002, 004, 009, 015; huellas: 010, 015). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
