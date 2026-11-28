@@ -1127,7 +1127,7 @@ export function editTask(id) {
     inicializarBuscadorCausas();
 
     aplicarBloqueoModelador();
-    renderHistorialEstados(t.id);
+    prepararHistorialEstados(t.id);
 
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
@@ -1352,12 +1352,43 @@ const fmtHistorial = new Intl.DateTimeFormat('es-PE', {
     timeZone: TZ_PROYECTO, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
 });
 
+// El historial aparece plegado al abrir el formulario; se consulta solo al desplegarlo.
+function prepararHistorialEstados(pendienteId) {
+    const cont = document.getElementById('historial-estados-container');
+    if (!cont) return;
+    if (!pendienteId || !esAdminManpower(state)) { cont.classList.add('hidden'); return; }
+    cont.classList.remove('hidden');
+    plegarHistorialEstados(true);
+    const lista = document.getElementById('historial-estados-lista');
+    if (lista) { lista.innerHTML = ''; lista.dataset.cargado = ''; }
+}
+
+function plegarHistorialEstados(plegar) {
+    document.getElementById('historial-estados-cuerpo')?.classList.toggle('hidden', plegar);
+    const icono = document.getElementById('historial-estados-icono');
+    if (icono) icono.className = `fa-solid ${plegar ? 'fa-chevron-right' : 'fa-chevron-down'} text-[10px] w-3`;
+    const accion = document.getElementById('historial-estados-accion');
+    if (accion) accion.textContent = plegar ? '(ver)' : '(ocultar)';
+}
+
+window.toggleHistorialEstados = function() {
+    const cuerpo = document.getElementById('historial-estados-cuerpo');
+    if (!cuerpo) return;
+    const abrir = cuerpo.classList.contains('hidden');
+    plegarHistorialEstados(!abrir);
+    const lista = document.getElementById('historial-estados-lista');
+    const id = document.getElementById('task-id')?.value;
+    if (abrir && lista && lista.dataset.cargado !== String(id)) {
+        lista.dataset.cargado = String(id);
+        renderHistorialEstados(id ? parseInt(id) : null);
+    }
+};
+
 async function renderHistorialEstados(pendienteId) {
     const cont = document.getElementById('historial-estados-container');
     const lista = document.getElementById('historial-estados-lista');
     if (!cont || !lista) return;
     if (!pendienteId || !esAdminManpower(state)) { cont.classList.add('hidden'); return; }
-    cont.classList.remove('hidden');
     lista.innerHTML = '<p class="text-[10px] text-slate-400 italic">Cargando historial…</p>';
 
     const { data, error } = await supabaseClient
