@@ -310,7 +310,7 @@ function inicializarGantt(tareas) {
         const nRep = getReprogramaciones(t.id).length;
         return {
             id: String(t.id),
-            name: `${nRep ? `↻×${nRep} ` : ''}${t.codigo_contenedor || ''} ${t.actividad}`.substring(0, 70),
+            name: `${nRep ? `↻×${nRep} ` : ''}${t.codigo_contenedor || ''} ${t.actividad}`,
             start: t.fecha_inicio_programado,
             end: t.fecha_fin,
             progress: t.estado === 'Cerrado' ? 100 : t.estado === 'En proceso' ? 50 : 0,
@@ -1286,7 +1286,7 @@ function inicializarGanttParaPDF(tasksData) {
         const estadoClase = (t.estado || '').replace(/\s/g, '-').toLowerCase();
         return {
             id: String(t.id),
-            name: t.name || `${t.codigo_contenedor || ''} ${t.actividad || ''}`.substring(0, 70),
+            name: t.name || `${t.codigo_contenedor || ''} ${t.actividad || ''}`,
             start: t.start || t.fecha_inicio_programado,
             end: t.end || t.fecha_fin,
             progress: t.progress !== undefined ? t.progress : (t.estado === 'Cerrado' ? 100 : t.estado === 'En proceso' ? 50 : 0),
