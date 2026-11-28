@@ -373,6 +373,7 @@ function inicializarGantt(tareas) {
         });
 
         retrasarFichaGantt(ganttState.currentGantt);
+        sombrearDomingos(ganttState.currentGantt);
 
         pintarBarrasPorEstado(tareas);
 
@@ -450,6 +451,44 @@ function abrirEdicionDesdeGantt(task) {
         ventanaY: window.scrollY
     };
     window.editTask(t.id);
+}
+
+// Vista Día: cada domingo lleva la columna sombreada en rojo suave (detrás de
+// las barras) y su fecha en rojo. El color sale de la paleta (--bad) y se
+// escribe como atributo para que también salga en el PDF.
+function sombrearDomingos(gantt) {
+    if (!gantt || ganttState.viewMode !== 'Day' || !gantt.dates?.length) return;
+    const svg = document.querySelector('#gantt-container svg.gantt');
+    const capaGrid = gantt.layers?.grid;
+    if (!svg || !capaGrid) return;
+    const cw = gantt.options.column_width;
+    const rojo = getComputedStyle(document.documentElement).getPropertyValue('--bad').trim() || '#B91C1C';
+    const fondo = svg.querySelector('.grid-background');
+    const alto = parseFloat(fondo?.getAttribute('height')) || parseFloat(svg.getAttribute('height')) || 0;
+    const y0 = gantt.options.header_height + 10;
+
+    const domingos = new Set();
+    gantt.dates.forEach((d, i) => {
+        if (d.getDay() !== 0) return;
+        domingos.add(i);
+        const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        r.setAttribute('x', i * cw);
+        r.setAttribute('y', y0);
+        r.setAttribute('width', cw);
+        r.setAttribute('height', Math.max(0, alto - y0));
+        r.setAttribute('fill', rojo);
+        r.setAttribute('fill-opacity', '0.08');
+        r.setAttribute('class', 'gantt-domingo');
+        r.style.pointerEvents = 'none';
+        capaGrid.appendChild(r); // la capa de barras va después: quedan encima
+    });
+    svg.querySelectorAll('.lower-text').forEach(txt => {
+        const i = Math.round((parseFloat(txt.getAttribute('x')) - cw / 2) / cw);
+        if (domingos.has(i)) {
+            txt.classList.add('gantt-domingo-txt');
+            txt.setAttribute('fill', rojo);
+        }
+    });
 }
 
 // Cancelar el formulario: no hay que restaurar nada en el próximo dibujo
