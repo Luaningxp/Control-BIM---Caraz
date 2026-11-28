@@ -23,13 +23,14 @@ export const MIGRACIONES = [
     { numero: 11, nombre: '011_causas_solo_admin',               titulo: 'Causas de incumplimiento: solo admin edita' },
     { numero: 12, nombre: '012_fotos_ppc_solo_lectura',          titulo: 'Fotos del PPC: solo lectura' },
     { numero: 13, nombre: '013_permisos_tablas_abiertas',        titulo: 'Permisos: Roster, catálogos, planos y datos de actividad' },
-    { numero: 14, nombre: '014_recursos_actividad',              titulo: 'Recursos de actividades: admin, coordinador y supervisor' }
+    { numero: 14, nombre: '014_recursos_actividad',              titulo: 'Recursos de actividades: admin, coordinador y supervisor' },
+    { numero: 15, nombre: '015_ppc_sin_archivadas',              titulo: 'PPC sin actividades archivadas (recalcula semanas pasadas)' }
 ];
 
 // Scripts que redefinen funciones de scripts anteriores: si re-ejecutas uno
 // viejo, hay que volver a ejecutar estos después (en este orden).
 const POSTERIORES = {
-    1: [4, 5, 6], 2: [4, 9], 4: [5, 6, 9], 5: [6]
+    1: [4, 5, 6], 2: [4, 9, 15], 4: [5, 6, 9, 15], 5: [6], 9: [15], 10: [15]
 };
 
 const fmt = (iso) => {
