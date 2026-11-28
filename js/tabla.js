@@ -642,7 +642,7 @@ function renderArchivadas(container) {
                     <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="tbl-search-arch" placeholder="Buscar archivada..." value="${escapeHtml(tableState.filters.search)}" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600">
                 </div>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">Actividades eliminadas: no aparecen en ninguna vista, pero conservan sus HH y siguen en las semanas de PPC ya cerradas.</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Actividades eliminadas: no aparecen en ninguna vista ni cuentan en el PPC de ninguna semana, pero conservan sus HH (siguen sumando en horas). Si se restauran, vuelven a contar en el PPC.</p>
             </div>
             <button onclick="window.toggleVerArchivadas()" class="px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-arrow-left mr-1"></i> Volver a la tabla</button>
         </div>
@@ -1669,7 +1669,7 @@ export async function deleteTask(id) {
     
     const confirmado = await confirmDelete({
         title: 'Eliminar actividad',
-        message: `Vas a eliminar la actividad "${nombre}". Dejará de verse en todas las vistas, pero se archiva: sus horas de Manpower, planos y causas se conservan y sigue contando en las semanas de PPC ya cerradas. Solo un administrador puede restaurarla.`
+        message: `Vas a eliminar la actividad "${nombre}". Dejará de verse en todas las vistas, pero se archiva: sus horas de Manpower (siguen sumando), planos y causas se conservan, y deja de contar en el PPC de todas las semanas, también las ya cerradas. Solo un administrador puede restaurarla.`
     });
     if (!confirmado) return;
     

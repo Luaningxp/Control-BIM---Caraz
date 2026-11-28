@@ -23,15 +23,16 @@ detecta cuáles de los scripts 001-009 ya estaban aplicados y los deja registrad
 | 006 | `006_manpower_registro_por_fecha.sql` | versión vigente de las reglas de Manpower |
 | 007 | `007_reagrupar_grupos_bim.sql` | **solo una vez**: si ya se ejecutó, se detiene sin cambiar nada |
 | 008 | `008_cambio_masivo_grupo.sql` | |
-| 009 | `009_espera_bloqueos_ppc_responsable.sql` | versión vigente del PPC |
+| 009 | `009_espera_bloqueos_ppc_responsable.sql` | el 015 reemplaza el cálculo del PPC |
 | 010 | `010_control_versiones.sql` | registro de scripts, revisión y exportar estructura |
 | 011 | `011_causas_solo_admin.sql` | catálogo de causas: solo admin lo edita |
 | 012 | `012_fotos_ppc_solo_lectura.sql` | fotos semanales del PPC: nadie las edita desde la app |
 | 013 | `013_permisos_tablas_abiertas.sql` | Roster, subcontratas, parámetros y planos: solo admin; planos/causas/parámetros de una actividad: quien puede editarla |
 | 014 | `014_recursos_actividad.sql` | recursos de actividades: solo admin, coordinador y supervisor |
+| 015 | `015_ppc_sin_archivadas.sql` | versión vigente del PPC: las archivadas no cuentan en ninguna semana (recalcula las fotos pasadas una vez) |
 
 **Ojo:** algunos scripts redefinen funciones de otros anteriores (Manpower: 001, 004, 005, 006;
-PPC: 002, 004, 009). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
+PPC: 002, 004, 009, 015; huellas: 010, 015). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
 Configuración > Base de datos te avisa si alguna función quedó en una versión vieja.
 
 ## Script nuevo (para quien programa)
