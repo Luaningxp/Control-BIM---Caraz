@@ -418,11 +418,8 @@ export async function onDrop(e, nuevoEstado) {
     const t = state.tasksCache.find(x => x.id === id);
     if (!t || t.estado === nuevoEstado) return;
 
-    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-    if (soloModelador && nuevoEstado === 'Cerrado') {
-        toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
-        return;
-    }
+    // Los modeladores también cierran: el arrastre ya se limita a sus tarjetas
+    // asignadas y Supabase lo valida (sql/017_modeladores_cierran.sql).
 
     // Regla: marcar Cerrado sin fecha -> fecha de cierre = hoy (Lima).
     // Si eso deja el cierre después del Fin Prog., se abre el modal para registrar la causa.

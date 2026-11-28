@@ -31,9 +31,10 @@ detecta cuáles de los scripts 001-009 ya estaban aplicados y los deja registrad
 | 014 | `014_recursos_actividad.sql` | recursos de actividades: solo admin, coordinador y supervisor |
 | 015 | `015_ppc_sin_archivadas.sql` | versión vigente del PPC: las archivadas no cuentan en ninguna semana (recalcula las fotos pasadas una vez) |
 | 016 | `016_unir_diseno_planos_modelado.sql` | une los grupos Diseño Planos y Modelado en DISEÑO - RFCS Y REDISEÑOS |
+| 017 | `017_modeladores_cierran.sql` | modeladores cierran, reabren y corrigen el cierre de sus actividades; historial con fechas de cierre (solo admin lo lee) |
 
 **Ojo:** algunos scripts redefinen funciones de otros anteriores (Manpower: 001, 004, 005, 006;
-PPC: 002, 004, 009, 015; huellas: 010, 015). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
+PPC: 002, 004, 009, 015; huellas: 010, 015; cierre y espera: 004, 009, 017). Si vuelves a ejecutar uno viejo, después vuelve a ejecutar los posteriores.
 Configuración > Base de datos te avisa si alguna función quedó en una versión vieja.
 
 ## Script nuevo (para quien programa)
@@ -47,7 +48,7 @@ Configuración > Base de datos te avisa si alguna función quedó en una versió
 ## Pruebas de permisos por rol
 
 `pruebas/pruebas_roles.sql`: pégalo en el SQL Editor y ejecútalo. Crea 4 usuarios ficticios
-(admin, coordinador, supervisor, modelador), intenta 32 acciones con cada uno y **deshace todo al final**:
+(admin, coordinador, supervisor, modelador), intenta 37 acciones con cada uno y **deshace todo al final**:
 no cambia ningún dato. Muestra una tabla con ✅ / ❌. Para repetirlas: `select * from public.pruebas_roles();`
 
 ## Foto de la estructura

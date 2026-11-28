@@ -196,9 +196,9 @@ begin
                 (9, 'Reemplazar toda la base (archivar todas)', null,
                  $q$select public.archivar_todas_actividades()$q$,
                  $q$select archivada_en is not null from public.pendientes_bim where id = {X}$q$, 'SSNN'),
-                (10, 'Cerrar una actividad', null,
+                (10, 'Cerrar una actividad donde participa', null,
                  $q$update public.pendientes_bim set estado = 'Cerrado' where id = {X}$q$,
-                 $q$select estado = 'Cerrado' from public.pendientes_bim where id = {X}$q$, 'SSSN'),
+                 $q$select estado = 'Cerrado' from public.pendientes_bim where id = {X}$q$, 'SSSS'),
                 (11, 'Pasar a En espera una actividad donde participa', null,
                  $q$update public.pendientes_bim set estado = 'En espera', motivo_espera_id = {CAUSA} where id = {X}$q$,
                  $q$select estado = 'En espera' from public.pendientes_bim where id = {X}$q$, 'SSSS'),
@@ -271,7 +271,36 @@ begin
                  $q$select exists (select 1 from public.actividad_recursos where pendiente_id = {Y} and usuario_id = {YO})$q$, 'SSSN'),
                 (32, 'Quitar recursos de una actividad donde participa', null,
                  $q$delete from public.actividad_recursos where pendiente_id = {X}$q$,
-                 $q$select not exists (select 1 from public.actividad_recursos where pendiente_id = {X})$q$, 'SSSN')
+                 $q$select not exists (select 1 from public.actividad_recursos where pendiente_id = {X})$q$, 'SSSN'),
+                -- 33-37: sql/017_modeladores_cierran.sql
+                (33, 'Cerrar una actividad donde NO participa', null,
+                 $q$update public.pendientes_bim set estado = 'Cerrado' where id = {Y}$q$,
+                 $q$select estado = 'Cerrado' from public.pendientes_bim where id = {Y}$q$, 'SSSN'),
+                (34, 'Reabrir una actividad cerrada donde participa (queda en el historial)',
+                 $q$update public.pendientes_bim set fecha_inicio_programado = {HOY} - 2, estado = 'Cerrado', fecha_cierre = {HOY} - 2 where id = {X}$q$,
+                 $q$update public.pendientes_bim set estado = 'En proceso' where id = {X}$q$,
+                 $q$select p.estado = 'En proceso' and p.fecha_cierre is null
+                       and exists (select 1 from public.pendientes_estado_historial h
+                                   where h.pendiente_id = {X} and h.cambiado_por = {YO}
+                                     and h.estado_anterior = 'Cerrado' and h.estado_nuevo = 'En proceso'
+                                     and h.fecha_cierre_anterior = {HOY} - 2 and h.fecha_cierre_nueva is null)
+                    from public.pendientes_bim p where p.id = {X}$q$, 'SSSS'),
+                (35, 'Corregir la fecha de cierre donde participa (queda en el historial)',
+                 $q$update public.pendientes_bim set fecha_inicio_programado = {HOY} - 2, estado = 'Cerrado', fecha_cierre = {HOY} - 2 where id = {X}$q$,
+                 $q$update public.pendientes_bim set fecha_cierre = {HOY} - 1 where id = {X}$q$,
+                 $q$select p.fecha_cierre = {HOY} - 1
+                       and exists (select 1 from public.pendientes_estado_historial h
+                                   where h.pendiente_id = {X} and h.cambiado_por = {YO}
+                                     and h.fecha_cierre_anterior = {HOY} - 2 and h.fecha_cierre_nueva = {HOY} - 1)
+                    from public.pendientes_bim p where p.id = {X}$q$, 'SSSS'),
+                (36, 'Corregir la fecha de cierre donde NO participa',
+                 $q$update public.pendientes_bim set fecha_inicio_programado = {HOY} - 2, estado = 'Cerrado', fecha_cierre = {HOY} - 2 where id = {Y}$q$,
+                 $q$update public.pendientes_bim set fecha_cierre = {HOY} - 1 where id = {Y}$q$,
+                 $q$select fecha_cierre = {HOY} - 1 from public.pendientes_bim where id = {Y}$q$, 'SSSN'),
+                (37, 'Ver el historial de estados y cierres',
+                 $q$insert into public.pendientes_estado_historial (pendiente_id, estado_nuevo) values ({X}, 'ZZ PRUEBA DE ROL')$q$,
+                 $q$select exists (select 1 from public.pendientes_estado_historial where estado_nuevo = 'ZZ PRUEBA DE ROL')$q$,
+                 null, 'SSNN')
             ) as v(num, nombre, pre, accion, chequeo, esperados)
         loop
             for i in 1..4 loop

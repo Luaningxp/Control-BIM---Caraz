@@ -2,7 +2,7 @@ import { supabaseClient, state, fetchAll } from './db.js';
 import { 
     escapeHtml, fmtDate, cdeBadge, nombreResponsable, toast, 
     getCriticidad, critColor, nombreFormateado, getIniciales, colorAvatar, 
-    confirmDelete, semaforo, hoyLima, resolverCierre, validarFechaCierre, ESTADO_REAPERTURA_DEFAULT } from './utils.js';
+    confirmDelete, semaforo, hoyLima, resolverCierre, validarFechaCierre, ESTADO_REAPERTURA_DEFAULT, esAdminManpower, TZ_PROYECTO } from './utils.js';
 import { ESTADO_ESPERA, puedeCambiarEstado, llenarSelectMotivo, ultimaCausaEspera, nombreCausaPorId } from './espera.js';
 import { detectarReprogramacion, pedirMotivoReprogramacion, registrarReprogramacion, badgeReprogramada } from './reprogramaciones.js';
 
@@ -1002,6 +1002,7 @@ function esResponsableValido(p) {
 export function openModal() {
     if (!state.isAdmin && !state.isCoordinador && !state.isSupervisor) return;
     document.getElementById('modal-title').innerText = "Nueva Actividad";
+    document.getElementById('historial-estados-container')?.classList.add('hidden');
     
             ['task-id','task-actividad','task-fecha-inicio','task-fecha-fin','task-fecha-cierre','task-nota'].forEach(id => {
         const el = document.getElementById(id);
@@ -1068,8 +1069,8 @@ export function editTask(id) {
     document.getElementById('task-estado').value = t.estado || 'No iniciado';
     const estadoSel = document.getElementById('task-estado');
     if (estadoSel) {
-    const soloModelador = state.isModelador && !state.isAdmin && !state.isCoordinador && !state.isSupervisor;
-        estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option>' + (soloModelador ? '' : '<option>Cerrado</option>');
+        // Modeladores también cierran (solo donde están asignados: sql/017_modeladores_cierran.sql)
+        estadoSel.innerHTML = '<option>No iniciado</option><option>En proceso</option><option>En espera</option><option>Cerrado</option>';
         estadoSel.value = t.estado || 'No iniciado';
     }
     llenarSelectMotivo(document.getElementById('task-motivo-espera'), t.estado === ESTADO_ESPERA ? t.motivo_espera_id : null)
@@ -1126,6 +1127,7 @@ export function editTask(id) {
     inicializarBuscadorCausas();
 
     aplicarBloqueoModelador();
+    renderHistorialEstados(t.id);
 
     document.getElementById('modal-task').classList.remove('hidden');
     document.getElementById('modal-task').classList.add('flex');
@@ -1284,12 +1286,14 @@ function aplicarBloqueoModelador() {
             if (el) { el.disabled = true; el.title = 'Solo puedes cambiar el estado de las actividades en las que estás asignado.'; }
         });
     }
-    // Poner fecha de cierre cierra la actividad: los modeladores no cierran
+    // Poner fecha de cierre cierra la actividad: los modeladores cierran, reabren
+    // y corrigen el cierre solo donde están asignados (sql/017_modeladores_cierran.sql)
     const fcEl = document.getElementById('task-fecha-cierre');
     if (fcEl) {
-        fcEl.disabled = soloModelador;
-        fcEl.classList.toggle('opacity-60', soloModelador);
-        fcEl.title = soloModelador ? 'Solo supervisores o administradores cierran actividades.' : '';
+        const sinPermisoCierre = !!previaEstado && !puedeCambiarEstado(previaEstado);
+        fcEl.disabled = sinPermisoCierre;
+        fcEl.classList.toggle('opacity-60', sinPermisoCierre);
+        fcEl.title = sinPermisoCierre ? 'Solo puedes cerrar las actividades en las que estás asignado.' : '';
     }
 
     configurarCierreModal();
@@ -1343,6 +1347,65 @@ function renderCustomProps(pendienteId) {
 }
 
 // --- CIERRE AUTOMÁTICO EN EL MODAL (misma regla que resolverCierre / trigger SQL) ---
+// --- HISTORIAL DE ESTADOS Y CIERRES (solo administradores: sql/017_modeladores_cierran.sql) ---
+const fmtHistorial = new Intl.DateTimeFormat('es-PE', {
+    timeZone: TZ_PROYECTO, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+});
+
+async function renderHistorialEstados(pendienteId) {
+    const cont = document.getElementById('historial-estados-container');
+    const lista = document.getElementById('historial-estados-lista');
+    if (!cont || !lista) return;
+    if (!pendienteId || !esAdminManpower(state)) { cont.classList.add('hidden'); return; }
+    cont.classList.remove('hidden');
+    lista.innerHTML = '<p class="text-[10px] text-slate-400 italic">Cargando historial…</p>';
+
+    const { data, error } = await supabaseClient
+        .from('pendientes_estado_historial')
+        .select('estado_anterior, estado_nuevo, motivo_espera_id, fecha_cierre_anterior, fecha_cierre_nueva, cambiado_por, cambiado_en')
+        .eq('pendiente_id', pendienteId)
+        .order('cambiado_en', { ascending: false })
+        .limit(100);
+    // Si ya se abrió otra actividad, no pisar su historial
+    if (String(document.getElementById('task-id')?.value) !== String(pendienteId)) return;
+    if (error) {
+        const msg = /fecha_cierre_(anterior|nueva)/.test(error.message || '')
+            ? 'Falta ejecutar sql/017_modeladores_cierran.sql en Supabase.'
+            : error.message;
+        lista.innerHTML = `<p class="text-[10px] text-rose-600">No se pudo leer el historial: ${escapeHtml(msg)}</p>`;
+        return;
+    }
+    if (!data || data.length === 0) {
+        lista.innerHTML = '<p class="text-[10px] text-slate-400 italic">Sin cambios registrados.</p>';
+        return;
+    }
+    const quien = (uid) => {
+        if (!uid) return 'Sistema / SQL';
+        const p = (state.perfilesCache || []).find(x => x.id === uid);
+        return p ? (nombreFormateado(p) || p.email) : 'Usuario desconocido';
+    };
+    const fecha = (d) => d ? fmtDate(d) : '—';
+    lista.innerHTML = data.map(h => {
+        const cambios = [];
+        if (h.estado_anterior !== h.estado_nuevo) {
+            cambios.push(h.estado_anterior
+                ? `${escapeHtml(h.estado_anterior)} → <b>${escapeHtml(h.estado_nuevo || '—')}</b>`
+                : `Creada como <b>${escapeHtml(h.estado_nuevo || '—')}</b>`);
+        }
+        if ((h.fecha_cierre_anterior || null) !== (h.fecha_cierre_nueva || null)) {
+            cambios.push(`Cierre: ${fecha(h.fecha_cierre_anterior)} → <b>${fecha(h.fecha_cierre_nueva)}</b>`);
+        }
+        if (h.estado_nuevo === ESTADO_ESPERA && h.motivo_espera_id) {
+            cambios.push(`Motivo: ${escapeHtml(nombreCausaPorId(h.motivo_espera_id))}`);
+        }
+        if (cambios.length === 0) cambios.push(escapeHtml(h.estado_nuevo || '—'));
+        return `<div class="py-1 border-b border-slate-100 dark:border-slate-700 last:border-0">
+            <div class="text-slate-700 dark:text-slate-200">${cambios.join(' · ')}</div>
+            <div class="text-[10px] text-slate-500">${escapeHtml(fmtHistorial.format(new Date(h.cambiado_en)))} · ${escapeHtml(quien(h.cambiado_por))}</div>
+        </div>`;
+    }).join('');
+}
+
 function configurarCierreModal() {
     const estadoSel = document.getElementById('task-estado');
     const fc = document.getElementById('task-fecha-cierre');
@@ -1483,12 +1546,6 @@ export async function saveTask(e) {
     if (!(soloModelador && id) && !especialidadId) {
         toast('Elige la especialidad de la actividad.');
         document.getElementById('task-especialidad')?.focus();
-        if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
-        return;
-    }
-
-    if (soloModelador && estado === 'Cerrado') {
-        toast('Los modeladores no pueden cerrar actividades. Coordina con tu supervisor.');
         if (btn) { btn.disabled = false; btn.innerHTML = 'Guardar'; }
         return;
     }
