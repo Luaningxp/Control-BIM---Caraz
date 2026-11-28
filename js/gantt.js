@@ -1,5 +1,6 @@
 import { state } from './db.js';
-import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar, today, hoyLima, isoLocal } from './utils.js';
+import { escapeHtml, fmtDate, nombreFormateado, semaforo, getCriticidad, getIniciales, colorAvatar, today, hoyLima, isoLocal, toast } from './utils.js';
+import { canEdit } from './tabla.js';
 import { tipoDia } from './roster.js';
 import { getReprogramaciones } from './reprogramaciones.js';
 
@@ -17,8 +18,15 @@ let ganttState = {
     soloPorVencer: false,
     soloSinFecha: false,
     viewMode: 'Day',
-    currentGantt: null
+    currentGantt: null,
+    // Posición del scroll al abrir la edición con doble clic; al volver a
+    // dibujar (tras guardar) se restaura en lugar de saltar a HOY.
+    scrollGuardado: null
 };
+
+// Retardo de la ficha del clic simple: si llega el doble clic antes, no se muestra
+const GANTT_RETARDO_FICHA = 250; // ms
+let ganttTimerFicha = null;
 
 // Ocupación por modelador: rango fijo (4 semanas atrás → 12 adelante, desde lunes)
 // con ancho fijo por día y scroll horizontal propio.
@@ -356,17 +364,34 @@ function inicializarGantt(tareas) {
                             <p><b class="text-slate-700">Fin:</b> ${fmtDate(original.fecha_fin)}</p>
                             <p><b class="text-slate-700">Estado:</b> <span style="color: ${color}; font-weight: 700;">${escapeHtml(original.estado)}</span></p>
                         </div>
+                        ${canEdit(original) ? `<p class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400"><i class="fa-solid fa-pen-to-square mr-1"></i>Doble clic para editar</p>` : ''}
                     </div>
                 `;
-            }
+            },
+            // frappe-gantt 0.6.1 llama a on_click con el DOBLE clic sobre la barra
+            on_click: (task) => abrirEdicionDesdeGantt(task)
         });
+
+        retrasarFichaGantt(ganttState.currentGantt);
 
         pintarBarrasPorEstado(tareas);
 
-                ganttState.currentGantt.on_click = (task) => {
-            if (task.id === 'today-line') return;
-            window.editTask(parseInt(task.id));
-        };
+        // Tras guardar desde el Gantt: volver a donde estaba el usuario
+        const guardado = ganttState.scrollGuardado;
+        ganttState.scrollGuardado = null;
+        if (guardado && guardado.viewMode === ganttState.viewMode) {
+            const restaurar = () => {
+                const sc = document.querySelector('#gantt-container .gantt-container');
+                if (!sc) return;
+                sc.scrollLeft = guardado.left;
+                sc.scrollTop = guardado.top;
+                sc.dispatchEvent(new Event('scroll'));
+            };
+            restaurar();
+            setTimeout(restaurar, 950); // después de fijar la cabecera y la línea de HOY
+            if (guardado.ventanaY != null) window.scrollTo(0, guardado.ventanaY);
+            return;
+        }
 
         // Forzar el scroll a la fecha de hoy
         setTimeout(() => {
@@ -393,6 +418,42 @@ function inicializarGantt(tareas) {
         container.innerHTML = `<div class="text-red-500 text-sm p-4">Error: ${err.message}</div>`;
     }
 }
+
+// Clic simple: la ficha aparece con un pequeño retardo para que el doble clic
+// no la haga parpadear (frappe la muestra con 'focus' y con 'click').
+function retrasarFichaGantt(gantt) {
+    (gantt?.bars || []).forEach(bar => {
+        const mostrar = bar.show_popup.bind(bar);
+        bar.show_popup = () => {
+            clearTimeout(ganttTimerFicha);
+            ganttTimerFicha = setTimeout(mostrar, GANTT_RETARDO_FICHA);
+        };
+    });
+}
+
+// Doble clic: abre el formulario de edición de la Tabla con los mismos permisos
+function abrirEdicionDesdeGantt(task) {
+    clearTimeout(ganttTimerFicha);
+    ganttState.currentGantt?.hide_popup();
+    if (!task || task._isToday || task.id === 'today-line') return;
+    const t = state.tasksCache.find(x => String(x.id) === String(task.id));
+    if (!t) return;
+    if (!canEdit(t)) {
+        toast('No tienes permiso para editar esta actividad');
+        return;
+    }
+    const sc = document.querySelector('#gantt-container .gantt-container');
+    ganttState.scrollGuardado = {
+        viewMode: ganttState.viewMode,
+        left: sc ? sc.scrollLeft : 0,
+        top: sc ? sc.scrollTop : 0,
+        ventanaY: window.scrollY
+    };
+    window.editTask(t.id);
+}
+
+// Cancelar el formulario: no hay que restaurar nada en el próximo dibujo
+window.ganttOlvidarScroll = () => { ganttState.scrollGuardado = null; };
 
 function pintarBarrasPorEstado(tareas) {
     const aplicar = () => {
