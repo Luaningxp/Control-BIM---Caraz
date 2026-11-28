@@ -510,7 +510,7 @@ window.aplicarCambioMasivoGrupo = async function() {
     seleccionMasiva.clear();
     destinoMasivo = '';
     await fetchAll();
-    window.renderView();
+    renderConservandoScroll();
     toast(`${data ?? cambian.length} actividad${(data ?? cambian.length) === 1 ? '' : 'es'} movida${(data ?? cambian.length) === 1 ? '' : 's'} a ${destino || 'SIN GRUPO'}`);
 };
 
