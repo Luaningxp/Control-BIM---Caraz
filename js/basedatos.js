@@ -24,7 +24,8 @@ export const MIGRACIONES = [
     { numero: 12, nombre: '012_fotos_ppc_solo_lectura',          titulo: 'Fotos del PPC: solo lectura' },
     { numero: 13, nombre: '013_permisos_tablas_abiertas',        titulo: 'Permisos: Roster, catálogos, planos y datos de actividad' },
     { numero: 14, nombre: '014_recursos_actividad',              titulo: 'Recursos de actividades: admin, coordinador y supervisor' },
-    { numero: 15, nombre: '015_ppc_sin_archivadas',              titulo: 'PPC sin actividades archivadas (recalcula semanas pasadas)' }
+    { numero: 15, nombre: '015_ppc_sin_archivadas',              titulo: 'PPC sin actividades archivadas (recalcula semanas pasadas)' },
+    { numero: 16, nombre: '016_unir_diseno_planos_modelado',     titulo: 'Unir grupos Diseño Planos y Modelado' }
 ];
 
 // Scripts que redefinen funciones de scripts anteriores: si re-ejecutas uno

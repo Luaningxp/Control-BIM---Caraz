@@ -334,10 +334,16 @@ window.handleFileUpload = (e) => {
                 .toUpperCase().replace(/\s+/g, ' ').trim();
             const gruposPorClave = new Map(state.gruposCache.map(g => [claveGrupo(g.nombre), g.nombre]));
             const gruposDesconocidos = new Set();
+            // Nombres viejos que ahora son otro grupo (sql/016)
+            const aliasGrupo = new Map([
+                ['DISENO - RFCS Y REDISENOS - PLANOS',   'DISENO - RFCS Y REDISENOS'],
+                ['DISENO - RFCS Y REDISENOS - MODELADO', 'DISENO - RFCS Y REDISENOS']
+            ]);
             const resolverGrupo = (val) => {
                 const texto = String(val ?? '').trim();
                 if (!texto) return null;
-                const nombre = gruposPorClave.get(claveGrupo(texto));
+                const clave = claveGrupo(texto);
+                const nombre = gruposPorClave.get(clave) || gruposPorClave.get(aliasGrupo.get(clave));
                 if (!nombre) gruposDesconocidos.add(texto);
                 return nombre || null;
             };
