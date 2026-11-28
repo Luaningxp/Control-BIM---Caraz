@@ -25,13 +25,14 @@ export const MIGRACIONES = [
     { numero: 13, nombre: '013_permisos_tablas_abiertas',        titulo: 'Permisos: Roster, catálogos, planos y datos de actividad' },
     { numero: 14, nombre: '014_recursos_actividad',              titulo: 'Recursos de actividades: admin, coordinador y supervisor' },
     { numero: 15, nombre: '015_ppc_sin_archivadas',              titulo: 'PPC sin actividades archivadas (recalcula semanas pasadas)' },
-    { numero: 16, nombre: '016_unir_diseno_planos_modelado',     titulo: 'Unir grupos Diseño Planos y Modelado' }
+    { numero: 16, nombre: '016_unir_diseno_planos_modelado',     titulo: 'Unir grupos Diseño Planos y Modelado' },
+    { numero: 17, nombre: '017_modeladores_cierran',             titulo: 'Modeladores cierran, reabren y corrigen sus actividades (con historial)' }
 ];
 
 // Scripts que redefinen funciones de scripts anteriores: si re-ejecutas uno
 // viejo, hay que volver a ejecutar estos después (en este orden).
 const POSTERIORES = {
-    1: [4, 5, 6], 2: [4, 9, 15], 4: [5, 6, 9, 15], 5: [6], 9: [15], 10: [15]
+    1: [4, 5, 6], 2: [4, 9, 15], 4: [5, 6, 9, 15, 17], 5: [6], 9: [15, 17], 10: [15]
 };
 
 const fmt = (iso) => {
