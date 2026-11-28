@@ -6,6 +6,7 @@ import { getReprogramaciones } from './reprogramaciones.js';
 
 let ganttState = {
     search: '',
+    searchTerms: [], // fichas "+ O": la actividad aparece si contiene alguna (o el texto escrito)
     filterGrupo: '',
     filterResp: '',
     filterRecursos: '',
@@ -72,28 +73,25 @@ export function renderGantt(container) {
 
         // ▼ LÓGICA DE BÚSQUEDA ▼
         let matchSearch = true;
-        if (ganttState.search) {
-            const q = ganttState.search.toLowerCase().trim();
-            
-            // 1. Buscar en actividad y código
-            const enTexto = (t.actividad || '').toLowerCase().includes(q) || 
-                            (t.codigo_contenedor || '').toLowerCase().includes(q);
-            
-            // 2. Buscar en el nombre del responsable
+        const terminos = terminosBusquedaGantt();
+        if (terminos.length) {
+            // Texto donde se busca: actividad, código, responsable y recursos
             const respPerfil = state.perfilesCache.find(p => p.id === t.responsable_id);
-            const enResponsable = respPerfil ? nombreFormateado(respPerfil).toLowerCase().includes(q) : false;
-            
-            // 3. Buscar en los nombres de los recursos asignados
-            const enRecursos = (state.actividadRecursosCache || [])
+            const recursos = (state.actividadRecursosCache || [])
                 .filter(r => r.pendiente_id === t.id)
                 .map(r => {
                     const p = state.perfilesCache.find(x => x.id === r.usuario_id);
                     return p ? nombreFormateado(p).toLowerCase() : '';
                 })
-                .join(' ')
-                .includes(q);
-
-            matchSearch = enTexto || enResponsable || enRecursos;
+                .join(' ');
+            const campos = [
+                (t.actividad || '').toLowerCase(),
+                (t.codigo_contenedor || '').toLowerCase(),
+                respPerfil ? nombreFormateado(respPerfil).toLowerCase() : '',
+                recursos
+            ];
+            // Lógica O: basta con que un término aparezca en algún campo
+            matchSearch = terminos.some(q => campos.some(c => c.includes(q)));
         }
 
         return matchSearch && matchGrupo && matchResp && matchRecursos && matchEstado &&
@@ -135,11 +133,15 @@ export function renderGantt(container) {
     container.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
             <div class="flex flex-1 items-center gap-2 flex-wrap">
-                <div class="relative w-full max-w-xs">
-                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="gantt-search" placeholder="Buscar tarea, responsable..." value="${escapeHtml(ganttState.search || '')}" 
-                           class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                <div class="relative w-full max-w-xs flex items-center gap-1">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="gantt-search" placeholder="${ganttState.searchTerms.length ? 'O también…' : 'Buscar tarea, responsable...'}" value="${escapeHtml(ganttState.search || '')}" 
+                               class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-sky-600">
+                    </div>
+                    <button onclick="window.ganttAgregarTermino()" title="Agregar otro término (O). También con Enter." class="px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 whitespace-nowrap">+ O</button>
                 </div>
+                ${ganttState.searchTerms.map((term, i) => `<span class="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-200 rounded-full pl-2 pr-1 py-0.5 text-[11px] font-medium">${escapeHtml(term)}<button onclick="window.ganttQuitarTermino(${i})" title="Quitar" class="w-4 h-4 rounded-full hover:bg-sky-100"><i class="fa-solid fa-xmark text-[9px]"></i></button></span>`).join('<span class="text-[10px] text-slate-400 font-semibold">O</span>')}
                 <button onclick="window.toggleGanttFilterDrawer()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtros
                     ${filtrosActivos > 0 ? `<span class="bg-sky-600 text-white rounded-full px-1.5 text-[10px]">${filtrosActivos}</span>` : ''}
@@ -278,6 +280,9 @@ export function renderGantt(container) {
     }
     const searchInput = document.getElementById('gantt-search');
     if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); window.ganttAgregarTermino(); }
+        });
         searchInput.addEventListener('input', (e) => {
             ganttState.search = e.target.value;
             clearTimeout(window.ganttSearchTimeout);
@@ -491,6 +496,31 @@ function sombrearDomingos(gantt) {
     });
 }
 
+// Buscador con varios términos: las fichas "+ O" más lo escrito en el cuadro.
+// La coma NO separa: se busca tal cual, por si es parte del nombre.
+function terminosBusquedaGantt() {
+    return [...ganttState.searchTerms, ganttState.search || '']
+        .map(x => x.toLowerCase().trim())
+        .filter(Boolean);
+}
+
+window.ganttAgregarTermino = function() {
+    const inp = document.getElementById('gantt-search');
+    const texto = (inp ? inp.value : ganttState.search || '').trim();
+    clearTimeout(window.ganttSearchTimeout);
+    if (texto && !ganttState.searchTerms.some(x => x.toLowerCase() === texto.toLowerCase())) {
+        ganttState.searchTerms.push(texto);
+    }
+    ganttState.search = '';
+    window.renderView();
+    document.getElementById('gantt-search')?.focus();
+};
+
+window.ganttQuitarTermino = function(i) {
+    ganttState.searchTerms.splice(i, 1);
+    window.renderView();
+};
+
 // Cancelar el formulario: no hay que restaurar nada en el próximo dibujo
 window.ganttOlvidarScroll = () => { ganttState.scrollGuardado = null; };
 
@@ -688,7 +718,7 @@ window.toggleGanttEstadoOculto = function(estado, checked) {
 
 window.clearGanttFilters = function() {
     ganttState = {
-        search: '', filterGrupo: '', filterResp: '', filterRecursos: '', estadosOcultos: [],
+        search: '', searchTerms: [], filterGrupo: '', filterResp: '', filterRecursos: '', estadosOcultos: [],
         iniDesde: '', iniHasta: '', finDesde: '', finHasta: '',
         soloVencidas: false, soloPorVencer: false, soloSinFecha: false,
         viewMode: ganttState.viewMode, currentGantt: ganttState.currentGantt
