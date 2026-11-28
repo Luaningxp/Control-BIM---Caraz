@@ -461,7 +461,7 @@ function renderBarraMasiva(tasks) {
 window.toggleModoMasivo = function() {
     modoMasivo = !modoMasivo;
     if (!modoMasivo) { seleccionMasiva.clear(); destinoMasivo = ''; }
-    window.renderView();
+    renderConservandoScroll();
 };
 
 /** Vuelve a pintar la Tabla sin perder la posición del scroll (tabla y página). */
